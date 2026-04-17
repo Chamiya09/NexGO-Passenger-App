@@ -16,6 +16,7 @@ export default function ConfirmRouteScreen() {
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Safely parse parameters
   const pLat = parseFloat(params.pLat as string);
@@ -152,27 +153,36 @@ export default function ConfirmRouteScreen() {
              </View>
           ) : (
             <>
-              {/* Drag Handle */}
-              <View style={styles.dragHandleContainer}>
-                <View style={styles.dragHandle} />
-              </View>
-
-              {/* Title Header */}
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Choose Your Ride</Text>
-                <View style={styles.distancePill}>
-                  <Text style={styles.distancePillText}>{distance || "9.3 km"}</Text>
+              {/* Drag Handle & Header (Touchable to toggle) */}
+              <TouchableOpacity 
+                activeOpacity={0.8} 
+                onPress={() => setIsExpanded(!isExpanded)}
+              >
+                <View style={styles.dragHandleContainer}>
+                  <View style={styles.dragHandle} />
                 </View>
-              </View>
 
-              {/* Path Row */}
-              <View style={styles.pathRow}>
-                <Text style={styles.pathText} numberOfLines={1}>{pName?.split(',')[0]}...</Text>
-                <Feather name="arrow-right" size={16} color="#017270" style={{marginHorizontal: 8}} />
-                <Text style={styles.pathText} numberOfLines={1}>{dName?.split(',')[0]}...</Text>
-              </View>
+                {/* Title Header */}
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Choose Your Ride</Text>
+                  <View style={styles.distancePill}>
+                    <Text style={styles.distancePillText}>{distance || "9.3 km"}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
 
-              <Text style={styles.infoWarningText}>Bikes/Tuks are not allowed on expressways. Taking the alternative route.</Text>
+              {isExpanded && (
+                <>
+                  {/* Path Row */}
+                  <View style={styles.pathRow}>
+                    <Text style={styles.pathText} numberOfLines={1}>{pName?.split(',')[0]}...</Text>
+                    <Feather name="arrow-right" size={16} color="#017270" style={{marginHorizontal: 8}} />
+                    <Text style={styles.pathText} numberOfLines={1}>{dName?.split(',')[0]}...</Text>
+                  </View>
+
+                  <Text style={styles.infoWarningText}>Bikes/Tuks are not allowed on expressways. Taking the alternative route.</Text>
+                </>
+              )}
 
               {/* Horizontal Ride Scroller */}
               <ScrollView 
@@ -202,25 +212,26 @@ export default function ConfirmRouteScreen() {
                 </TouchableOpacity>
               </ScrollView>
 
-              {/* Action List */}
-              <View style={styles.actionList}>
-                <TouchableOpacity style={styles.listRow}>
-                  <MaterialCommunityIcons name="ticket-outline" size={22} color="#8A9A9A" />
-                  <Text style={styles.listRowTitle}>Add Promo Code</Text>
-                  <Feather name="chevron-right" size={18} color="#8A9A9A" />
-                </TouchableOpacity>
-                
-                <View style={styles.divider} />
-                
-                <TouchableOpacity style={styles.listRow}>
-                  <MaterialCommunityIcons name="cash" size={22} color="#8A9A9A" />
-                  <View style={styles.listRowTextContainer}>
-                    <Text style={styles.listRowTitle}>Payment Method</Text>
-                    <Text style={styles.listRowSub}>Cash</Text>
-                  </View>
-                  <Feather name="chevron-right" size={18} color="#8A9A9A" />
-                </TouchableOpacity>
-              </View>
+              {isExpanded && (
+                <View style={styles.actionList}>
+                  <TouchableOpacity style={styles.listRow}>
+                    <MaterialCommunityIcons name="ticket-outline" size={22} color="#8A9A9A" />
+                    <Text style={styles.listRowTitle}>Add Promo Code</Text>
+                    <Feather name="chevron-right" size={18} color="#8A9A9A" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.divider} />
+                  
+                  <TouchableOpacity style={styles.listRow}>
+                    <MaterialCommunityIcons name="cash" size={22} color="#8A9A9A" />
+                    <View style={styles.listRowTextContainer}>
+                      <Text style={styles.listRowTitle}>Payment Method</Text>
+                      <Text style={styles.listRowSub}>Cash</Text>
+                    </View>
+                    <Feather name="chevron-right" size={18} color="#8A9A9A" />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Confirm Book Button */}
               <TouchableOpacity style={styles.superConfirmButton}>
@@ -338,7 +349,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 20,
     elevation: 20,
-    minHeight: 250,
   },
   dragHandleContainer: {
     alignItems: 'center',
