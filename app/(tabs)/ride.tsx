@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,8 @@ import MapView, { UrlTile, Marker } from 'react-native-maps';
 const { width, height } = Dimensions.get('window');
 
 export default function RideScreen() {
+  const router = useRouter();
+
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: 6.9271,
     longitude: 79.8612,
@@ -182,8 +185,22 @@ export default function RideScreen() {
               if (activeStep === 'PICKUP') {
                 setActiveStep('DROP');
               } else {
-                // Future Implementation: Confirm Route
-                alert(`Route confirmed from ${pickupData.name} to ${dropData.name}`);
+                if (!dropData.coords || !pickupData.coords) {
+                  alert('Please select both locations');
+                  return;
+                }
+                
+                router.push({
+                  pathname: '/confirm-route',
+                  params: {
+                    pLat: pickupData.coords.latitude,
+                    pLng: pickupData.coords.longitude,
+                    pName: pickupData.name,
+                    dLat: dropData.coords.latitude,
+                    dLng: dropData.coords.longitude,
+                    dName: dropData.name,
+                  }
+                });
               }
             }}
           >
