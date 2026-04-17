@@ -123,15 +123,26 @@ export default function ConfirmRouteScreen() {
             </Marker>
           )}
 
-          {/* Route Line */}
+          {/* Route Line Highlight (Outer Border) */}
           {routeCoords.length > 0 && (
             <Polyline
               coordinates={routeCoords}
-              strokeColor="#FF8C70"
-              strokeWidth={5}
+              strokeColor="#017270"
+              strokeWidth={8}
               lineJoin="round"
               lineCap="round"
               zIndex={1}
+            />
+          )}
+          {/* Route Line Core (Inner) */}
+          {routeCoords.length > 0 && (
+            <Polyline
+              coordinates={routeCoords}
+              strokeColor="#169F95"
+              strokeWidth={4}
+              lineJoin="round"
+              lineCap="round"
+              zIndex={2}
             />
           )}
         </MapView>
