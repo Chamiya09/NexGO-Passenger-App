@@ -48,7 +48,6 @@ export default function TabLayout() {
           title: 'Ride',
           tabBarIcon: ({ color }) => <Ionicons size={26} name="car-sport-outline" color={color} />,
         }}
-        listeners={{ tabPress: e => e.preventDefault() }}
       />
       <Tabs.Screen
         name="activities"
@@ -56,7 +55,6 @@ export default function TabLayout() {
           title: 'Activities',
           tabBarIcon: ({ color }) => <Feather size={24} name="clock" color={color} />,
         }}
-        listeners={{ tabPress: e => e.preventDefault() }}
       />
       <Tabs.Screen
         name="profile"
@@ -64,7 +62,6 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color }) => <Ionicons size={24} name="person-outline" color={color} />,
         }}
-        listeners={{ tabPress: e => e.preventDefault() }}
       />
     </Tabs>
   );
