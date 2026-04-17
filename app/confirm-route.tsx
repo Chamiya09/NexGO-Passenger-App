@@ -12,11 +12,12 @@ export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
   
-  const [routeCoords, setRouteCoords] = useState<{latitude: number, longitude: number}[]>([]);
+  const [routesData, setRoutesData] = useState<{coords: {latitude: number, longitude: number}[], distance: string, duration: string}[]>([]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedVehicle, setSelectedVehicle] = useState('Mini');
 
   // Safely parse parameters
   const pLat = parseFloat(params.pLat as string);
@@ -28,27 +29,37 @@ export default function ConfirmRouteScreen() {
 
   useEffect(() => {
     const fetchRoute = async () => {
+      setLoading(true);
       try {
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson`
-        );
+        let url = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
+        
+        if (selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') {
+          // Use dedicated German OSM bike instance to physically force off-highway routing algorithms
+          url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data && data.routes && data.routes.length > 0) {
-          const coords = data.routes[0].geometry.coordinates.map((coord: any) => ({
-            latitude: coord[1],
-            longitude: coord[0],
-          }));
-          setRouteCoords(coords);
+          const parsedRoutes = data.routes.map((route: any) => {
+            const coords = route.geometry.coordinates.map((coord: any) => ({
+              latitude: coord[1],
+              longitude: coord[0],
+            }));
+            const distKm = (route.distance / 1000).toFixed(1);
+            const durMin = Math.round(route.duration / 60);
+            return { coords, distance: distKm, duration: durMin };
+          });
           
-          const distKm = (data.routes[0].distance / 1000).toFixed(1);
-          const durMin = Math.round(data.routes[0].duration / 60);
-          setDistance(`${distKm} km`);
-          setDuration(`${durMin} min`);
+          setRoutesData(parsedRoutes);
           
-          // Fit map to coordinates perfectly wrapping both markers and the polyline
+          setDistance(`${parsedRoutes[0].distance} km`);
+          setDuration(`${parsedRoutes[0].duration} min`);
+          
+          // Fit map to coordinates perfectly wrapping both markers and the primary polyline
           setTimeout(() => {
-            mapRef.current?.fitToCoordinates(coords, {
+            mapRef.current?.fitToCoordinates(parsedRoutes[0].coords, {
               edgePadding: { top: 120, right: 60, bottom: 400, left: 60 },
               animated: true,
             });
@@ -64,7 +75,19 @@ export default function ConfirmRouteScreen() {
     if (pLat && pLng && dLat && dLng) {
       fetchRoute();
     }
-  }, [pLat, pLng, dLat, dLng]);
+  }, [pLat, pLng, dLat, dLng, selectedVehicle]);
+
+  // Derived price calculator for dynamic button
+  const getPriceForSelected = () => {
+    switch(selectedVehicle) {
+      case 'Bike': return 'LKR 850';
+      case 'TukTuk': return 'LKR 1115';
+      case 'Mini': return 'LKR 1301';
+      case 'Sedan': return 'LKR 1450';
+      case 'Van': return 'LKR 2100';
+      default: return 'LKR 1301';
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -114,36 +137,58 @@ export default function ConfirmRouteScreen() {
             </Marker>
           )}
 
-          {/* Route Label Midway */}
-          {routeCoords.length > 0 && (
-            <Marker coordinate={routeCoords[Math.floor(routeCoords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={2}>
-               <View style={styles.routeTagPill}>
-                 <Text style={styles.routeTagText}>Local Fastest</Text>
-               </View>
-            </Marker>
-          )}
+          {/* Alternative Routes (Rendered First so they are beneath primary) */}
+          {routesData.length > 1 && routesData.slice(1).map((route, index) => (
+             <React.Fragment key={`alt-${index}`}>
+               <Polyline
+                 coordinates={route.coords}
+                 strokeColor="#B0B0B0"
+                 strokeWidth={6}
+                 lineJoin="round"
+                 lineCap="round"
+                 zIndex={1}
+               />
+               <Polyline
+                 coordinates={route.coords}
+                 strokeColor="#E0E0E0"
+                 strokeWidth={3}
+                 lineJoin="round"
+                 lineCap="round"
+                 zIndex={1}
+               />
+             </React.Fragment>
+          ))}
 
-          {/* Route Line Highlight (Outer Border) */}
-          {routeCoords.length > 0 && (
+          {/* Primary Route Line Highlight (Outer Border) */}
+          {routesData.length > 0 && (
             <Polyline
-              coordinates={routeCoords}
+              coordinates={routesData[0].coords}
               strokeColor="#017270"
               strokeWidth={8}
               lineJoin="round"
               lineCap="round"
-              zIndex={1}
+              zIndex={2}
             />
           )}
-          {/* Route Line Core (Inner) */}
-          {routeCoords.length > 0 && (
+          {/* Primary Route Line Core (Inner) */}
+          {routesData.length > 0 && (
             <Polyline
-              coordinates={routeCoords}
+              coordinates={routesData[0].coords}
               strokeColor="#169F95"
               strokeWidth={4}
               lineJoin="round"
               lineCap="round"
-              zIndex={2}
+              zIndex={3}
             />
+          )}
+
+          {/* Route Label Midway */}
+          {routesData.length > 0 && (
+            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4}>
+               <View style={styles.routeTagPill}>
+                 <Text style={styles.routeTagText}>Local Fastest</Text>
+               </View>
+            </Marker>
           )}
         </MapView>
       </View>
@@ -192,7 +237,9 @@ export default function ConfirmRouteScreen() {
                     <Text style={styles.pathText} numberOfLines={1}>{dName?.split(',')[0]}...</Text>
                   </View>
 
-                  <Text style={styles.infoWarningText}>Bikes/Tuks are not allowed on expressways. Taking the alternative route.</Text>
+                  { (selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') && (
+                    <Text style={styles.infoWarningText}>Bikes/Tuks are not allowed on expressways. Taking the alternative route.</Text>
+                  )}
                 </>
               )}
 
@@ -202,39 +249,54 @@ export default function ConfirmRouteScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.rideScrollContent}
               >
-                <TouchableOpacity style={styles.rideSquare}>
-                  <MaterialCommunityIcons name="motorbike" size={26} color="#017270" />
-                  <Text style={styles.rideSquareTitle}>Bike</Text>
-                  <Text style={styles.rideSquarePrice}>LKR 850</Text>
-                  <Text style={styles.rideSquareETA}>15 min</Text>
+                <TouchableOpacity 
+                  style={[styles.rideSquare, selectedVehicle === 'Bike' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Bike')}
+                >
+                  <MaterialCommunityIcons name="motorbike" size={26} color={selectedVehicle === 'Bike' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Bike' && {color: '#FFF'}]}>Bike</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && {color: '#FFF'}]}>LKR 850</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Bike' && {color: '#FFF'}]}>15 min</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.rideSquare, styles.activeRideSquare]}>
-                  <MaterialCommunityIcons name="train-car" size={26} color="#FFF" />
-                  <Text style={[styles.rideSquareTitle, {color: '#FFF'}]}>TukTuk</Text>
-                  <Text style={[styles.rideSquarePrice, {color: '#FFF'}]}>LKR 1115</Text>
-                  <Text style={[styles.rideSquareETA, {color: '#FFF'}]}>28 min</Text>
+                <TouchableOpacity 
+                  style={[styles.rideSquare, selectedVehicle === 'TukTuk' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('TukTuk')}
+                >
+                  <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'TukTuk' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'TukTuk' && {color: '#FFF'}]}>TukTuk</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'TukTuk' && {color: '#FFF'}]}>LKR 1115</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'TukTuk' && {color: '#FFF'}]}>28 min</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.rideSquare}>
-                  <MaterialCommunityIcons name="car" size={26} color="#017270" />
-                  <Text style={styles.rideSquareTitle}>Mini</Text>
-                  <Text style={styles.rideSquarePrice}>LKR 1301</Text>
-                  <Text style={styles.rideSquareETA}>26 min</Text>
+                <TouchableOpacity 
+                  style={[styles.rideSquare, selectedVehicle === 'Mini' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Mini')}
+                >
+                  <MaterialCommunityIcons name="car" size={26} color={selectedVehicle === 'Mini' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Mini' && {color: '#FFF'}]}>Mini</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && {color: '#FFF'}]}>LKR 1301</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Mini' && {color: '#FFF'}]}>26 min</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.rideSquare}>
-                  <MaterialCommunityIcons name="car-estate" size={26} color="#017270" />
-                  <Text style={styles.rideSquareTitle}>Sedan</Text>
-                  <Text style={styles.rideSquarePrice}>LKR 1450</Text>
-                  <Text style={styles.rideSquareETA}>24 min</Text>
+                <TouchableOpacity 
+                  style={[styles.rideSquare, selectedVehicle === 'Sedan' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Sedan')}
+                >
+                  <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Sedan' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Sedan' && {color: '#FFF'}]}>Sedan</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Sedan' && {color: '#FFF'}]}>LKR 1450</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Sedan' && {color: '#FFF'}]}>24 min</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.rideSquare}>
-                  <MaterialCommunityIcons name="van-passenger" size={26} color="#017270" />
-                  <Text style={styles.rideSquareTitle}>Van</Text>
-                  <Text style={styles.rideSquarePrice}>LKR 2100</Text>
-                  <Text style={styles.rideSquareETA}>30 min</Text>
+                <TouchableOpacity 
+                  style={[styles.rideSquare, selectedVehicle === 'Van' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Van')}
+                >
+                  <MaterialCommunityIcons name="van-passenger" size={26} color={selectedVehicle === 'Van' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Van' && {color: '#FFF'}]}>Van</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && {color: '#FFF'}]}>LKR 2100</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Van' && {color: '#FFF'}]}>30 min</Text>
                 </TouchableOpacity>
               </ScrollView>
 
@@ -261,7 +323,7 @@ export default function ConfirmRouteScreen() {
 
               {/* Confirm Book Button */}
               <TouchableOpacity style={styles.superConfirmButton}>
-                <Text style={styles.superConfirmButtonText}>Confirm NexGO • LKR 1115</Text>
+                <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} • {getPriceForSelected()}</Text>
               </TouchableOpacity>
             </>
           )}
