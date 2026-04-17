@@ -182,11 +182,20 @@ export default function ConfirmRouteScreen() {
             />
           )}
 
-          {/* Route Label Midway */}
+          {/* Primary Route Label Midway */}
           {routesData.length > 0 && (
-            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4}>
+            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={5}>
                <View style={styles.routeTagPill}>
                  <Text style={styles.routeTagText}>Local Fastest</Text>
+               </View>
+            </Marker>
+          )}
+
+          {/* Alternative Route Label Midway */}
+          {routesData.length > 1 && (
+            <Marker coordinate={routesData[1].coords[Math.floor(routesData[1].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4}>
+               <View style={[styles.routeTagPill, {backgroundColor: '#FFFFFF', borderColor: '#B0B0B0'}]}>
+                 <Text style={[styles.routeTagText, {color: '#526E6C'}]}>Short Way</Text>
                </View>
             </Marker>
           )}
