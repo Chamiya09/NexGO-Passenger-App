@@ -313,7 +313,9 @@ export default function ConfirmRouteScreen() {
                 <View style={styles.actionList}>
                   <TouchableOpacity style={styles.listRow}>
                     <MaterialCommunityIcons name="ticket-outline" size={22} color="#8A9A9A" />
-                    <Text style={styles.listRowTitle}>Add Promo Code</Text>
+                    <View style={styles.listRowTextContainer}>
+                      <Text style={styles.listRowTitle}>Add Promo Code</Text>
+                    </View>
                     <Feather name="chevron-right" size={18} color="#8A9A9A" />
                   </TouchableOpacity>
                   
@@ -546,16 +548,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   listRowTitle: {
-    flex: 1,
     fontSize: 13,
     fontWeight: '800',
     color: '#102A28',
-    marginLeft: 12,
   },
   listRowSub: {
     fontSize: 11,
     fontWeight: '700',
     color: '#8A9A9A',
+    marginTop: 2,
   },
   divider: {
     height: 1,
