@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import MapView, { UrlTile } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,14 +13,22 @@ export default function RideScreen() {
       
       {/* Map Background Placeholder */}
       <View style={styles.mapPlaceholder}>
-        {/* We would use MapView here, but using a mocked background for UI purpose */}
-        <View style={styles.mapGraphic}>
-          <View style={[styles.mapElement, { width: 300, height: 400, top: -50, left: -100, borderRadius: 200 }]} />
-          <View style={[styles.mapElement, { width: 400, height: 300, top: 200, right: -150, borderRadius: 150 }]} />
-          
-          <View style={styles.roadLine} />
-          <View style={[styles.roadLine, { transform: [{ rotate: '45deg' }], top: 300, left: 100 }]} />
-        </View>
+        <MapView
+          style={StyleSheet.absoluteFillObject}
+          mapType="none"
+          initialRegion={{
+            latitude: 6.9271,
+            longitude: 79.8612,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+        >
+          <UrlTile
+            urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maximumZ={19}
+            flipY={false}
+          />
+        </MapView>
 
         {/* Custom Marker Mock */}
         <View style={styles.markerContainer}>
