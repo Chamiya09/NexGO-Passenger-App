@@ -35,7 +35,17 @@ export default function RideScreen() {
           setDropData(prev => ({ ...prev, name: 'Fetching...' }));
         }
 
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&zoom=18&addressdetails=1`);
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'NexGOPassengerApp/1.0 (prototype testing)',
+            }
+          }
+        );
+        
+        if (!response.ok) throw new Error('OSM blocked response or offline');
+        
         const data = await response.json();
         
         let composedName = 'Unknown Location';
@@ -67,7 +77,11 @@ export default function RideScreen() {
       }
     };
 
-    fetchLocationName();
+    const debounceTimer = setTimeout(() => {
+      fetchLocationName();
+    }, 800);
+
+    return () => clearTimeout(debounceTimer);
   }, [selectedLocation, activeStep]);
 
   return (
