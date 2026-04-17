@@ -35,23 +35,17 @@ export default function RideScreen() {
           setDropData(prev => ({ ...prev, name: 'Fetching...' }));
         }
 
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&zoom=18&addressdetails=1`,
-          {
-            headers: {
-              'User-Agent': 'NexGOPassengerApp/1.0 (prototype testing)',
-            }
-          }
-        );
+        const response = await fetch(`https://photon.komoot.io/reverse?lon=${selectedLocation.longitude}&lat=${selectedLocation.latitude}`);
         
-        if (!response.ok) throw new Error('OSM blocked response or offline');
+        if (!response.ok) throw new Error('Photon API offline');
         
         const data = await response.json();
         
         let composedName = 'Unknown Location';
-        if (data && data.address) {
-          const detail = data.address.road || data.address.neighbourhood || data.address.suburb || data.address.village;
-          const region = data.address.city || data.address.town || data.address.state;
+        if (data && data.features && data.features.length > 0) {
+          const p = data.features[0].properties;
+          const detail = p.street || p.name || p.district || p.locality;
+          const region = p.city || p.county || p.state;
           
           let name = detail ? `${detail}` : '';
           if (region && detail && detail !== region) {
