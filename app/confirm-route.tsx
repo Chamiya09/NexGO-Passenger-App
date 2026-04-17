@@ -202,6 +202,13 @@ export default function ConfirmRouteScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.rideScrollContent}
               >
+                <TouchableOpacity style={styles.rideSquare}>
+                  <MaterialCommunityIcons name="motorbike" size={26} color="#017270" />
+                  <Text style={styles.rideSquareTitle}>Bike</Text>
+                  <Text style={styles.rideSquarePrice}>LKR 850</Text>
+                  <Text style={styles.rideSquareETA}>15 min</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity style={[styles.rideSquare, styles.activeRideSquare]}>
                   <MaterialCommunityIcons name="train-car" size={26} color="#FFF" />
                   <Text style={[styles.rideSquareTitle, {color: '#FFF'}]}>TukTuk</Text>
@@ -221,13 +228,6 @@ export default function ConfirmRouteScreen() {
                   <Text style={styles.rideSquareTitle}>Sedan</Text>
                   <Text style={styles.rideSquarePrice}>LKR 1450</Text>
                   <Text style={styles.rideSquareETA}>24 min</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.rideSquare}>
-                  <MaterialCommunityIcons name="motorbike" size={26} color="#017270" />
-                  <Text style={styles.rideSquareTitle}>Bike</Text>
-                  <Text style={styles.rideSquarePrice}>LKR 850</Text>
-                  <Text style={styles.rideSquareETA}>15 min</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.rideSquare}>
