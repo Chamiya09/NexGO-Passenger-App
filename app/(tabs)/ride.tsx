@@ -38,14 +38,12 @@ export default function RideScreen() {
             shouldReplaceMapContent={true}
             zIndex={1}
           />
-          <Marker
-            coordinate={selectedLocation}
-            draggable
-            onDragEnd={(e) => setSelectedLocation(e.nativeEvent.coordinate)}
-          >
-            <Ionicons name="location-sharp" size={48} color="#169F95" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
-          </Marker>
         </MapView>
+
+        {/* Fixed Center Selection Marker */}
+        <View pointerEvents="none" style={styles.fixedMarkerContainer}>
+          <Ionicons name="location-sharp" size={56} color="#169F95" style={styles.fixedMarkerIcon} />
+        </View>
       </View>
 
       {/* Back Button */}
@@ -151,7 +149,21 @@ const styles = StyleSheet.create({
     left: -50,
     transform: [{ rotate: '-15deg' }],
   },
-
+  fixedMarkerContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -28, 
+    marginTop: -56, 
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  fixedMarkerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.3)', 
+    textShadowOffset: { width: 0, height: 4 }, 
+    textShadowRadius: 6,
+  },
   topSafeArea: {
     position: 'absolute',
     top: 0,
