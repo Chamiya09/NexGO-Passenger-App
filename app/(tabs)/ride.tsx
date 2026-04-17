@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,29 @@ export default function RideScreen() {
     latitude: 6.9271,
     longitude: 79.8612,
   });
+  const [locationName, setLocationName] = useState('Fetching...');
+
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      try {
+        setLocationName('Fetching...');
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&zoom=18&addressdetails=1`);
+        const data = await response.json();
+        
+        if (data && data.address) {
+          const shortName = data.address.neighbourhood || data.address.suburb || data.address.village || data.address.road || data.address.city || 'Unknown Location';
+          setLocationName(shortName);
+        } else {
+          setLocationName('Unknown Location');
+        }
+      } catch (error) {
+        console.error('Error fetching location name:', error);
+        setLocationName('Unknown Location');
+      }
+    };
+
+    fetchLocationName();
+  }, [selectedLocation]);
 
   return (
     <View style={styles.container}>
@@ -76,7 +99,7 @@ export default function RideScreen() {
               <View style={styles.inputRow}>
                 <View style={styles.activeIndicator} />
                 <View style={styles.inputTextContainer}>
-                  <Text style={styles.activeLocationText}>Unknown Location</Text>
+                  <Text style={styles.activeLocationText} numberOfLines={1}>{locationName}</Text>
                 </View>
                 <View style={styles.inputIcons}>
                   <TouchableOpacity><Feather name="heart" size={20} color="#A0B3B2" /></TouchableOpacity>
