@@ -20,9 +20,9 @@ export default function TabLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#F0F5F4',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
           elevation: 10,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -32,20 +32,21 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '700',
+          marginTop: -2,
         }
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Feather size={24} name="home" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons size={24} name="home" color={color} />,
         }}
       />
       <Tabs.Screen
         name="ride"
         options={{
           title: 'Ride',
-          tabBarIcon: ({ color }) => <Ionicons size={24} name="car-outline" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons size={26} name="car-sport-outline" color={color} />,
         }}
         listeners={{ tabPress: e => e.preventDefault() }}
       />
@@ -61,7 +62,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <Feather size={24} name="user" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons size={24} name="person-outline" color={color} />,
         }}
         listeners={{ tabPress: e => e.preventDefault() }}
       />
