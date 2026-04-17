@@ -11,29 +11,61 @@ export default function RideScreen() {
     latitude: 6.9271,
     longitude: 79.8612,
   });
-  const [locationName, setLocationName] = useState('Fetching...');
+  const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
+  
+  const [pickupData, setPickupData] = useState({
+    coords: { latitude: 6.9271, longitude: 79.8612 },
+    name: 'Fetching...',
+  });
+
+  const [dropData, setDropData] = useState({
+    coords: null as any,
+    name: 'Unknown Location',
+  });
 
   useEffect(() => {
     const fetchLocationName = async () => {
       try {
-        setLocationName('Fetching...');
+        if (activeStep === 'PICKUP') {
+          setPickupData(prev => ({ ...prev, name: 'Fetching...' }));
+        } else {
+          setDropData(prev => ({ ...prev, name: 'Fetching...' }));
+        }
+
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedLocation.latitude}&lon=${selectedLocation.longitude}&zoom=18&addressdetails=1`);
         const data = await response.json();
         
+        let composedName = 'Unknown Location';
         if (data && data.address) {
-          const shortName = data.address.neighbourhood || data.address.suburb || data.address.village || data.address.road || data.address.city || 'Unknown Location';
-          setLocationName(shortName);
+          const detail = data.address.road || data.address.neighbourhood || data.address.suburb || data.address.village;
+          const region = data.address.city || data.address.town || data.address.state;
+          
+          let name = detail ? `${detail}` : '';
+          if (region && detail && detail !== region) {
+            name += `, ${region}`;
+          } else if (!name && region) {
+            name = region;
+          }
+          if (name) composedName = name;
+        }
+
+        if (activeStep === 'PICKUP') {
+          setPickupData({ coords: selectedLocation, name: composedName });
         } else {
-          setLocationName('Unknown Location');
+          setDropData({ coords: selectedLocation, name: composedName });
         }
       } catch (error) {
         console.error('Error fetching location name:', error);
-        setLocationName('Unknown Location');
+        if (activeStep === 'PICKUP') {
+          setPickupData(prev => ({ ...prev, name: 'Unknown Location' }));
+        } else {
+          setDropData(prev => ({ ...prev, name: 'Unknown Location' }));
+        }
       }
     };
 
     fetchLocationName();
-  }, [selectedLocation]);
+  }, [selectedLocation, activeStep]);
 
   return (
     <View style={styles.container}>
@@ -95,30 +127,39 @@ export default function RideScreen() {
 
             {/* Input Fields */}
             <View style={styles.inputFields}>
-              {/* First Input Row */}
-              <View style={styles.inputRow}>
-                <View style={styles.activeIndicator} />
+              {/* First Input Row - PICKUP */}
+              <TouchableOpacity 
+                style={[styles.inputRow, activeStep !== 'PICKUP' && { paddingLeft: 11 }]}
+                onPress={() => setActiveStep('PICKUP')}
+              >
+                {activeStep === 'PICKUP' && <View style={styles.activeIndicator} />}
                 <View style={styles.inputTextContainer}>
-                  <Text style={styles.activeLocationText} numberOfLines={1}>{locationName}</Text>
+                  <Text style={activeStep === 'PICKUP' ? styles.activeLocationText : styles.inactiveLocationText} numberOfLines={1}>
+                    {pickupData.name}
+                  </Text>
                 </View>
                 <View style={styles.inputIcons}>
-                  <TouchableOpacity><Feather name="heart" size={20} color="#A0B3B2" /></TouchableOpacity>
-                  <TouchableOpacity><Feather name="plus-circle" size={20} color="#017270" /></TouchableOpacity>
+                  <TouchableOpacity><Feather name="heart" size={20} color={activeStep === 'PICKUP' ? "#017270" : "#E0E8E7"} /></TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View style={styles.divider} />
 
-              {/* Second Input Row */}
-              <View style={[styles.inputRow, { paddingLeft: 11 }]}>
+              {/* Second Input Row - DROP */}
+              <TouchableOpacity 
+                style={[styles.inputRow, activeStep !== 'DROP' && { paddingLeft: 11 }]}
+                onPress={() => setActiveStep('DROP')}
+              >
+                {activeStep === 'DROP' && <View style={styles.activeIndicator} />}
                 <View style={styles.inputTextContainer}>
-                  <Text style={styles.inactiveLocationText}>Unknown Location</Text>
+                  <Text style={activeStep === 'DROP' ? styles.activeLocationText : styles.inactiveLocationText} numberOfLines={1}>
+                    {dropData.name}
+                  </Text>
                 </View>
                 <View style={styles.inputIcons}>
-                  <TouchableOpacity><Feather name="heart" size={20} color="#E0E8E7" /></TouchableOpacity>
-                  <TouchableOpacity><Feather name="plus-circle" size={20} color="#E0E8E7" /></TouchableOpacity>
+                  <TouchableOpacity><Feather name="plus-circle" size={20} color={activeStep === 'DROP' ? "#017270" : "#E0E8E7"} /></TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -135,8 +176,20 @@ export default function RideScreen() {
           </View>
 
           {/* Confirm Button */}
-          <TouchableOpacity style={styles.confirmButton}>
-            <Text style={styles.confirmButtonText}>Confirm Pickup</Text>
+          <TouchableOpacity 
+            style={styles.confirmButton}
+            onPress={() => {
+              if (activeStep === 'PICKUP') {
+                setActiveStep('DROP');
+              } else {
+                // Future Implementation: Confirm Route
+                alert(`Route confirmed from ${pickupData.name} to ${dropData.name}`);
+              }
+            }}
+          >
+            <Text style={styles.confirmButtonText}>
+              {activeStep === 'PICKUP' ? 'Confirm Pickup' : 'Confirm Dropoff'}
+            </Text>
           </TouchableOpacity>
 
         </View>
