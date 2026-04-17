@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import MapView, { UrlTile } from 'react-native-maps';
+import MapView, { UrlTile, Marker } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,15 +28,15 @@ export default function RideScreen() {
             maximumZ={19}
             flipY={false}
           />
+          <Marker
+            coordinate={{ latitude: 6.9271, longitude: 79.8612 }}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={styles.markerIcon}>
+              <View style={styles.markerDot} />
+            </View>
+          </Marker>
         </MapView>
-
-        {/* Custom Marker Mock */}
-        <View style={styles.markerContainer}>
-          <View style={styles.markerIcon}>
-            <View style={styles.markerDot} />
-          </View>
-          <View style={styles.markerPointer} />
-        </View>
       </View>
 
       {/* Back Button */}
