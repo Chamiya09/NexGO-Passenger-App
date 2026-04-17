@@ -42,7 +42,7 @@ export default function RideScreen() {
 
         {/* Fixed Center Selection Marker */}
         <View pointerEvents="none" style={styles.fixedMarkerContainer}>
-          <Ionicons name="location-sharp" size={56} color="#169F95" style={styles.fixedMarkerIcon} />
+          <Ionicons name="location-sharp" size={40} color="#169F95" style={styles.fixedMarkerIcon} />
         </View>
       </View>
 
@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -28, 
-    marginTop: -56, 
+    marginLeft: -20, 
+    marginTop: -40, 
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -213,33 +213,33 @@ const styles = StyleSheet.create({
   },
   bottomCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.05,
     shadowRadius: 15,
-    elevation: 10,
+    elevation: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: '#E6EFEF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 20,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
   },
   timeline: {
     alignItems: 'center',
-    width: 20,
-    marginRight: 10,
-    marginTop: 10,
-    marginBottom: 10,
+    width: 16,
+    marginRight: 8,
+    marginTop: 6,
+    marginBottom: 6,
   },
   timelineDotHollow: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 2,
     borderColor: '#017270',
     backgroundColor: '#FFF',
@@ -251,10 +251,10 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   timelineSquare: {
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
     backgroundColor: '#017270',
-    borderRadius: 2,
+    borderRadius: 1,
   },
   inputFields: {
     flex: 1,
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 44,
+    height: 36,
   },
   activeIndicator: {
     width: 3,
@@ -277,12 +277,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeLocationText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
     color: '#284644',
   },
   inactiveLocationText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#D1E0DE',
   },
@@ -299,32 +299,32 @@ const styles = StyleSheet.create({
   tagsContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   tagPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E6EFEF',
     gap: 6,
   },
   tagText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: '#102A28',
   },
   confirmButton: {
     backgroundColor: '#017270',
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
 });
