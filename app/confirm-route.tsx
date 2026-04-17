@@ -97,7 +97,7 @@ export default function ConfirmRouteScreen() {
             <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3}>
                <View style={styles.mapLabelPill}>
                  <View style={[styles.mapLabelDot, { backgroundColor: '#169F95' }]} />
-                 <Text style={styles.mapLabelText} numberOfLines={1}>{pName}</Text>
+                 <Text style={styles.mapLabelText} numberOfLines={1}>Pickup</Text>
                </View>
                <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
             </Marker>
@@ -108,7 +108,7 @@ export default function ConfirmRouteScreen() {
             <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
                <View style={styles.mapLabelPill}>
                  <View style={[styles.mapLabelDot, { backgroundColor: '#E74C3C' }]} />
-                 <Text style={styles.mapLabelText} numberOfLines={1}>{dName}</Text>
+                 <Text style={styles.mapLabelText} numberOfLines={1}>Dropoff</Text>
                </View>
                <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
             </Marker>
@@ -221,6 +221,20 @@ export default function ConfirmRouteScreen() {
                   <Text style={styles.rideSquareTitle}>Sedan</Text>
                   <Text style={styles.rideSquarePrice}>LKR 1450</Text>
                   <Text style={styles.rideSquareETA}>24 min</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.rideSquare}>
+                  <MaterialCommunityIcons name="motorbike" size={26} color="#017270" />
+                  <Text style={styles.rideSquareTitle}>Bike</Text>
+                  <Text style={styles.rideSquarePrice}>LKR 850</Text>
+                  <Text style={styles.rideSquareETA}>15 min</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.rideSquare}>
+                  <MaterialCommunityIcons name="van-passenger" size={26} color="#017270" />
+                  <Text style={styles.rideSquareTitle}>Van</Text>
+                  <Text style={styles.rideSquarePrice}>LKR 2100</Text>
+                  <Text style={styles.rideSquareETA}>30 min</Text>
                 </TouchableOpacity>
               </ScrollView>
 
