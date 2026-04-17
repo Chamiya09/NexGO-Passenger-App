@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile, Marker } from 'react-native-maps';
@@ -7,11 +7,16 @@ import MapView, { UrlTile, Marker } from 'react-native-maps';
 const { width, height } = Dimensions.get('window');
 
 export default function RideScreen() {
+  const [selectedLocation, setSelectedLocation] = useState({
+    latitude: 6.9271,
+    longitude: 79.8612,
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" translucent backgroundColor="transparent" />
       
-      {/* Map Background Placeholder */}
+      {/* Map Background */}
       <View style={styles.mapPlaceholder}>
         <MapView
           style={StyleSheet.absoluteFillObject}
@@ -22,6 +27,9 @@ export default function RideScreen() {
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
+          onRegionChangeComplete={(region) => {
+            setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
+          }}
         >
           <UrlTile
             urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -31,12 +39,11 @@ export default function RideScreen() {
             zIndex={1}
           />
           <Marker
-            coordinate={{ latitude: 6.9271, longitude: 79.8612 }}
-            anchor={{ x: 0.5, y: 1 }}
+            coordinate={selectedLocation}
+            draggable
+            onDragEnd={(e) => setSelectedLocation(e.nativeEvent.coordinate)}
           >
-            <View style={styles.markerIcon}>
-              <View style={styles.markerDot} />
-            </View>
+            <Ionicons name="location-sharp" size={48} color="#169F95" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }} />
           </Marker>
         </MapView>
       </View>
@@ -144,38 +151,7 @@ const styles = StyleSheet.create({
     left: -50,
     transform: [{ rotate: '-15deg' }],
   },
-  markerContainer: {
-    position: 'absolute',
-    top: '40%',
-    left: '50%',
-    marginLeft: -15,
-    marginTop: -40,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  markerIcon: {
-    width: 30,
-    height: 30,
-    backgroundColor: '#017270',
-    borderRadius: 15,
-    borderBottomRightRadius: 2,
-    transform: [{ rotate: '-45deg' }],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  markerDot: {
-    width: 12,
-    height: 12,
-    backgroundColor: '#FFF',
-    borderRadius: 6,
-  },
-  markerPointer: {
-    display: 'none', 
-  },
+
   topSafeArea: {
     position: 'absolute',
     top: 0,
