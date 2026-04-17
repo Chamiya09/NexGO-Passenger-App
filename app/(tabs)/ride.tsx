@@ -15,7 +15,7 @@ export default function RideScreen() {
       <View style={styles.mapPlaceholder}>
         <MapView
           style={StyleSheet.absoluteFillObject}
-          mapType="none"
+          mapType={Platform.OS === 'android' ? 'none' : 'standard'}
           initialRegion={{
             latitude: 6.9271,
             longitude: 79.8612,
@@ -27,6 +27,8 @@ export default function RideScreen() {
             urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
             maximumZ={19}
             flipY={false}
+            shouldReplaceMapContent={true}
+            zIndex={1}
           />
           <Marker
             coordinate={{ latitude: 6.9271, longitude: 79.8612 }}
