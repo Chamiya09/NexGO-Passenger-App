@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ScrollView,
   Pressable,
@@ -11,8 +11,43 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
+
+type ProfileSection = {
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  route: '/profile/personal-details' | '/profile/payment-details' | '/profile/privacy-security' | '/profile/support-help';
+};
+
+const PROFILE_SECTIONS: ProfileSection[] = [
+  {
+    title: 'Personal Details',
+    subtitle: 'Name, email, phone, and saved places',
+    icon: 'person-circle-outline',
+    route: '/profile/personal-details',
+  },
+  {
+    title: 'Payment Details',
+    subtitle: 'Cards, wallet, and billing preferences',
+    icon: 'card-outline',
+    route: '/profile/payment-details',
+  },
+  {
+    title: 'Privacy & Security',
+    subtitle: 'Password, 2FA, and trusted devices',
+    icon: 'shield-checkmark-outline',
+    route: '/profile/privacy-security',
+  },
+  {
+    title: 'Support & Help',
+    subtitle: 'Safety center and 24/7 app support',
+    icon: 'help-buoy-outline',
+    route: '/profile/support-help',
+  },
+];
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -24,6 +59,11 @@ export default function ProfileScreen() {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() || '')
     .join('');
+
+  const userSince = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return `Member since ${currentYear - 1}`;
+  }, []);
 
   const onLogout = () => {
     logout();
@@ -44,6 +84,7 @@ export default function ProfileScreen() {
 
           <Text style={styles.name}>{fullName}</Text>
           <Text style={styles.meta}>{user?.email || 'No email available'}</Text>
+          <Text style={styles.memberSince}>{userSince}</Text>
 
           <View style={styles.badgesRow}>
             <View style={styles.badge}>
@@ -61,47 +102,33 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionHeading}>Profile Settings</Text>
+        <Text style={styles.sectionSubheading}>Tap a section to open and manage details.</Text>
 
-          <View style={styles.tile}>
-            <Text style={styles.tileLabel}>Phone</Text>
-            <Text style={styles.tileValue}>{user?.phoneNumber || 'Not set'}</Text>
-          </View>
+        {PROFILE_SECTIONS.map((section) => (
+          <Pressable
+            key={section.title}
+            style={styles.sectionBox}
+            onPress={() => router.push(section.route)}>
+            <View style={styles.sectionIconWrap}>
+              <Ionicons name={section.icon} size={22} color="#0E857C" />
+            </View>
+            <View style={styles.sectionTextWrap}>
+              <Text style={styles.sectionBoxTitle}>{section.title}</Text>
+              <Text style={styles.sectionBoxSubtitle}>{section.subtitle}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#8CA3A0" />
+          </Pressable>
+        ))}
 
-          <View style={styles.tile}>
-            <Text style={styles.tileLabel}>Payment method</Text>
-            <Text style={styles.tileValue}>Card ending 1024</Text>
-          </View>
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerZoneTitle}>Session</Text>
+          <Text style={styles.dangerZoneText}>Log out from this device and require sign in next time.</Text>
 
-          <View style={styles.tile}>
-            <Text style={styles.tileLabel}>Saved places</Text>
-            <Text style={styles.tileValue}>Home, Work</Text>
-          </View>
+          <Pressable style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutText}>Log out</Text>
+          </Pressable>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-
-          <View style={styles.preferenceRow}>
-            <Text style={styles.preferenceText}>Quiet ride</Text>
-            <Text style={styles.preferenceState}>Enabled</Text>
-          </View>
-
-          <View style={styles.preferenceRow}>
-            <Text style={styles.preferenceText}>Promo notifications</Text>
-            <Text style={styles.preferenceState}>Enabled</Text>
-          </View>
-
-          <View style={styles.preferenceRow}>
-            <Text style={styles.preferenceText}>Emergency contacts</Text>
-            <Text style={styles.preferenceState}>2 added</Text>
-          </View>
-        </View>
-
-        <Pressable style={styles.logoutButton} onPress={onLogout}>
-          <Text style={styles.logoutText}>Log out</Text>
-        </Pressable>
 
         <Text style={styles.versionText}>NexGO Passenger v1.0</Text>
       </ScrollView>
@@ -112,7 +139,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F3F8F7',
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   container: {
@@ -121,11 +148,16 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   heroCard: {
-    borderRadius: 20,
-    padding: 20,
-    backgroundColor: '#0F9A8F',
+    borderRadius: 24,
+    padding: 22,
+    backgroundColor: '#0B8D83',
     marginBottom: 20,
     overflow: 'hidden',
+    shadowColor: '#0D2D2A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
   },
   heroGlowOne: {
     position: 'absolute',
@@ -146,9 +178,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   avatar: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -168,7 +200,13 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 14,
     color: '#E8FCFA',
+    marginBottom: 4,
+  },
+  memberSince: {
+    color: '#CFF4EF',
+    fontSize: 13,
     marginBottom: 16,
+    fontWeight: '600',
   },
   badgesRow: {
     flexDirection: 'row',
@@ -191,58 +229,74 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  section: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E3EBEA',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#102A28',
-    marginBottom: 12,
-  },
-  tile: {
-    borderRadius: 12,
-    backgroundColor: '#F8FBFB',
-    borderWidth: 1,
-    borderColor: '#E8F0EF',
-    padding: 12,
-    marginBottom: 10,
-  },
-  tileLabel: {
-    color: '#607170',
-    fontSize: 14,
+  sectionHeading: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#123733',
     marginBottom: 4,
   },
-  tileValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#133A37',
-  },
-  preferenceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFF4F3',
-  },
-  preferenceText: {
-    fontSize: 15,
-    color: '#274B49',
-    fontWeight: '500',
-  },
-  preferenceState: {
+  sectionSubheading: {
     fontSize: 13,
+    color: '#5D7572',
+    marginBottom: 12,
+  },
+  sectionBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#DEE9E8',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#102A28',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
+  },
+  sectionIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E7F6F4',
+    marginRight: 12,
+  },
+  sectionTextWrap: {
+    flex: 1,
+  },
+  sectionBoxTitle: {
+    fontSize: 15,
     fontWeight: '700',
-    color: '#607170',
+    color: '#173E3A',
+    marginBottom: 2,
+  },
+  sectionBoxSubtitle: {
+    fontSize: 12,
+    color: '#647A78',
+  },
+  dangerZone: {
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFF6F6',
+    borderWidth: 1,
+    borderColor: '#F4D1D1',
+  },
+  dangerZoneTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7B2727',
+    marginBottom: 4,
+  },
+  dangerZoneText: {
+    color: '#8C4747',
+    fontSize: 13,
+    marginBottom: 12,
   },
   logoutButton: {
-    marginTop: 4,
     height: 48,
     borderRadius: 12,
     backgroundColor: '#D84242',
