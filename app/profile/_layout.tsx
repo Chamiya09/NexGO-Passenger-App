@@ -10,16 +10,12 @@ export default function ProfileStackLayout() {
         headerShadowVisible: false,
         headerStyle: { backgroundColor: '#F0F1F3' },
         headerTintColor: '#153F3A',
-        headerBackTitleVisible: false,
         headerBackButtonDisplayMode: 'minimal',
       }}>
       <Stack.Screen
         name="personal-details"
         options={{
           title: 'Personal Details',
-          headerTitleStyle: {
-            marginTop: 6,
-          },
         }}
       />
       <Stack.Screen name="membership" options={{ title: 'Membership' }} />

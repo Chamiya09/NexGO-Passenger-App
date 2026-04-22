@@ -1,13 +1,33 @@
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export default function PersonalDetailsScreen() {
-  const { user } = useAuth();
-  const fullName = user?.fullName || 'Passenger';
+  const { user, updateProfile, deleteAccount } = useAuth();
+  const [form, setForm] = useState({
+    fullName: user?.fullName || '',
+    email: user?.email || '',
+    phoneNumber: user?.phoneNumber || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const colors = {
     background: useThemeColor({}, 'background'),
@@ -15,86 +35,238 @@ export default function PersonalDetailsScreen() {
     textSecondary: useThemeColor({ light: '#6A807D', dark: '#A3B1AE' }, 'icon'),
     card: useThemeColor({ light: '#FFFFFF', dark: '#1F2327' }, 'background'),
     border: useThemeColor({ light: '#DFE9E7', dark: '#33383D' }, 'icon'),
-    divider: useThemeColor({ light: '#EAF0EF', dark: '#3A4147' }, 'icon'),
     accent: useThemeColor({ light: '#14988F', dark: '#48C4BA' }, 'tint'),
     accentSoft: useThemeColor({ light: '#E7F5F3', dark: '#293538' }, 'background'),
+    input: useThemeColor({ light: '#F7FBFA', dark: '#252A2F' }, 'background'),
+    danger: '#C13B3B',
+    dangerSoft: '#FFF4F4',
+    success: '#157A62',
   };
 
-  const rows = [
-    {
-      label: 'Full name',
-      value: fullName,
-      icon: 'person-outline' as const,
-    },
-    {
-      label: 'Email',
-      value: user?.email || 'Not set',
-      icon: 'mail-outline' as const,
-    },
-    {
-      label: 'Phone number',
-      value: user?.phoneNumber || 'Not set',
-      icon: 'call-outline' as const,
-    },
-  ];
+  useEffect(() => {
+    setForm({
+      fullName: user?.fullName || '',
+      email: user?.email || '',
+      phoneNumber: user?.phoneNumber || '',
+    });
+  }, [user?.email, user?.fullName, user?.phoneNumber]);
+
+  const handleChange = (field: 'fullName' | 'email' | 'phoneNumber', value: string) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const validateForm = () => {
+    const fullName = form.fullName.trim();
+    const email = form.email.trim();
+    const phoneNumber = form.phoneNumber.trim();
+
+    if (!fullName || !email || !phoneNumber) {
+      return 'Full name, email, and phone number are required.';
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      return 'Enter a valid email address.';
+    }
+
+    return null;
+  };
+
+  const handleSave = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setErrorMessage(validationError);
+      setSuccessMessage(null);
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await updateProfile({
+        fullName: form.fullName.trim(),
+        email: form.email.trim().toLowerCase(),
+        phoneNumber: form.phoneNumber.trim(),
+      });
+      setSuccessMessage('Personal details updated successfully.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update personal details');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete account',
+      'This will permanently remove your passenger account and saved data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void handleDeleteAccount();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteAccount();
+      router.replace('/login');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to delete account');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}> 
-            <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
-            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Account verified</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
+              <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Account verified</Text>
+            </View>
+
+            <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
+              Keep your details accurate for smooth bookings and secure account recovery.
+            </Text>
           </View>
 
-          <Text style={[styles.heroHint, { color: colors.textSecondary }]}>Keep your details accurate for smooth bookings and secure account recovery.</Text>
-        </View>
+          {errorMessage ? <Text style={[styles.feedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
+          {successMessage ? <Text style={[styles.feedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT INFORMATION</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PERSONAL DETAILS</Text>
 
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {rows.map((row, index) => (
-            <View key={row.label}>
-              <View style={styles.row}>
-                <View style={styles.rowLeft}>
-                  <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-                    <Ionicons name={row.icon} size={16} color={colors.accent} />
-                  </View>
+          <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Full name</Text>
+              <TextInput
+                value={form.fullName}
+                onChangeText={(value) => handleChange('fullName', value)}
+                placeholder="Your full name"
+                placeholderTextColor={colors.textSecondary}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+            </View>
 
-                  <View>
-                    <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{row.label}</Text>
-                    <Text style={[styles.rowValue, { color: colors.textPrimary }]}>{row.value}</Text>
-                  </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Email</Text>
+              <TextInput
+                value={form.email}
+                onChangeText={(value) => handleChange('email', value)}
+                placeholder="name@example.com"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Phone number</Text>
+              <TextInput
+                value={form.phoneNumber}
+                onChangeText={(value) => handleChange('phoneNumber', value)}
+                placeholder="Your phone number"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="phone-pad"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
+              />
+            </View>
+
+            <Pressable
+              style={[
+                styles.primaryButton,
+                { backgroundColor: colors.accent },
+                saving ? styles.buttonDisabled : null,
+              ]}
+              onPress={() => {
+                void handleSave();
+              }}
+              disabled={saving || deleting}>
+              <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Update Details'}</Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DANGER ZONE</Text>
+
+          <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.dangerCard, { backgroundColor: colors.dangerSoft, borderColor: '#F1D6D6' }]}>
+              <View style={styles.dangerHeader}>
+                <View style={[styles.dangerIconWrap, { backgroundColor: '#FFE9E9' }]}>
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                </View>
+
+                <View style={styles.dangerTextWrap}>
+                  <Text style={[styles.dangerTitle, { color: colors.danger }]}>Delete account</Text>
+                  <Text style={[styles.dangerText, { color: colors.textSecondary }]}>
+                    Permanently remove your passenger account and all saved profile data.
+                  </Text>
                 </View>
               </View>
 
-              {index < rows.length - 1 ? <View style={[styles.divider, { backgroundColor: colors.divider }]} /> : null}
-            </View>
-          ))}
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SAVED PLACES</Text>
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-                <Ionicons name="location-outline" size={16} color={colors.accent} />
-              </View>
-
-              <View>
-                <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>Places</Text>
-                <Text style={[styles.rowValue, { color: colors.textPrimary }]}>Home, Work, Airport</Text>
-              </View>
+              <Pressable
+                style={[styles.deleteButton, deleting ? styles.buttonDisabled : null]}
+                onPress={confirmDeleteAccount}
+                disabled={saving || deleting}>
+                <Text style={styles.deleteButtonText}>{deleting ? 'Deleting...' : 'Delete Account'}</Text>
+              </Pressable>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
+    flex: 1,
+  },
+  keyboardWrap: {
     flex: 1,
   },
   container: {
@@ -125,6 +297,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
+  feedback: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
@@ -137,36 +314,79 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: 14,
+    padding: 14,
   },
-  row: {
-    minHeight: 68,
+  inputGroup: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    justifyContent: 'center',
+    fontSize: 15,
+    fontWeight: '600',
   },
-  rowLeft: {
-    flexDirection: 'row',
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    marginTop: 4,
   },
-  iconWrap: {
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  dangerCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+  },
+  dangerHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  dangerIconWrap: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
+  dangerTextWrap: {
+    flex: 1,
   },
-  rowValue: {
+  dangerTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    marginBottom: 4,
   },
-  divider: {
-    height: 1,
-    marginLeft: 58,
+  dangerText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#C13B3B',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

@@ -22,6 +22,12 @@ type RegisterPayload = {
   password: string;
 };
 
+type UpdateProfilePayload = {
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+};
+
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
@@ -29,6 +35,8 @@ type AuthContextValue = {
   loading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => void;
 };
 
@@ -131,6 +139,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async ({ fullName, email, phoneNumber }: UpdateProfilePayload) => {
+    if (!token) {
+      throw new Error('You need to be logged in to update your profile.');
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ fullName, email, phoneNumber }),
+      });
+
+      const data = await parseApiResponse<{ user: AuthUser }>(response);
+      setUser(data.user);
+      await persistSession(token, data.user);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!token) {
+      throw new Error('You need to be logged in to delete your account.');
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      await parseApiResponse<{ message: string }>(response);
+      setUser(null);
+      setToken(null);
+      await clearSession();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -138,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ user, token, initializing, loading, login, register, logout }),
+    () => ({ user, token, initializing, loading, login, register, updateProfile, deleteAccount, logout }),
     [user, token, initializing, loading]
   );
 
