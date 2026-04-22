@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Pla
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome5, Feather, Ionicons } from '@expo/vector-icons';
 
+import { useAuth } from '@/context/auth-context';
+
 export default function HomeScreen() {
+  const { user } = useAuth();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
@@ -12,7 +16,7 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hello, Chamod! 👋</Text>
+            <Text style={styles.greeting}>Hello, {user?.fullName || 'Passenger'}! 👋</Text>
             <Text style={styles.subtext}>Where are you going today?</Text>
             
             <View style={styles.pointsBadge}>
