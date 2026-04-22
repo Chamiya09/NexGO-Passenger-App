@@ -11,7 +11,7 @@ export default function ProfileStackLayout() {
         headerStyle: { backgroundColor: '#F0F1F3' },
         headerTintColor: '#153F3A',
       }}>
-      <Stack.Screen name="personal-details" options={{ headerShown: false }} />
+      <Stack.Screen name="personal-details" options={{ title: 'Personal Details' }} />
       <Stack.Screen name="membership" options={{ title: 'Membership' }} />
       <Stack.Screen name="saved-addresses" options={{ title: 'Saved Addresses' }} />
       <Stack.Screen name="payment-details" options={{ title: 'Payment Details' }} />

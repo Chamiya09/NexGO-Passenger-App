@@ -11,7 +11,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-export default function ConfirmRouteFallbackScreen() {
+export default function ConfirmRouteWebScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
