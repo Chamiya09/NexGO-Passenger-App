@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import {
+  Image,
   ScrollView,
   Pressable,
   SafeAreaView,
@@ -120,9 +121,14 @@ export default function ProfileScreen() {
         <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <View style={styles.profileHead}>
             <View style={[styles.avatarCircle, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}>
-              <Text style={[styles.avatarInitials, { color: palette.accent }]}>{initials || 'P'}</Text>
+              {user?.profileImageUrl ? (
+                <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={[styles.avatarInitials, { color: palette.accent }]}>{initials || 'P'}</Text>
+              )}
             </View>
 
+            <Text style={[styles.profileName, { color: palette.primaryText }]}>{fullName}</Text>
             <Text style={[styles.memberCaption, { color: palette.secondaryText }]}>Passenger account</Text>
           </View>
 
@@ -239,10 +245,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 11,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarInitials: {
     fontSize: 30,
     fontWeight: '800',
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 4,
   },
   memberCaption: {
     fontSize: 12,

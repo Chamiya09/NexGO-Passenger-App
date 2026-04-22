@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,6 +25,7 @@ export default function PersonalDetailsScreen() {
     fullName: user?.fullName || '',
     email: user?.email || '',
     phoneNumber: user?.phoneNumber || '',
+    profileImageUrl: user?.profileImageUrl || '',
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,10 +53,11 @@ export default function PersonalDetailsScreen() {
       fullName: user?.fullName || '',
       email: user?.email || '',
       phoneNumber: user?.phoneNumber || '',
+      profileImageUrl: user?.profileImageUrl || '',
     });
-  }, [user?.email, user?.fullName, user?.phoneNumber]);
+  }, [user?.email, user?.fullName, user?.phoneNumber, user?.profileImageUrl]);
 
-  const handleChange = (field: 'fullName' | 'email' | 'phoneNumber', value: string) => {
+  const handleChange = (field: 'fullName' | 'email' | 'phoneNumber' | 'profileImageUrl', value: string) => {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -66,6 +69,7 @@ export default function PersonalDetailsScreen() {
       fullName: user?.fullName || '',
       email: user?.email || '',
       phoneNumber: user?.phoneNumber || '',
+      profileImageUrl: user?.profileImageUrl || '',
     });
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -114,6 +118,7 @@ export default function PersonalDetailsScreen() {
         fullName: form.fullName.trim(),
         email: form.email.trim().toLowerCase(),
         phoneNumber: form.phoneNumber.trim(),
+        profileImageUrl: form.profileImageUrl.trim(),
       });
       setIsEditModalVisible(false);
       setSuccessMessage('Personal details updated successfully.');
@@ -166,6 +171,30 @@ export default function PersonalDetailsScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
           <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.heroTopRow}>
+              <View style={[styles.heroAvatar, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+                {user?.profileImageUrl ? (
+                  <Image source={{ uri: user.profileImageUrl }} style={styles.heroAvatarImage} />
+                ) : (
+                  <Text style={[styles.heroAvatarInitials, { color: colors.accent }]}>
+                    {(user?.fullName || 'Passenger')
+                      .split(' ')
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() || '')
+                      .join('') || 'P'}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.heroIdentity}>
+                <Text style={[styles.heroName, { color: colors.textPrimary }]}>{user?.fullName || 'Passenger'}</Text>
+                <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                  Passenger profile and recovery details
+                </Text>
+              </View>
+            </View>
+
             <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
               <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
               <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Account verified</Text>
@@ -197,6 +226,13 @@ export default function PersonalDetailsScreen() {
                 <Ionicons name="create-outline" size={14} color={colors.accent} />
                 <Text style={[styles.compactEditButtonText, { color: colors.accent }]}>Edit</Text>
               </Pressable>
+            </View>
+
+            <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Full name</Text>
+              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.fullName || 'Not set'}</Text>
             </View>
 
             <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
@@ -267,6 +303,46 @@ export default function PersonalDetailsScreen() {
                 </View>
 
                 {errorMessage ? <Text style={[styles.feedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
+
+                <View style={styles.avatarEditorWrap}>
+                  <View style={[styles.modalAvatar, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+                    {form.profileImageUrl ? (
+                      <Image source={{ uri: form.profileImageUrl }} style={styles.modalAvatarImage} />
+                    ) : (
+                      <Text style={[styles.modalAvatarInitials, { color: colors.accent }]}>
+                        {(form.fullName || 'Passenger')
+                          .split(' ')
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase() || '')
+                          .join('') || 'P'}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.avatarEditorHint, { color: colors.textSecondary }]}>
+                    Paste an image URL to update your profile icon.
+                  </Text>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Profile image URL</Text>
+                  <TextInput
+                    value={form.profileImageUrl}
+                    onChangeText={(value) => handleChange('profileImageUrl', value)}
+                    placeholder="https://example.com/avatar.jpg"
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                  />
+                </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Full name</Text>
@@ -376,6 +452,42 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 12,
   },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroAvatarInitials: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  heroIdentity: {
+    flex: 1,
+  },
+  heroName: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  heroSubline: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
   heroBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
@@ -469,6 +581,34 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 10,
+  },
+  avatarEditorWrap: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  modalAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalAvatarInitials: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  avatarEditorHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   inputLabel: {
     fontSize: 12,

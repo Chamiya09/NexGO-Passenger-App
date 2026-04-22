@@ -8,6 +8,7 @@ type AuthUser = {
   fullName: string;
   email: string;
   phoneNumber: string;
+  profileImageUrl?: string;
 };
 
 type LoginPayload = {
@@ -26,6 +27,7 @@ type UpdateProfilePayload = {
   fullName: string;
   email: string;
   phoneNumber: string;
+  profileImageUrl?: string;
 };
 
 type AuthContextValue = {
@@ -139,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateProfile = async ({ fullName, email, phoneNumber }: UpdateProfilePayload) => {
+  const updateProfile = async ({ fullName, email, phoneNumber, profileImageUrl }: UpdateProfilePayload) => {
     if (!token) {
       throw new Error('You need to be logged in to update your profile.');
     }
@@ -152,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ fullName, email, phoneNumber }),
+        body: JSON.stringify({ fullName, email, phoneNumber, profileImageUrl }),
       });
 
       const data = await parseApiResponse<{ user: AuthUser }>(response);
