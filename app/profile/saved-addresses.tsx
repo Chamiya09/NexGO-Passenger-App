@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -822,7 +823,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     paddingHorizontal: 20,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 0) + 12 : 12,
+    paddingBottom: 12,
   },
   modalKeyboardWrap: {
     width: '100%',
@@ -832,12 +835,13 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
   modalCard: {
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
+    maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -883,7 +887,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   mapCard: {
-    height: 220,
+    height: 180,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
