@@ -182,9 +182,21 @@ export default function PersonalDetailsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PERSONAL DETAILS</Text>
 
           <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Full name</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.fullName || 'Not set'}</Text>
+            <View style={styles.detailsHeader}>
+              <View>
+                <Text style={[styles.detailsTitle, { color: colors.textPrimary }]}>Account information</Text>
+                <Text style={[styles.detailsHint, { color: colors.textSecondary }]}>
+                  Review your current passenger profile details.
+                </Text>
+              </View>
+
+              <Pressable
+                style={[styles.compactEditButton, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}
+                onPress={openEditModal}
+                disabled={deleting}>
+                <Ionicons name="create-outline" size={14} color={colors.accent} />
+                <Text style={[styles.compactEditButtonText, { color: colors.accent }]}>Edit</Text>
+              </Pressable>
             </View>
 
             <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
@@ -200,16 +212,6 @@ export default function PersonalDetailsScreen() {
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone number</Text>
               <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.phoneNumber || 'Not set'}</Text>
             </View>
-
-            <Pressable
-              style={[
-                styles.primaryButton,
-                { backgroundColor: colors.accent },
-              ]}
-              onPress={openEditModal}
-              disabled={deleting}>
-              <Text style={styles.primaryButtonText}>Edit Details</Text>
-            </Pressable>
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DANGER ZONE</Text>
@@ -363,20 +365,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
   },
   heroBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -386,46 +391,84 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroHint: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
   },
   feedback: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 6,
+    marginTop: 2,
   },
   groupCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 14,
-    padding: 14,
+    marginBottom: 12,
+    padding: 12,
+  },
+  detailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  detailsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  detailsHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    maxWidth: 220,
+  },
+  compactEditButton: {
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  compactEditButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   infoRow: {
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    minHeight: 22,
   },
   infoLabel: {
     fontSize: 12,
     fontWeight: '700',
+    flexShrink: 0,
   },
   infoValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
+    flex: 1,
+    textAlign: 'right',
   },
   inlineDivider: {
     height: 1,
-    marginVertical: 14,
+    marginVertical: 10,
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   inputLabel: {
     fontSize: 12,
@@ -435,9 +478,9 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
     fontWeight: '600',
   },
   primaryButton: {
@@ -462,12 +505,13 @@ const styles = StyleSheet.create({
   dangerCard: {
     borderWidth: 1,
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
   },
   dangerHeader: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
   },
   dangerIconWrap: {
     width: 32,
@@ -480,17 +524,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dangerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   dangerText: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '500',
   },
   deleteButton: {
-    minHeight: 46,
+    minHeight: 42,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -503,7 +547,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     justifyContent: 'center',
   },
   modalKeyboardWrap: {
@@ -517,26 +561,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   modalSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '500',
-    maxWidth: 240,
+    maxWidth: 220,
   },
   closeButton: {
     width: 32,
@@ -548,11 +592,11 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   secondaryButton: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
