@@ -448,6 +448,7 @@ export default function SavedAddressesScreen() {
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               keyboardShouldPersistTaps="handled"
+              bounces={false}
               showsVerticalScrollIndicator={false}>
               <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.modalHeader}>
@@ -829,19 +830,21 @@ const styles = StyleSheet.create({
   },
   modalKeyboardWrap: {
     width: '100%',
+    flex: 1,
   },
   modalScroll: {
     width: '100%',
+    flexGrow: 0,
   },
   modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'flex-end',
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   modalCard: {
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    maxHeight: '92%',
+    maxHeight: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
