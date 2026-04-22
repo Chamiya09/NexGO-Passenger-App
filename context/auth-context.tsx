@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
 type AuthUser = {
   id: string;
@@ -35,41 +35,6 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AUTH_STORAGE_KEY = 'nexgo-passenger-auth';
-
-const resolveApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, '');
-  }
-
-  const hostUri =
-    (Constants as any)?.expoConfig?.hostUri ||
-    (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ||
-    (Constants as any)?.manifest?.debuggerHost;
-
-  if (typeof hostUri === 'string' && hostUri.length > 0) {
-    const host = hostUri.split(':')[0];
-    if (host) {
-      return `http://${host}:5000/api`;
-    }
-  }
-
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
-  }
-
-  return 'http://localhost:5000/api';
-};
-
-const API_BASE_URL = resolveApiBaseUrl();
-
-async function parseResponse(response: Response) {
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.message || 'Request failed');
-  }
-
-  return data;
-}
 
 async function persistSession(nextToken: string, nextUser: AuthUser) {
   await AsyncStorage.setItem(
@@ -110,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        const data = await parseResponse(response);
+        const data = await parseApiResponse<{ user: AuthUser }>(response);
         setToken(parsedSession.token);
         setUser(data.user);
         await persistSession(parsedSession.token, data.user);
@@ -137,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await parseResponse(response);
+      const data = await parseApiResponse<{ token: string; user: AuthUser }>(response);
       setUser(data.user);
       setToken(data.token);
       await persistSession(data.token, data.user);
@@ -157,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ fullName, email, phoneNumber, password }),
       });
 
-      const data = await parseResponse(response);
+      const data = await parseApiResponse<{ token: string; user: AuthUser }>(response);
       setUser(data.user);
       setToken(data.token);
       await persistSession(data.token, data.user);
