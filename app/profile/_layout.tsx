@@ -13,7 +13,15 @@ export default function ProfileStackLayout() {
         headerBackTitleVisible: false,
         headerBackButtonDisplayMode: 'minimal',
       }}>
-      <Stack.Screen name="personal-details" options={{ title: 'Personal Details' }} />
+      <Stack.Screen
+        name="personal-details"
+        options={{
+          title: 'Personal Details',
+          headerTitleStyle: {
+            marginTop: 6,
+          },
+        }}
+      />
       <Stack.Screen name="membership" options={{ title: 'Membership' }} />
       <Stack.Screen name="saved-addresses" options={{ title: 'Saved Addresses' }} />
       <Stack.Screen name="payment-details" options={{ title: 'Payment Details' }} />
