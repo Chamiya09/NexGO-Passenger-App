@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   ScrollView,
   Pressable,
@@ -17,36 +17,27 @@ import { useAuth } from '@/context/auth-context';
 
 type ProfileSection = {
   title: string;
-  subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route: '/profile/personal-details' | '/profile/payment-details' | '/profile/privacy-security' | '/profile/support-help';
+  route:
+    | '/profile/personal-details'
+    | '/profile/membership'
+    | '/profile/support-help'
+    | '/profile/saved-addresses'
+    | '/profile/payment-details'
+    | '/profile/privacy-security'
+    | '/profile/earn-with-nexgo'
+    | '/profile/about-us';
+  badge?: string;
 };
 
 const PROFILE_SECTIONS: ProfileSection[] = [
-  {
-    title: 'Personal Details',
-    subtitle: 'Name, email, phone, and saved places',
-    icon: 'person-circle-outline',
-    route: '/profile/personal-details',
-  },
-  {
-    title: 'Payment Details',
-    subtitle: 'Cards, wallet, and billing preferences',
-    icon: 'card-outline',
-    route: '/profile/payment-details',
-  },
-  {
-    title: 'Privacy & Security',
-    subtitle: 'Password, 2FA, and trusted devices',
-    icon: 'shield-checkmark-outline',
-    route: '/profile/privacy-security',
-  },
-  {
-    title: 'Support & Help',
-    subtitle: 'Safety center and 24/7 app support',
-    icon: 'help-buoy-outline',
-    route: '/profile/support-help',
-  },
+  { title: 'Membership', icon: 'ribbon-outline', route: '/profile/membership' },
+  { title: 'Account Security', icon: 'shield-checkmark-outline', route: '/profile/privacy-security' },
+  { title: 'Help and Support', icon: 'help-circle-outline', route: '/profile/support-help' },
+  { title: 'Saved Addresses', icon: 'heart-outline', route: '/profile/saved-addresses', badge: 'New' },
+  { title: 'Payment', icon: 'card-outline', route: '/profile/payment-details' },
+  { title: 'Earn with NexGO', icon: 'car-sport-outline', route: '/profile/earn-with-nexgo' },
+  { title: 'About Us', icon: 'information-circle-outline', route: '/profile/about-us' },
 ];
 
 export default function ProfileScreen() {
@@ -60,74 +51,91 @@ export default function ProfileScreen() {
     .map((part) => part[0]?.toUpperCase() || '')
     .join('');
 
-  const userSince = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return `Member since ${currentYear - 1}`;
-  }, []);
-
-  const onLogout = () => {
-    logout();
-    router.replace('/login');
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroCard}>
-          <View style={styles.heroGlowOne} />
-          <View style={styles.heroGlowTwo} />
-
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials || 'P'}</Text>
+        <View style={styles.profileHead}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarInitials}>{initials || 'P'}</Text>
           </View>
 
-          <Text style={styles.name}>{fullName}</Text>
-          <Text style={styles.meta}>{user?.email || 'No email available'}</Text>
-          <Text style={styles.memberSince}>{userSince}</Text>
+          <Pressable style={styles.nameRow} onPress={() => router.push('/profile/personal-details')}>
+            <Text style={styles.nameText}>{fullName}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#64748B" />
+          </Pressable>
 
-          <View style={styles.badgesRow}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeLabel}>Points</Text>
-              <Text style={styles.badgeValue}>450</Text>
-            </View>
-            <View style={styles.badge}>
-              <Text style={styles.badgeLabel}>Rides</Text>
-              <Text style={styles.badgeValue}>32</Text>
-            </View>
-            <View style={styles.badge}>
-              <Text style={styles.badgeLabel}>Rating</Text>
-              <Text style={styles.badgeValue}>4.9</Text>
-            </View>
+          <View style={styles.memberTag}>
+            <Text style={styles.memberTagText}>NEXGO PLUS</Text>
           </View>
+        </View>
+
+        <View style={styles.progressCard}>
+          <View style={styles.progressTopRow}>
+            <Text style={styles.progressTitle}>
+              5 of 10 <Text style={styles.progressTitleAccent}>profile complete</Text>
+            </Text>
+            <Text style={styles.progressLink}>Complete now</Text>
+          </View>
+
+          <View style={styles.progressTrack}>
+            <View style={styles.progressFill} />
+          </View>
+
+          <Text style={styles.progressCaption}>
+            Add a few more details for faster bookings and safer rides.
+          </Text>
+        </View>
+
+        <View style={styles.offerCard}>
+          <Text style={styles.offerLabel}>NexGO Wallet</Text>
+          <Text style={styles.offerTitle}>Get cashback on rides and unlock monthly perks</Text>
+          <Pressable style={styles.offerButton}>
+            <Text style={styles.offerButtonText}>Activate now</Text>
+          </Pressable>
+
+          <View style={styles.offerDecorOne} />
+          <View style={styles.offerDecorTwo} />
         </View>
 
         {PROFILE_SECTIONS.map((section) => (
           <Pressable
             key={section.title}
-            style={styles.sectionBox}
+            style={styles.settingRow}
             onPress={() => router.push(section.route)}>
-            <View style={styles.sectionIconWrap}>
-              <Ionicons name={section.icon} size={22} color="#0E857C" />
+            <View style={styles.settingLeft}>
+              <Ionicons name={section.icon} size={25} color="#1E1E22" />
+              <Text style={styles.settingText}>{section.title}</Text>
             </View>
-            <View style={styles.sectionTextWrap}>
-              <Text style={styles.sectionBoxTitle}>{section.title}</Text>
-              <Text style={styles.sectionBoxSubtitle}>{section.subtitle}</Text>
+
+            <View style={styles.settingRight}>
+              {section.badge ? (
+                <View style={styles.badgePill}>
+                  <Text style={styles.badgePillText}>{section.badge}</Text>
+                </View>
+              ) : null}
+              <Ionicons name="chevron-forward" size={22} color="#B8BCC4" />
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#8CA3A0" />
           </Pressable>
         ))}
 
-        <View style={styles.dangerZone}>
-          <Text style={styles.dangerZoneTitle}>Session</Text>
-          <Text style={styles.dangerZoneText}>Log out from this device and require sign in next time.</Text>
+        <Pressable
+          style={[styles.settingRow, styles.logoutRow]}
+          onPress={() => {
+            logout();
+            router.replace('/login');
+          }}>
+          <View style={styles.settingLeft}>
+            <Ionicons name="log-out-outline" size={24} color="#C03939" />
+            <Text style={styles.logoutRowText}>Log out</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color="#D4A9A9" />
+        </Pressable>
 
-          <Pressable style={styles.logoutButton} onPress={onLogout}>
-            <Text style={styles.logoutText}>Log out</Text>
-          </Pressable>
+        <View style={styles.footerWrap}>
+          <Text style={styles.footerTop}>Made with ❤️ in Sri Lanka</Text>
+          <Text style={styles.footerBottom}>App version: 1.0.0 - 264</Text>
         </View>
-
-        <Text style={styles.versionText}>NexGO Passenger v1.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -136,180 +144,226 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F3F8F7',
+    backgroundColor: '#F4F7F6',
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   container: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 30,
   },
-  heroCard: {
-    borderRadius: 24,
-    padding: 22,
-    backgroundColor: '#0B8D83',
-    marginBottom: 20,
-    overflow: 'hidden',
-    shadowColor: '#0D2D2A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 6,
+  profileHead: {
+    alignItems: 'center',
+    paddingTop: 8,
+    marginBottom: 16,
   },
-  heroGlowOne: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    top: -45,
-    right: -35,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  heroGlowTwo: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    bottom: -40,
-    left: -25,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+  avatarCircle: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: '#DDE9E7',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#CDE0DC',
+  },
+  avatarInitials: {
+    fontSize: 32,
+    color: '#1E4B45',
+    fontWeight: '800',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  nameText: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: '#173A36',
+    marginRight: 4,
+  },
+  memberTag: {
+    height: 30,
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0C746A',
+  },
+  memberTagText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressCard: {
+    borderRadius: 16,
+    backgroundColor: '#E9F1F8',
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DDE7F2',
+  },
+  progressTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  progressTitle: {
+    fontSize: 15,
+    color: '#1F3552',
+    fontWeight: '700',
+  },
+  progressTitleAccent: {
+    color: '#345E93',
+    fontWeight: '700',
+  },
+  progressLink: {
+    color: '#2569A3',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 4,
+    backgroundColor: '#C7D9EA',
+    marginBottom: 10,
+  },
+  progressFill: {
+    width: '50%',
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#1F5F9A',
+  },
+  progressCaption: {
+    color: '#314D70',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  offerCard: {
+    borderRadius: 18,
+    backgroundColor: '#0F8A80',
+    minHeight: 150,
+    padding: 16,
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  offerLabel: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8FAF7',
+    color: '#0A5C54',
+    fontWeight: '700',
+    fontSize: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  offerTitle: {
+    width: '62%',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 23,
     marginBottom: 14,
   },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  meta: {
-    fontSize: 14,
-    color: '#E8FCFA',
-    marginBottom: 4,
-  },
-  memberSince: {
-    color: '#CFF4EF',
-    fontSize: 13,
-    marginBottom: 16,
-    fontWeight: '600',
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  badge: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  badgeLabel: {
-    color: '#D9F8F4',
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  badgeValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sectionHeading: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#123733',
-    marginBottom: 4,
-  },
-  sectionSubheading: {
-    fontSize: 13,
-    color: '#5D7572',
-    marginBottom: 12,
-  },
-  sectionBox: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E6ECEB',
+  offerButton: {
+    alignSelf: 'flex-start',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    marginBottom: 11,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  offerButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#10312D',
+  },
+  offerDecorOne: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    right: -26,
+    top: -22,
+    backgroundColor: '#0A766D',
+  },
+  offerDecorTwo: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    right: -68,
+    bottom: -96,
+    backgroundColor: '#3AC0B0',
+    opacity: 0.35,
+  },
+  settingRow: {
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    minHeight: 72,
+    paddingHorizontal: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0F2F2C',
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    justifyContent: 'space-between',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
     elevation: 2,
   },
-  sectionIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
+  settingLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EEF7F6',
-    marginRight: 12,
+    gap: 12,
   },
-  sectionTextWrap: {
-    flex: 1,
+  settingText: {
+    fontSize: 17,
+    color: '#1C1F24',
+    fontWeight: '500',
   },
-  sectionBoxTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A3E3A',
-    marginBottom: 2,
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  sectionBoxSubtitle: {
-    fontSize: 13,
-    color: '#708684',
-  },
-  dangerZone: {
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: '#FFF6F6',
-    borderWidth: 1,
-    borderColor: '#F4D1D1',
-  },
-  dangerZoneTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#7B2727',
-    marginBottom: 4,
-  },
-  dangerZoneText: {
-    color: '#8C4747',
-    fontSize: 13,
-    marginBottom: 12,
-  },
-  logoutButton: {
-    height: 48,
+  badgePill: {
+    backgroundColor: '#E43A3A',
+    paddingHorizontal: 11,
+    height: 20,
     borderRadius: 12,
-    backgroundColor: '#D84242',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoutText: {
+  badgePillText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: '700',
   },
-  versionText: {
-    marginTop: 14,
-    textAlign: 'center',
-    color: '#9BAAA9',
-    fontSize: 12,
+  logoutRow: {
+    marginTop: 8,
+    backgroundColor: '#FFF7F7',
+  },
+  logoutRowText: {
+    fontSize: 17,
+    color: '#B72F2F',
     fontWeight: '600',
+  },
+  footerWrap: {
+    paddingVertical: 14,
+    paddingHorizontal: 2,
+  },
+  footerTop: {
+    fontSize: 16,
+    color: '#252A34',
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  footerBottom: {
+    color: '#9DA3AE',
+    fontSize: 14,
   },
 });
