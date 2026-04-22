@@ -102,9 +102,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionHeading}>Profile Settings</Text>
-        <Text style={styles.sectionSubheading}>Tap a section to open and manage details.</Text>
-
         {PROFILE_SECTIONS.map((section) => (
           <Pressable
             key={section.title}
@@ -241,42 +238,42 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionBox: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#DEE9E8',
+    borderColor: '#E6ECEB',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    marginBottom: 11,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#102A28',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 1,
+    shadowColor: '#0F2F2C',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
   },
   sectionIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E7F6F4',
+    backgroundColor: '#EEF7F6',
     marginRight: 12,
   },
   sectionTextWrap: {
     flex: 1,
   },
   sectionBoxTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#173E3A',
+    color: '#1A3E3A',
     marginBottom: 2,
   },
   sectionBoxSubtitle: {
-    fontSize: 12,
-    color: '#647A78',
+    fontSize: 13,
+    color: '#708684',
   },
   dangerZone: {
     borderRadius: 16,

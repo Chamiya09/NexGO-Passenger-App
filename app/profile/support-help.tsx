@@ -5,22 +5,24 @@ export default function SupportHelpScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.heading}>Support & Help</Text>
-        <Text style={styles.subheading}>Get help for rides, billing, and safety.</Text>
+        <Text style={styles.pageHint}>Get help for rides, billing, and safety.</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Safety center</Text>
-          <Text style={styles.value}>Emergency tools and ride safety support</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>24/7 chat support</Text>
-          <Text style={styles.value}>Available in app for urgent issues</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>FAQ and guides</Text>
-          <Text style={styles.value}>Payments, rides, profile and account help</Text>
+        <Text style={styles.groupTitle}>SUPPORT</Text>
+        <View style={styles.groupCard}>
+          <View style={styles.row}>
+            <Text style={styles.label}>Safety center</Text>
+            <Text style={styles.value}>Always on</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.label}>24/7 chat support</Text>
+            <Text style={styles.value}>Available</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.label}>FAQ and guides</Text>
+            <Text style={styles.value}>Browse topics</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -35,33 +37,46 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
   },
-  heading: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#153F3A',
-    marginBottom: 4,
-  },
-  subheading: {
+  pageHint: {
     fontSize: 14,
-    color: '#5A7471',
+    color: '#738786',
     marginBottom: 14,
   },
-  card: {
-    borderRadius: 14,
+  groupTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7E9190',
+    marginBottom: 8,
+    letterSpacing: 0.4,
+  },
+  groupCard: {
+    borderRadius: 13,
     borderWidth: 1,
-    borderColor: '#DEE9E8',
+    borderColor: '#E7ECEB',
     backgroundColor: '#FFFFFF',
-    padding: 14,
-    marginBottom: 10,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  row: {
+    minHeight: 52,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#EEF2F1',
+    marginLeft: 14,
   },
   label: {
-    fontSize: 13,
-    color: '#65817D',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#2E4C49',
   },
   value: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#163F3B',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#617977',
   },
 });
