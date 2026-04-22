@@ -1,5 +1,7 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text } from 'react-native';
+
+import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 
 export default function AboutUsScreen() {
   return (
@@ -7,26 +9,15 @@ export default function AboutUsScreen() {
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.pageHint}>NexGO helps passengers book reliable rides with transparent pricing.</Text>
 
-        <Text style={styles.groupTitle}>APP INFO</Text>
-        <View style={styles.groupCard}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Version</Text>
-            <Text style={styles.value}>1.0.0</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.label}>Build</Text>
-            <Text style={styles.value}>264</Text>
-          </View>
-        </View>
+        <ProfileDetailsGroup
+          title="APP INFO"
+          rows={[
+            { label: 'Version', value: '1.0.0' },
+            { label: 'Build', value: '264' },
+          ]}
+        />
 
-        <Text style={styles.groupTitle}>COMPANY</Text>
-        <View style={styles.groupCard}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Headquarters</Text>
-            <Text style={styles.value}>Sri Lanka</Text>
-          </View>
-        </View>
+        <ProfileDetailsGroup title="COMPANY" rows={[{ label: 'Headquarters', value: 'Sri Lanka' }]} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -35,7 +26,7 @@ export default function AboutUsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F0F1F3',
+    backgroundColor: '#F4F7F6',
   },
   container: {
     padding: 20,
@@ -44,42 +35,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#738786',
     marginBottom: 14,
-  },
-  groupTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7E9190',
-    marginBottom: 8,
-    letterSpacing: 0.4,
-  },
-  groupCard: {
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: '#E7ECEB',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 14,
-    overflow: 'hidden',
-  },
-  row: {
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#EEF2F1',
-    marginLeft: 14,
-  },
-  label: {
-    fontSize: 15,
-    color: '#2E4C49',
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#617977',
   },
 });
