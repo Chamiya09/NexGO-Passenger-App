@@ -450,152 +450,154 @@ export default function SavedAddressesScreen() {
               keyboardShouldPersistTaps="handled"
               bounces={false}
               showsVerticalScrollIndicator={false}>
-              <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.modalHeader}>
-                  <View>
-                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Saved Address</Text>
-                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                      Move the map and save the centered location.
-                    </Text>
+              <View style={styles.modalSheet}>
+                <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.modalHeader}>
+                    <View>
+                      <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Saved Address</Text>
+                      <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                        Move the map and save the centered location.
+                      </Text>
+                    </View>
+
+                    <Pressable style={styles.closeButton} onPress={closeAddModal} disabled={saving}>
+                      <Ionicons name="close" size={20} color={colors.textPrimary} />
+                    </Pressable>
                   </View>
 
-                  <Pressable style={styles.closeButton} onPress={closeAddModal} disabled={saving}>
-                    <Ionicons name="close" size={20} color={colors.textPrimary} />
-                  </Pressable>
-                </View>
+                  <View style={styles.labelRow}>
+                    {(['Home', 'Work', 'Other'] as AddressLabel[]).map((label) => {
+                      const isActive = form.label === label;
 
-                <View style={styles.labelRow}>
-                  {(['Home', 'Work', 'Other'] as AddressLabel[]).map((label) => {
-                    const isActive = form.label === label;
-
-                    return (
-                      <Pressable
-                        key={label}
-                        style={[
-                          styles.labelChip,
-                          {
-                            backgroundColor: isActive ? colors.accentSoft : colors.input,
-                            borderColor: isActive ? colors.accent : colors.border,
-                          },
-                        ]}
-                        onPress={() => handleChange('label', label)}>
-                        <Ionicons
-                          name={labelIconMap[label]}
-                          size={14}
-                          color={isActive ? colors.accent : colors.textSecondary}
-                        />
-                        <Text
+                      return (
+                        <Pressable
+                          key={label}
                           style={[
-                            styles.labelChipText,
-                            { color: isActive ? colors.accent : colors.textPrimary },
-                          ]}>
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <View style={[styles.mapCard, { borderColor: colors.border }]}>
-                  <MapView
-                    style={StyleSheet.absoluteFillObject}
-                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                    mapType="standard"
-                    initialRegion={DEFAULT_REGION}
-                    region={mapRegion}
-                    onRegionChangeComplete={(region) => {
-                      setSelectedLocation({
-                        latitude: region.latitude,
-                        longitude: region.longitude,
-                      });
-                    }}
-                  />
-
-                  <View pointerEvents="none" style={styles.fixedMarkerContainer}>
-                    <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />
-                  </View>
-                </View>
-
-                <View style={[styles.selectedLocationCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <View style={styles.selectedLocationHeader}>
-                    <Text style={[styles.selectedLocationLabel, { color: colors.textSecondary }]}>Selected from map</Text>
-                    {resolvingAddress ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-                  </View>
-                  <Text style={[styles.selectedLocationText, { color: colors.textPrimary }]}>{selectedAddressLine}</Text>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Address title</Text>
-                  <TextInput
-                    value={form.title}
-                    onChangeText={(value) => handleChange('title', value)}
-                    placeholder="Home, Office, Gym"
-                    placeholderTextColor={colors.textSecondary}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Pickup note</Text>
-                  <TextInput
-                    value={form.note}
-                    onChangeText={(value) => handleChange('note', value)}
-                    placeholder="Gate number, building entrance, security desk"
-                    placeholderTextColor={colors.textSecondary}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                  />
-                </View>
-
-                <View style={[styles.switchRow, { borderColor: colors.border }]}>
-                  <View style={styles.switchTextWrap}>
-                    <Text style={[styles.switchTitle, { color: colors.textPrimary }]}>Set as default</Text>
-                    <Text style={[styles.switchHint, { color: colors.textSecondary }]}>
-                      Use this place first when selecting pickups.
-                    </Text>
+                            styles.labelChip,
+                            {
+                              backgroundColor: isActive ? colors.accentSoft : colors.input,
+                              borderColor: isActive ? colors.accent : colors.border,
+                            },
+                          ]}
+                          onPress={() => handleChange('label', label)}>
+                          <Ionicons
+                            name={labelIconMap[label]}
+                            size={14}
+                            color={isActive ? colors.accent : colors.textSecondary}
+                          />
+                          <Text
+                            style={[
+                              styles.labelChipText,
+                              { color: isActive ? colors.accent : colors.textPrimary },
+                            ]}>
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
                   </View>
 
-                  <Switch
-                    value={form.isDefault}
-                    onValueChange={(value) => handleChange('isDefault', value)}
-                    trackColor={{ false: '#C7D4D2', true: colors.accent }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
+                  <View style={[styles.mapCard, { borderColor: colors.border }]}>
+                    <MapView
+                      style={StyleSheet.absoluteFillObject}
+                      provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                      mapType="standard"
+                      initialRegion={DEFAULT_REGION}
+                      region={mapRegion}
+                      onRegionChangeComplete={(region) => {
+                        setSelectedLocation({
+                          latitude: region.latitude,
+                          longitude: region.longitude,
+                        });
+                      }}
+                    />
 
-                <View style={styles.modalActions}>
-                  <Pressable
-                    style={[styles.secondaryButton, { borderColor: colors.border }]}
-                    onPress={closeAddModal}
-                    disabled={saving}>
-                    <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>Cancel</Text>
-                  </Pressable>
+                    <View pointerEvents="none" style={styles.fixedMarkerContainer}>
+                      <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />
+                    </View>
+                  </View>
 
-                  <Pressable
-                    style={[
-                      styles.submitButton,
-                      { backgroundColor: colors.accent },
-                      saving ? styles.submitButtonDisabled : null,
-                    ]}
-                    onPress={() => {
-                      void saveAddress();
-                    }}
-                    disabled={saving}>
-                    <Text style={styles.submitButtonText}>{saving ? 'Saving...' : 'Save Address'}</Text>
-                  </Pressable>
+                  <View style={[styles.selectedLocationCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                    <View style={styles.selectedLocationHeader}>
+                      <Text style={[styles.selectedLocationLabel, { color: colors.textSecondary }]}>Selected from map</Text>
+                      {resolvingAddress ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                    </View>
+                    <Text style={[styles.selectedLocationText, { color: colors.textPrimary }]}>{selectedAddressLine}</Text>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Address title</Text>
+                    <TextInput
+                      value={form.title}
+                      onChangeText={(value) => handleChange('title', value)}
+                      placeholder="Home, Office, Gym"
+                      placeholderTextColor={colors.textSecondary}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.border,
+                          color: colors.textPrimary,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Pickup note</Text>
+                    <TextInput
+                      value={form.note}
+                      onChangeText={(value) => handleChange('note', value)}
+                      placeholder="Gate number, building entrance, security desk"
+                      placeholderTextColor={colors.textSecondary}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.border,
+                          color: colors.textPrimary,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  <View style={[styles.switchRow, { borderColor: colors.border }]}>
+                    <View style={styles.switchTextWrap}>
+                      <Text style={[styles.switchTitle, { color: colors.textPrimary }]}>Set as default</Text>
+                      <Text style={[styles.switchHint, { color: colors.textSecondary }]}>
+                        Use this place first when selecting pickups.
+                      </Text>
+                    </View>
+
+                    <Switch
+                      value={form.isDefault}
+                      onValueChange={(value) => handleChange('isDefault', value)}
+                      trackColor={{ false: '#C7D4D2', true: colors.accent }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <Pressable
+                      style={[styles.secondaryButton, { borderColor: colors.border }]}
+                      onPress={closeAddModal}
+                      disabled={saving}>
+                      <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.submitButton,
+                        { backgroundColor: colors.accent },
+                        saving ? styles.submitButtonDisabled : null,
+                      ]}
+                      onPress={() => {
+                        void saveAddress();
+                      }}
+                      disabled={saving}>
+                      <Text style={styles.submitButtonText}>{saving ? 'Saving...' : 'Save Address'}</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             </ScrollView>
@@ -840,11 +842,14 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 8,
   },
+  modalSheet: {
+    minHeight: '100%',
+    justifyContent: 'flex-end',
+  },
   modalCard: {
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
-    maxHeight: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
