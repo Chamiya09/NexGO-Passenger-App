@@ -825,10 +825,10 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     justifyContent: 'flex-end',
     paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 0) + 12 : 12,
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   modalKeyboardWrap: {
     width: '100%',
@@ -839,34 +839,34 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   modalScrollContent: {
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   modalSheet: {
     minHeight: '100%',
     justifyContent: 'flex-end',
   },
   modalCard: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   modalSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '500',
-    maxWidth: 240,
+    maxWidth: 220,
   },
   closeButton: {
     width: 32,
@@ -878,11 +878,11 @@ const styles = StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   labelChip: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 36,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -891,15 +891,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   labelChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   mapCard: {
-    height: 180,
-    borderRadius: 16,
+    height: 156,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   fixedMarkerContainer: {
     position: 'absolute',
@@ -918,9 +918,9 @@ const styles = StyleSheet.create({
   selectedLocationCard: {
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    marginBottom: 10,
   },
   selectedLocationHeader: {
     flexDirection: 'row',
@@ -934,12 +934,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   selectedLocationText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '600',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   inputLabel: {
     fontSize: 12,
@@ -949,18 +949,18 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
     fontWeight: '600',
   },
   switchRow: {
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginTop: 2,
-    marginBottom: 14,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -970,14 +970,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   switchTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 2,
   },
   switchHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
-    maxWidth: 220,
+    maxWidth: 200,
   },
   modalActions: {
     flexDirection: 'row',
@@ -985,19 +985,19 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   submitButton: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1007,7 +1007,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
 });
