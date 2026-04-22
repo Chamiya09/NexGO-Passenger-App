@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
@@ -26,13 +27,21 @@ type SavedAddress = {
   label: AddressLabel;
   title: string;
   addressLine: string;
+  latitude: number;
+  longitude: number;
   note: string;
   isDefault: boolean;
 };
 
+const DEFAULT_REGION = {
+  latitude: 6.9271,
+  longitude: 79.8612,
+  latitudeDelta: 0.025,
+  longitudeDelta: 0.025,
+};
+
 const initialForm = {
   title: '',
-  addressLine: '',
   note: '',
   label: 'Other' as AddressLabel,
   isDefault: false,
@@ -53,6 +62,12 @@ export default function SavedAddressesScreen() {
   const [saving, setSaving] = useState(false);
   const [updatingDefaultId, setUpdatingDefaultId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState({
+    latitude: DEFAULT_REGION.latitude,
+    longitude: DEFAULT_REGION.longitude,
+  });
+  const [selectedAddressLine, setSelectedAddressLine] = useState('Move the map to choose an address');
+  const [resolvingAddress, setResolvingAddress] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -99,11 +114,63 @@ export default function SavedAddressesScreen() {
     void loadSavedAddresses();
   }, [token]);
 
+  useEffect(() => {
+    if (!isModalVisible) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        setResolvingAddress(true);
+        const response = await fetch(
+          `https://photon.komoot.io/reverse?lon=${selectedLocation.longitude}&lat=${selectedLocation.latitude}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error('Unable to resolve location');
+        }
+
+        const data = await response.json();
+        let composedName = 'Selected map location';
+
+        if (data?.features?.length > 0) {
+          const p = data.features[0].properties || {};
+          const detail = p.street || p.name || p.district || p.locality;
+          const region = p.city || p.county || p.state;
+          const country = p.country;
+
+          const parts = [detail, region, country].filter(Boolean);
+          if (parts.length > 0) {
+            composedName = parts.join(', ');
+          }
+        }
+
+        setSelectedAddressLine(composedName);
+      } catch {
+        setSelectedAddressLine('Selected map location');
+      } finally {
+        setResolvingAddress(false);
+      }
+    }, 700);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [isModalVisible, selectedLocation]);
+
   const openAddModal = () => {
     setForm({
       ...initialForm,
       isDefault: addresses.length === 0,
     });
+    setSelectedLocation({
+      latitude: DEFAULT_REGION.latitude,
+      longitude: DEFAULT_REGION.longitude,
+    });
+    setSelectedAddressLine('Move the map to choose an address');
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsModalVisible(true);
@@ -126,8 +193,12 @@ export default function SavedAddressesScreen() {
   };
 
   const validateForm = () => {
-    if (!form.title.trim() || !form.addressLine.trim()) {
-      return 'Address title and location are required.';
+    if (!form.title.trim()) {
+      return 'Address title is required.';
+    }
+
+    if (!selectedAddressLine || selectedAddressLine === 'Move the map to choose an address') {
+      return 'Choose the address from the map before saving.';
     }
 
     return null;
@@ -160,7 +231,9 @@ export default function SavedAddressesScreen() {
         body: JSON.stringify({
           label: form.label,
           title: form.title.trim(),
-          addressLine: form.addressLine.trim(),
+          addressLine: selectedAddressLine,
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
           note: form.note.trim(),
           isDefault: form.isDefault,
         }),
@@ -234,6 +307,16 @@ export default function SavedAddressesScreen() {
     }
   };
 
+  const mapRegion = useMemo(
+    () => ({
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      latitudeDelta: DEFAULT_REGION.latitudeDelta,
+      longitudeDelta: DEFAULT_REGION.longitudeDelta,
+    }),
+    [selectedLocation]
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -249,9 +332,9 @@ export default function SavedAddressesScreen() {
           </Text>
 
           <View style={[styles.tipCard, { backgroundColor: colors.warningSoft, borderColor: '#F4DFB8' }]}>
-            <Ionicons name="flash-outline" size={16} color={colors.warning} />
+            <Ionicons name="map-outline" size={16} color={colors.warning} />
             <Text style={[styles.tipText, { color: colors.textPrimary }]}>
-              Set one default address to speed up your next booking flow.
+              New addresses are selected directly from the map, just like the ride booking flow.
             </Text>
           </View>
         </View>
@@ -370,7 +453,7 @@ export default function SavedAddressesScreen() {
                   <View>
                     <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Saved Address</Text>
                     <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                      Save a pickup point for faster ride booking.
+                      Move the map and save the centered location.
                     </Text>
                   </View>
 
@@ -411,6 +494,34 @@ export default function SavedAddressesScreen() {
                   })}
                 </View>
 
+                <View style={[styles.mapCard, { borderColor: colors.border }]}>
+                  <MapView
+                    style={StyleSheet.absoluteFillObject}
+                    provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                    mapType="standard"
+                    initialRegion={DEFAULT_REGION}
+                    region={mapRegion}
+                    onRegionChangeComplete={(region) => {
+                      setSelectedLocation({
+                        latitude: region.latitude,
+                        longitude: region.longitude,
+                      });
+                    }}
+                  />
+
+                  <View pointerEvents="none" style={styles.fixedMarkerContainer}>
+                    <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />
+                  </View>
+                </View>
+
+                <View style={[styles.selectedLocationCard, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                  <View style={styles.selectedLocationHeader}>
+                    <Text style={[styles.selectedLocationLabel, { color: colors.textSecondary }]}>Selected from map</Text>
+                    {resolvingAddress ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                  </View>
+                  <Text style={[styles.selectedLocationText, { color: colors.textPrimary }]}>{selectedAddressLine}</Text>
+                </View>
+
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Address title</Text>
                   <TextInput
@@ -420,26 +531,6 @@ export default function SavedAddressesScreen() {
                     placeholderTextColor={colors.textSecondary}
                     style={[
                       styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Address</Text>
-                  <TextInput
-                    value={form.addressLine}
-                    onChangeText={(value) => handleChange('addressLine', value)}
-                    placeholder="Street, city, landmark"
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    style={[
-                      styles.input,
-                      styles.textArea,
                       {
                         backgroundColor: colors.input,
                         borderColor: colors.border,
@@ -791,6 +882,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  mapCard: {
+    height: 220,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  fixedMarkerContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fixedMarkerIcon: {
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 6,
+  },
+  selectedLocationCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  selectedLocationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  selectedLocationLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  selectedLocationText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
   inputGroup: {
     marginBottom: 12,
   },
@@ -806,10 +941,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     fontWeight: '600',
-  },
-  textArea: {
-    minHeight: 84,
-    textAlignVertical: 'top',
   },
   switchRow: {
     borderWidth: 1,
