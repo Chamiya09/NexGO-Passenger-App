@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -113,11 +116,45 @@ export default function PaymentDetailsScreen() {
     setForm(initialForm);
   };
 
+  const validatePaymentForm = () => {
+    const cardholderName = form.cardholderName.trim();
+    const cardNumber = form.cardNumber.replace(/\D/g, '');
+    const expiryMonth = form.expiryMonth.trim();
+    const expiryYear = form.expiryYear.trim();
+
+    if (!cardholderName || !cardNumber || !expiryMonth || !expiryYear) {
+      return 'Please complete all payment method fields.';
+    }
+
+    if (cardNumber.length < 12 || cardNumber.length > 19) {
+      return 'Card number must be between 12 and 19 digits.';
+    }
+
+    if (!/^(0?[1-9]|1[0-2])$/.test(expiryMonth)) {
+      return 'Enter a valid expiry month between 1 and 12.';
+    }
+
+    if (!/^\d{2,4}$/.test(expiryYear)) {
+      return 'Enter a valid expiry year with 2 or 4 digits.';
+    }
+
+    return null;
+  };
+
   const submitPaymentMethod = async () => {
     if (!token) {
       setErrorMessage('You need to be logged in to add a payment method.');
       return;
     }
+
+    const validationError = validatePaymentForm();
+    if (validationError) {
+      setErrorMessage(validationError);
+      setSuccessMessage(null);
+      return;
+    }
+
+    Keyboard.dismiss();
 
     setSaving(true);
     setErrorMessage(null);
@@ -130,7 +167,13 @@ export default function PaymentDetailsScreen() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          cardholderName: form.cardholderName.trim(),
+          cardNumber: form.cardNumber.replace(/\D/g, ''),
+          expiryMonth: form.expiryMonth.trim(),
+          expiryYear: form.expiryYear.trim(),
+          isDefault: form.isDefault,
+        }),
       });
 
       const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
@@ -275,135 +318,152 @@ export default function PaymentDetailsScreen() {
 
       <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={closeAddModal}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Payment Method</Text>
-                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                  Save masked card details securely for future rides.
-                </Text>
+          <KeyboardAvoidingView
+            style={styles.modalKeyboardWrap}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}>
+              <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Payment Method</Text>
+                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                      Save masked card details securely for future rides.
+                    </Text>
+                  </View>
+
+                  <Pressable style={styles.closeButton} onPress={closeAddModal} disabled={saving}>
+                    <Ionicons name="close" size={20} color={colors.textPrimary} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Cardholder name</Text>
+                  <TextInput
+                    value={form.cardholderName}
+                    onChangeText={(value) => handleChange('cardholderName', value)}
+                    placeholder="Name on card"
+                    placeholderTextColor={colors.textSecondary}
+                    returnKeyType="next"
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Card number</Text>
+                  <TextInput
+                    value={form.cardNumber}
+                    onChangeText={(value) => handleChange('cardNumber', value)}
+                    placeholder="1234 5678 9012 3456"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="number-pad"
+                    returnKeyType="next"
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.inlineFields}>
+                  <View style={[styles.inputGroup, styles.inlineField]}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry month</Text>
+                    <TextInput
+                      value={form.expiryMonth}
+                      onChangeText={(value) => handleChange('expiryMonth', value)}
+                      placeholder="MM"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="number-pad"
+                      returnKeyType="next"
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.border,
+                          color: colors.textPrimary,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  <View style={[styles.inputGroup, styles.inlineField]}>
+                    <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry year</Text>
+                    <TextInput
+                      value={form.expiryYear}
+                      onChangeText={(value) => handleChange('expiryYear', value)}
+                      placeholder="YYYY"
+                      placeholderTextColor={colors.textSecondary}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={() => {
+                        void submitPaymentMethod();
+                      }}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.border,
+                          color: colors.textPrimary,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.switchRow, { borderColor: colors.border }]}>
+                  <View>
+                    <Text style={[styles.switchTitle, { color: colors.textPrimary }]}>Set as default</Text>
+                    <Text style={[styles.switchHint, { color: colors.textSecondary }]}>
+                      Use this payment method first for future rides.
+                    </Text>
+                  </View>
+
+                  <Switch
+                    value={form.isDefault}
+                    onValueChange={(value) => handleChange('isDefault', value)}
+                    trackColor={{ false: '#C7D4D2', true: colors.accent }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={[styles.secondaryButton, { borderColor: colors.border }]}
+                    onPress={closeAddModal}
+                    disabled={saving}>
+                    <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.submitButton,
+                      { backgroundColor: colors.accent },
+                      saving ? styles.submitButtonDisabled : null,
+                    ]}
+                    onPress={() => {
+                      void submitPaymentMethod();
+                    }}
+                    disabled={saving}>
+                    <Text style={styles.submitButtonText}>{saving ? 'Saving...' : 'Save Method'}</Text>
+                  </Pressable>
+                </View>
               </View>
-
-              <Pressable style={styles.closeButton} onPress={closeAddModal} disabled={saving}>
-                <Ionicons name="close" size={20} color={colors.textPrimary} />
-              </Pressable>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Cardholder name</Text>
-              <TextInput
-                value={form.cardholderName}
-                onChangeText={(value) => handleChange('cardholderName', value)}
-                placeholder="Name on card"
-                placeholderTextColor={colors.textSecondary}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Card number</Text>
-              <TextInput
-                value={form.cardNumber}
-                onChangeText={(value) => handleChange('cardNumber', value)}
-                placeholder="1234 5678 9012 3456"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="number-pad"
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.border,
-                    color: colors.textPrimary,
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.inlineFields}>
-              <View style={[styles.inputGroup, styles.inlineField]}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry month</Text>
-                <TextInput
-                  value={form.expiryMonth}
-                  onChangeText={(value) => handleChange('expiryMonth', value)}
-                  placeholder="MM"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                />
-              </View>
-
-              <View style={[styles.inputGroup, styles.inlineField]}>
-                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry year</Text>
-                <TextInput
-                  value={form.expiryYear}
-                  onChangeText={(value) => handleChange('expiryYear', value)}
-                  placeholder="YYYY"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.border,
-                      color: colors.textPrimary,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={[styles.switchRow, { borderColor: colors.border }]}>
-              <View>
-                <Text style={[styles.switchTitle, { color: colors.textPrimary }]}>Set as default</Text>
-                <Text style={[styles.switchHint, { color: colors.textSecondary }]}>
-                  Use this payment method first for future rides.
-                </Text>
-              </View>
-
-              <Switch
-                value={form.isDefault}
-                onValueChange={(value) => handleChange('isDefault', value)}
-                trackColor={{ false: '#C7D4D2', true: colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.secondaryButton, { borderColor: colors.border }]}
-                onPress={closeAddModal}
-                disabled={saving}>
-                <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.submitButton,
-                  { backgroundColor: colors.accent },
-                  saving ? styles.submitButtonDisabled : null,
-                ]}
-                onPress={() => {
-                  void submitPaymentMethod();
-                }}
-                disabled={saving}>
-                <Text style={styles.submitButtonText}>{saving ? 'Saving...' : 'Save Method'}</Text>
-              </Pressable>
-            </View>
-          </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -588,6 +648,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
+  },
+  modalKeyboardWrap: {
+    width: '100%',
+  },
+  modalScroll: {
+    width: '100%',
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   modalHeader: {
     flexDirection: 'row',
