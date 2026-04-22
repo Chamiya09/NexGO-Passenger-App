@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { UrlTile, Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -99,7 +99,8 @@ export default function ConfirmRouteScreen() {
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          mapType={Platform.OS === 'android' ? 'none' : 'standard'}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          mapType="standard"
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
@@ -107,14 +108,6 @@ export default function ConfirmRouteScreen() {
             longitudeDelta: 0.05,
           }}
         >
-          <UrlTile
-            urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maximumZ={19}
-            flipY={false}
-            shouldReplaceMapContent={true}
-            zIndex={-1}
-          />
-          
           {/* Pickup Marker */}
           {pLat && pLng && (
             <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3}>
