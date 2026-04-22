@@ -4,7 +4,11 @@ import { Redirect } from 'expo-router';
 import { useAuth } from '@/context/auth-context';
 
 export default function IndexScreen() {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
+
+  if (initializing) {
+    return null;
+  }
 
   if (!user) {
     return <Redirect href="/login" />;

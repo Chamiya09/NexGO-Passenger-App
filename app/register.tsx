@@ -31,7 +31,9 @@ export default function RegisterScreen() {
         phoneNumber: phoneNumber.trim(),
         password,
       });
-      router.replace('/(tabs)');
+      Alert.alert('Account created', 'Your account has been created. Please sign in.', [
+        { text: 'OK', onPress: () => router.replace('/login') },
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Registration failed';
       Alert.alert('Registration failed', message);

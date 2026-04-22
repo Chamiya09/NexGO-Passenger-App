@@ -6,7 +6,11 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
 
 export default function TabLayout() {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
+
+  if (initializing) {
+    return null;
+  }
 
   if (!user) {
     return <Redirect href="/login" />;

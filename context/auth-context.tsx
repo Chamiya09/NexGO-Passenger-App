@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
 type AuthUser = {
@@ -23,6 +25,7 @@ type RegisterPayload = {
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
+  initializing: boolean;
   loading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
@@ -31,9 +34,23 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const AUTH_STORAGE_KEY = 'nexgo-passenger-auth';
+
 const resolveApiBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, '');
+  }
+
+  const hostUri =
+    (Constants as any)?.expoConfig?.hostUri ||
+    (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ||
+    (Constants as any)?.manifest?.debuggerHost;
+
+  if (typeof hostUri === 'string' && hostUri.length > 0) {
+    const host = hostUri.split(':')[0];
+    if (host) {
+      return `http://${host}:5000/api`;
+    }
   }
 
   if (Platform.OS === 'android') {
@@ -54,10 +71,60 @@ async function parseResponse(response: Response) {
   return data;
 }
 
+async function persistSession(nextToken: string, nextUser: AuthUser) {
+  await AsyncStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({ token: nextToken, user: nextUser })
+  );
+}
+
+async function clearSession() {
+  await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const hydrateAuth = async () => {
+      try {
+        const sessionRaw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+
+        if (!sessionRaw) {
+          return;
+        }
+
+        const parsedSession = JSON.parse(sessionRaw) as { token?: string; user?: AuthUser };
+
+        if (!parsedSession?.token) {
+          await clearSession();
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${parsedSession.token}`,
+          },
+        });
+
+        const data = await parseResponse(response);
+        setToken(parsedSession.token);
+        setUser(data.user);
+        await persistSession(parsedSession.token, data.user);
+      } catch {
+        setToken(null);
+        setUser(null);
+        await clearSession();
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    void hydrateAuth();
+  }, []);
 
   const login = async ({ email, password }: LoginPayload) => {
     setLoading(true);
@@ -73,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await parseResponse(response);
       setUser(data.user);
       setToken(data.token);
+      await persistSession(data.token, data.user);
     } finally {
       setLoading(false);
     }
@@ -92,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await parseResponse(response);
       setUser(data.user);
       setToken(data.token);
+      await persistSession(data.token, data.user);
     } finally {
       setLoading(false);
     }
@@ -100,11 +169,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null);
     setToken(null);
+    void clearSession();
   };
 
   const value = useMemo(
-    () => ({ user, token, loading, login, register, logout }),
-    [user, token, loading]
+    () => ({ user, token, initializing, loading, login, register, logout }),
+    [user, token, initializing, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
