@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -26,6 +26,30 @@ export default function ConfirmRouteScreen() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
   const [rideRequesting, setRideRequesting] = useState(false);
+  // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
+  const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
+  const [acceptedData, setAcceptedData] = useState<{ vehicleType: string } | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  // ── One ride at a time guard ────────────────────────────────────────────────
+  const [hasActiveRide, setHasActiveRide] = useState(false);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (!token) return;
+    // Check whether user already has a Pending or Accepted ride
+    fetch(`${(process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000/api').replace(/\/$/, '')}/rides/my-rides`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const active = (data.rides ?? []).some(
+          (r: { status: string }) => r.status === 'Pending' || r.status === 'Accepted'
+        );
+        setHasActiveRide(active);
+      })
+      .catch(() => {}); // Silently ignore network errors
+  }, [token]);
 
   // Safely parse parameters
   const pLat = parseFloat(params.pLat as string);
@@ -105,16 +129,17 @@ export default function ConfirmRouteScreen() {
     socket.on('rideAccepted', (data) => {
       console.log('[Passenger] rideAccepted received:', data);
       setRideRequesting(false);
-      Alert.alert(
-        '🚗 Driver is on the way!',
-        `Your ${data.vehicleType} has been accepted. The driver is heading to your pickup location.`,
-        [{ text: 'OK', style: 'default' }]
-      );
+      setAcceptedData({ vehicleType: data.vehicleType ?? selectedVehicle });
+      setOverlayState('accepted');
+      // Fade the overlay content in
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     });
 
     socket.on('rideError', (err) => {
       console.error('[Passenger] rideError:', err);
       setRideRequesting(false);
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
       Alert.alert('Request Failed', err.message ?? 'Something went wrong. Please try again.');
     });
 
@@ -147,6 +172,16 @@ export default function ConfirmRouteScreen() {
     }
 
     setRideRequesting(true);
+    setOverlayState('finding');
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    // Pulse animation loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.18, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
 
     socketRef.current.emit('requestRide', {
       passengerId: user.id,
@@ -421,24 +456,132 @@ export default function ConfirmRouteScreen() {
                 </View>
               )}
 
+              {/* Active ride warning banner */}
+              {hasActiveRide && (
+                <View style={styles.activeRideBanner}>
+                  <Ionicons name="information-circle-outline" size={16} color="#D97706" />
+                  <Text style={styles.activeRideBannerText}>
+                    You already have an active ride. Complete or cancel it first.
+                  </Text>
+                </View>
+              )}
+
               {/* Confirm Book Button */}
               <TouchableOpacity
-                style={[styles.superConfirmButton, rideRequesting && styles.superConfirmButtonDisabled]}
+                style={[
+                  styles.superConfirmButton,
+                  (rideRequesting || hasActiveRide) && styles.superConfirmButtonDisabled,
+                ]}
                 onPress={confirmRide}
-                disabled={rideRequesting}>
+                disabled={rideRequesting || hasActiveRide}>
                 {rideRequesting ? (
                   <View style={styles.superConfirmButtonContent}>
                     <ActivityIndicator size="small" color="#FFF" />
                     <Text style={styles.superConfirmButtonText}>Finding a Driver...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} - {getPriceForSelected()}</Text>
+                  <Text style={styles.superConfirmButtonText}>
+                    {hasActiveRide ? 'Ride Already Active' : `Confirm ${selectedVehicle} - ${getPriceForSelected()}`}
+                  </Text>
                 )}
               </TouchableOpacity>
             </>
           )}
         </View>
       </View>
+
+      {/* ── Finding / Accepted Overlay ── */}
+      <Modal
+        visible={overlayState !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (overlayState === 'accepted') {
+            setOverlayState(null);
+            pulseAnim.stopAnimation();
+            setHasActiveRide(false);
+            router.back();
+          }
+        }}>
+        <View style={styles.overlayBackdrop}>
+          <Animated.View style={[styles.overlayCard, { opacity: fadeAnim }]}>
+            {overlayState === 'finding' ? (
+              /* ── Searching state (white card) ── */
+              <>
+                {/* Pulsing teal icon ring */}
+                <Animated.View style={[styles.overlayIconRing, { transform: [{ scale: pulseAnim }] }]}>
+                  <View style={styles.overlayIconInner}>
+                    <Text style={styles.overlayCarEmoji}>🚗</Text>
+                  </View>
+                </Animated.View>
+
+                <Text style={styles.overlayTitle}>Finding your NexGO...</Text>
+                <Text style={styles.overlaySub}>
+                  {'Matching you with the nearest '}{selectedVehicle}{' driver. Hang tight!'}
+                </Text>
+
+                <View style={styles.overlayDotsRow}>
+                  <ActivityIndicator size="small" color={teal} />
+                  <Text style={styles.overlayDotsText}>Connecting nearby drivers</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.overlayCancelBtn}
+                  onPress={() => {
+                    setOverlayState(null);
+                    setRideRequesting(false);
+                    pulseAnim.stopAnimation();
+                  }}>
+                  <Text style={styles.overlayCancelText}>Cancel Request</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* ── Accepted state (white card) ── */
+              <>
+                <View style={styles.overlayCheckCircle}>
+                  <Ionicons name="checkmark-circle" size={52} color={teal} />
+                </View>
+
+                <Text style={styles.overlayTitle}>Driver is on the way!</Text>
+                <Text style={styles.overlaySub}>
+                  {'Your '}{acceptedData?.vehicleType ?? selectedVehicle}
+                  {' has been confirmed. The driver is heading to your pickup location.'}
+                </Text>
+
+                {/* Route summary block */}
+                <View style={styles.overlayRouteBlock}>
+                  <View style={styles.overlayRouteRow}>
+                    <View style={[styles.overlayRouteDot, { backgroundColor: teal }]} />
+                    <Text style={styles.overlayRouteText} numberOfLines={1}>
+                      {(pName as string) || 'Pickup location'}
+                    </Text>
+                  </View>
+                  <View style={styles.overlayRouteConnector} />
+                  <View style={styles.overlayRouteRow}>
+                    <View style={[styles.overlayRouteDot, { backgroundColor: '#E74C3C' }]} />
+                    <Text style={styles.overlayRouteText} numberOfLines={1}>
+                      {(dName as string) || 'Drop-off location'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.overlayDoneBtn}
+                  onPress={() => {
+                    setOverlayState(null);
+                    pulseAnim.stopAnimation();
+                    setHasActiveRide(true); // lock confirm until ride completes
+                    router.back();
+                  }}>
+                  <Text style={styles.overlayDoneText}>Got it</Text>
+                  <Ionicons name="arrow-forward" size={17} color="#FFF" />
+                </TouchableOpacity>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -753,5 +896,103 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontWeight: '700',
     color: '#017270',
+  },
+  // ── Finding / Accepted overlay ─────────────────────────────────────────────
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 30, 28, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  overlayCard: {
+    width: '100%',
+    backgroundColor: '#008080',
+    borderRadius: 28,
+    padding: 30,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 24,
+  },
+  overlayIconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+  overlayIconInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayCarEmoji: {
+    fontSize: 32,
+  },
+  overlayCheckCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+  overlayTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  overlaySub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 24,
+  },
+  overlayDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 28,
+  },
+  overlayDotsText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  overlayCancelBtn: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+  },
+  overlayCancelText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  overlayDoneBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 44,
+  },
+  overlayDoneText: {
+    color: '#008080',
+    fontSize: 16,
+    fontWeight: '900',
   },
 });
