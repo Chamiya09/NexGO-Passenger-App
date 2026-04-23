@@ -140,6 +140,8 @@ export default function ConfirmRouteScreen() {
       setRideRequesting(false);
       setOverlayState(null);
       pulseAnim.stopAnimation();
+      // Release the lock — the ride was never created successfully
+      setHasActiveRide(false);
       Alert.alert('Request Failed', err.message ?? 'Something went wrong. Please try again.');
     });
 
@@ -171,7 +173,9 @@ export default function ConfirmRouteScreen() {
       return;
     }
 
+    // Lock the confirm button immediately — stays locked until driver accepts or error
     setRideRequesting(true);
+    setHasActiveRide(true);
     setOverlayState('finding');
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
@@ -531,6 +535,8 @@ export default function ConfirmRouteScreen() {
                   onPress={() => {
                     setOverlayState(null);
                     setRideRequesting(false);
+                    // Release lock — passenger explicitly cancelled before any driver accepted
+                    setHasActiveRide(false);
                     pulseAnim.stopAnimation();
                   }}>
                   <Text style={styles.overlayCancelText}>Cancel Request</Text>
@@ -897,102 +903,172 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#017270',
   },
+  // ── Active ride banner ────────────────────────────────────────────────────
+  activeRideBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8EC',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  activeRideBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+    lineHeight: 17,
+  },
   // ── Finding / Accepted overlay ─────────────────────────────────────────────
   overlayBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10, 30, 28, 0.72)',
+    backgroundColor: 'rgba(10, 28, 26, 0.75)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
+    paddingHorizontal: 22,
   },
   overlayCard: {
     width: '100%',
-    backgroundColor: '#008080',
+    backgroundColor: '#FFFFFF',         // ← white card, system UI theme
     borderRadius: 28,
-    padding: 30,
+    padding: 28,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 24,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 20,
   },
   overlayIconRing: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 22,
+    marginBottom: 20,
   },
   overlayIconInner: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: '#D0EFEC',
     alignItems: 'center',
     justifyContent: 'center',
   },
   overlayCarEmoji: {
-    fontSize: 32,
+    fontSize: 30,
   },
   overlayCheckCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#E9F8EF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 22,
+    marginBottom: 18,
   },
   overlayTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
+    color: '#102A28',                    // ← dark text on white card
+    fontSize: 21,
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   overlaySub: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 14,
+    color: '#617C79',
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 24,
+    lineHeight: 20,
+    marginBottom: 20,
   },
   overlayDotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 28,
+    backgroundColor: '#F0F5F4',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 22,
+    width: '100%',
+    justifyContent: 'center',
   },
   overlayDotsText: {
-    color: 'rgba(255,255,255,0.75)',
+    color: '#617C79',
     fontSize: 13,
     fontWeight: '700',
   },
   overlayCancelBtn: {
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderWidth: 1.5,
+    borderColor: '#D9E9E6',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 36,
+    width: '100%',
+    alignItems: 'center',
   },
   overlayCancelText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+    color: '#617C79',
+    fontSize: 14,
     fontWeight: '800',
   },
+  // Route block inside the accepted overlay
+  overlayRouteBlock: {
+    width: '100%',
+    backgroundColor: '#F7FBFA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  overlayRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  overlayRouteDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  overlayRouteText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#102A28',
+  },
+  overlayRouteConnector: {
+    width: 2,
+    height: 14,
+    backgroundColor: '#D9E9E6',
+    borderRadius: 1,
+    marginLeft: 4,
+    marginVertical: 3,
+  },
   overlayDoneBtn: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: teal,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    justifyContent: 'center',
   },
   overlayDoneText: {
-    color: '#008080',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '900',
   },
 });
+
