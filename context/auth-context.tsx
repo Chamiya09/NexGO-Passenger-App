@@ -30,6 +30,12 @@ type UpdateProfilePayload = {
   profileImageUrl?: string;
 };
 
+type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+};
+
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
@@ -38,6 +44,7 @@ type AuthContextValue = {
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
+  changePassword: (payload: ChangePasswordPayload) => Promise<void>;
   deleteAccount: () => Promise<void>;
   logout: () => void;
 };
@@ -165,6 +172,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const changePassword = async ({
+    currentPassword,
+    newPassword,
+    confirmNewPassword,
+  }: ChangePasswordPayload) => {
+    if (!token) {
+      throw new Error('You need to be logged in to change your password.');
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me/password`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmNewPassword,
+        }),
+      });
+
+      await parseApiResponse<{ message: string }>(response);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteAccount = async () => {
     if (!token) {
       throw new Error('You need to be logged in to delete your account.');
@@ -195,7 +232,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ user, token, initializing, loading, login, register, updateProfile, deleteAccount, logout }),
+    () => ({
+      user,
+      token,
+      initializing,
+      loading,
+      login,
+      register,
+      updateProfile,
+      changePassword,
+      deleteAccount,
+      logout,
+    }),
     [user, token, initializing, loading]
   );
 
