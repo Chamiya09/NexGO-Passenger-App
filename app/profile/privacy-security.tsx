@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 const PRIVACY_ACTIONS = [
@@ -57,68 +58,47 @@ export default function PrivacySecurityScreen() {
             Review sign-in safety, data visibility, and trusted access across your NexGO account.
           </Text>
 
-          <View style={styles.heroStatsRow}>
-            <View style={[styles.heroStatCard, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
-              <Text style={[styles.heroStatValue, { color: colors.textPrimary }]}>4</Text>
-              <Text style={[styles.heroStatLabel, { color: colors.textSecondary }]}>Privacy checks</Text>
+          <View style={[styles.heroDetailsCard, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+            <View style={styles.heroDetailRow}>
+              <View style={styles.heroDetailLeft}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.accent} />
+                <Text style={[styles.heroDetailLabel, { color: colors.textPrimary }]}>Sign-in protection</Text>
+              </View>
+              <Text style={[styles.heroDetailValue, { color: colors.textSecondary }]}>Password and 2FA settings</Text>
             </View>
 
-            <View style={[styles.heroStatCard, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
-              <Text style={[styles.heroStatValue, { color: colors.textPrimary }]}>2</Text>
-              <Text style={[styles.heroStatLabel, { color: colors.textSecondary }]}>Alerts enabled</Text>
+            <View style={[styles.heroInlineDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.heroDetailRow}>
+              <View style={styles.heroDetailLeft}>
+                <Ionicons name="notifications-outline" size={16} color={colors.accent} />
+                <Text style={[styles.heroDetailLabel, { color: colors.textPrimary }]}>Security alerts</Text>
+              </View>
+              <Text style={[styles.heroDetailValue, { color: colors.textSecondary }]}>New login and account activity notices</Text>
             </View>
 
-            <View style={[styles.heroStatCard, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
-              <Text style={[styles.heroStatValue, { color: colors.textPrimary }]}>45d</Text>
-              <Text style={[styles.heroStatLabel, { color: colors.textSecondary }]}>Password age</Text>
+            <View style={[styles.heroInlineDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.heroDetailRow}>
+              <View style={styles.heroDetailLeft}>
+                <Ionicons name="document-text-outline" size={16} color={colors.accent} />
+                <Text style={[styles.heroDetailLabel, { color: colors.textPrimary }]}>Privacy requests</Text>
+              </View>
+              <Text style={[styles.heroDetailValue, { color: colors.textSecondary }]}>Download data and manage blocked contacts</Text>
             </View>
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT SAFETY</Text>
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {PRIVACY_ACTIONS.map((item, index) => (
-            <View key={item.title}>
-              <Pressable style={styles.actionRow}>
-                <View style={styles.rowLeft}>
-                  <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-                    <Ionicons name={item.icon} size={17} color={colors.accent} />
-                  </View>
-
-                  <View style={styles.rowTextWrap}>
-                    <View style={styles.titleBadgeRow}>
-                      <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-                      {item.badge ? (
-                        <View
-                          style={[
-                            styles.inlineBadge,
-                            {
-                              backgroundColor: item.badge === 'Off' ? colors.warningSoft : colors.accentSoft,
-                            },
-                          ]}>
-                          <Text
-                            style={[
-                              styles.inlineBadgeText,
-                              { color: item.badge === 'Off' ? colors.warning : colors.accent },
-                            ]}>
-                            {item.badge}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
-                  </View>
-                </View>
-
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </Pressable>
-
-              {index < PRIVACY_ACTIONS.length - 1 ? (
-                <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-              ) : null}
-            </View>
-          ))}
-        </View>
+        <ProfileDetailsGroup
+          title="ACCOUNT SAFETY"
+          actionRows={PRIVACY_ACTIONS.map((item) => ({
+            title: item.title,
+            subtitle: item.subtitle,
+            icon: item.icon,
+            badge: item.badge,
+            badgeTone: item.badge === 'Off' ? 'warning' : 'accent',
+          }))}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,95 +143,33 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: '500',
   },
-  heroStatsRow: {
-    flexDirection: 'row',
-    gap: 10,
+  heroDetailsCard: {
+    borderWidth: 1,
+    borderRadius: 14,
     marginTop: 14,
   },
-  heroStatCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 14,
+  heroDetailRow: {
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    alignItems: 'center',
+    gap: 8,
   },
-  heroStatValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  heroStatLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    marginBottom: 6,
-    marginTop: 2,
-  },
-  groupCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  actionRow: {
-    minHeight: 78,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  heroDetailLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
+    marginBottom: 3,
   },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowTextWrap: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 14,
+  heroDetailLabel: {
+    fontSize: 13,
     fontWeight: '800',
-    marginBottom: 2,
   },
-  rowSubtitle: {
+  heroDetailValue: {
     fontSize: 12,
     lineHeight: 17,
     fontWeight: '500',
   },
-  titleBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: 2,
-  },
-  inlineBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  inlineBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  divider: {
+  heroInlineDivider: {
     height: 1,
-    marginLeft: 60,
+    marginLeft: 12,
   },
 });
