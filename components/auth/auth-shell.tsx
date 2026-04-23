@@ -3,32 +3,51 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
+  eyebrow: string;
   title: string;
   subtitle: string;
   children: React.ReactNode;
 };
 
-export default function AuthShell({ title, subtitle, children }: Props) {
+export default function AuthShell({ eyebrow, title, subtitle, children }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-          <View style={styles.content}>{children}</View>
-        </View>
+      <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.authWrap}>
+            <View style={styles.brandHeader}>
+              <View style={styles.logoMark}>
+                <Ionicons name="navigate" size={22} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.brandName}>NexGO</Text>
+                <Text style={styles.brandCaption}>Passenger</Text>
+              </View>
+            </View>
+
+            <View style={styles.hero}>
+              <Text style={styles.eyebrow}>{eyebrow}</Text>
+              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
+            </View>
+
+            <View style={styles.content}>{children}</View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -37,43 +56,84 @@ export default function AuthShell({ title, subtitle, children }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F3F6F6',
+    backgroundColor: '#F4F8F7',
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
-  container: {
+  keyboardWrap: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
   },
-  card: {
+  container: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 26,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  authWrap: {
     width: '100%',
-    maxWidth: 430,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E4ECEB',
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    shadowColor: '#102A28',
+    maxWidth: 380,
+    alignSelf: 'center',
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 28,
+  },
+  logoMark: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#14988F',
+    shadowColor: '#0C5E59',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  brandName: {
+    color: '#123532',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  brandCaption: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  hero: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  eyebrow: {
+    color: '#14988F',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#102A28',
+    color: '#123532',
+    fontSize: 28,
+    lineHeight: 33,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   subtitle: {
-    marginTop: 8,
-    color: '#5C706E',
-    fontSize: 14,
+    color: '#617C79',
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: '500',
+    marginTop: 9,
+    maxWidth: 300,
+    textAlign: 'center',
   },
   content: {
-    marginTop: 18,
-    gap: 10,
+    gap: 14,
   },
 });
