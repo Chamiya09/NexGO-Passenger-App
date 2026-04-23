@@ -500,7 +500,7 @@ export default function SavedAddressesScreen() {
                   <View style={[styles.mapCard, { borderColor: colors.border }]}>
                     <MapView
                       style={StyleSheet.absoluteFillObject}
-                      mapType="none"
+                      mapType={Platform.OS === 'android' ? 'none' : 'standard'}
                       initialRegion={DEFAULT_REGION}
                       region={mapRegion}
                       onRegionChangeComplete={(region) => {

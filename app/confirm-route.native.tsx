@@ -269,7 +269,7 @@ export default function ConfirmRouteScreen() {
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          mapType="none"
+          mapType={Platform.OS === 'android' ? 'none' : 'standard'}
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
