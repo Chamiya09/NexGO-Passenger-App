@@ -162,7 +162,7 @@ const tagStyles = StyleSheet.create({
 });
 
 // ── Ride Card sub-component ───────────────────────────────────────────────────
-function RideCard({ ride }: { ride: Ride }) {
+function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => void }) {
   const pickupName  = shortenLocation(ride.pickup?.name,  ride.pickup?.latitude,  ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
 
@@ -201,7 +201,7 @@ function RideCard({ ride }: { ride: Ride }) {
         </View>
       </View>
 
-      {/* Footer: vehicle + fare */}
+      {/* Footer: vehicle + fare + (optional cancel) */}
       <View style={cardStyles.footer}>
         <View style={cardStyles.vehicleChip}>
           <Ionicons name="car-outline" size={13} color={teal} />
@@ -209,6 +209,16 @@ function RideCard({ ride }: { ride: Ride }) {
         </View>
         <Text style={cardStyles.fare}>LKR {ride.price.toLocaleString()}</Text>
       </View>
+      
+      {/* Cancel button if active (only in Pending/Finding stage) */}
+      {ride.status === 'Pending' && onCancel && (
+        <TouchableOpacity
+          style={cardStyles.cancelBtn}
+          onPress={() => onCancel(ride.id)}
+        >
+          <Text style={cardStyles.cancelBtnText}>Cancel Ride</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -283,6 +293,20 @@ const cardStyles = StyleSheet.create({
   },
   vehicleText: { fontSize: 12, fontWeight: '800', color: teal },
   fare: { fontSize: 15, fontWeight: '900', color: '#102A28' },
+  cancelBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+  },
+  cancelBtnText: {
+    color: '#DC2626',
+    fontWeight: '800',
+    fontSize: 14,
+  },
 });
 
 // ── Empty state ──────────────────────────────────────────────────────────────
@@ -356,6 +380,32 @@ export default function ActivitiesScreen() {
   useEffect(() => {
     fetchRides();
   }, [fetchRides]);
+
+  // ── Cancel ride via API ───────────────────────────────────────────────────
+  const handleCancelRide = async (rideId: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/rides/${rideId}/cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? 'Failed to cancel ride');
+      }
+      
+      // Emit cancel payload to socket so driver gets notified live
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('cancelRide', { rideId });
+      }
+
+      setRides((prev) => 
+        prev.map((r) => (r.id === rideId ? { ...r, status: 'Cancelled' } : r))
+      );
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Unable to cancel ride');
+    }
+  };
 
   // ── Socket: real-time status updates ──────────────────────────────────────
   useEffect(() => {
@@ -437,7 +487,7 @@ export default function ActivitiesScreen() {
         <FlatList
           data={rides}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RideCard ride={item} />}
+          renderItem={({ item }) => <RideCard ride={item} onCancel={handleCancelRide} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<EmptyState />}

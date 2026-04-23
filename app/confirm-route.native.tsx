@@ -29,6 +29,8 @@ export default function ConfirmRouteScreen() {
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
   const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
   const [acceptedData, setAcceptedData] = useState<{ vehicleType: string } | null>(null);
+  const [currentRideId, setCurrentRideId] = useState<string | null>(null);
+  const [currentRideStatus, setCurrentRideStatus] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   // ── One ride at a time guard ────────────────────────────────────────────────
@@ -125,14 +127,46 @@ export default function ConfirmRouteScreen() {
       }
     });
 
-    // Listen for the driver's acceptance
+    socket.on('rideCreated', (data) => {
+      console.log('[Passenger] rideCreated received:', data);
+      setCurrentRideId(data.rideId);
+    });
+
     socket.on('rideAccepted', (data) => {
       console.log('[Passenger] rideAccepted received:', data);
       setRideRequesting(false);
       setAcceptedData({ vehicleType: data.vehicleType ?? selectedVehicle });
       setOverlayState('accepted');
-      // Fade the overlay content in
+      setCurrentRideStatus('Accepted');
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    });
+
+    socket.on('rideStatusUpdate', (data) => {
+      console.log('[Passenger] rideStatusUpdate received:', data);
+      setCurrentRideStatus(data.status);
+
+      if (data.status === 'Completed') {
+        // Stop animations, unlock app, and hide overlay
+        setOverlayState(null);
+        pulseAnim.stopAnimation();
+        setHasActiveRide(false);
+        setCurrentRideId(null);
+        Alert.alert('Trip Completed', 'You have arrived at your destination!');
+        router.back();
+      } else if (data.status === 'Cancelled') {
+         setOverlayState(null);
+         pulseAnim.stopAnimation();
+         setHasActiveRide(false);
+         setCurrentRideId(null);
+      }
+    });
+
+    socket.on('rideCancelled', () => {
+      console.log('[Passenger] rideCancelled received');
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
+      setHasActiveRide(false);
+      setCurrentRideId(null);
     });
 
     socket.on('rideError', (err) => {
@@ -533,10 +567,13 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={styles.overlayCancelBtn}
                   onPress={() => {
+                    if (currentRideId && socketRef.current) {
+                      socketRef.current.emit('cancelRide', { rideId: currentRideId });
+                    }
                     setOverlayState(null);
                     setRideRequesting(false);
-                    // Release lock — passenger explicitly cancelled before any driver accepted
                     setHasActiveRide(false);
+                    setCurrentRideId(null);
                     pulseAnim.stopAnimation();
                   }}>
                   <Text style={styles.overlayCancelText}>Cancel Request</Text>
@@ -549,10 +586,14 @@ export default function ConfirmRouteScreen() {
                   <Ionicons name="checkmark-circle" size={52} color={teal} />
                 </View>
 
-                <Text style={styles.overlayTitle}>Driver is on the way!</Text>
+                <Text style={styles.overlayTitle}>
+                  {currentRideStatus === 'InProgress' ? 'Ride is in progress!' : 'Driver is on the way!'}
+                </Text>
                 <Text style={styles.overlaySub}>
-                  {'Your '}{acceptedData?.vehicleType ?? selectedVehicle}
-                  {' has been confirmed. The driver is heading to your pickup location.'}
+                  {currentRideStatus === 'InProgress' 
+                    ? `You are heading to your destination in your ${acceptedData?.vehicleType ?? selectedVehicle}.`
+                    : `Your ${acceptedData?.vehicleType ?? selectedVehicle} has been confirmed. The driver is heading to your pickup location.`
+                  }
                 </Text>
 
                 {/* Route summary block */}
