@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 
-const { width, height } = Dimensions.get('window');
+const teal = '#169F95';
 
 export default function RideScreen() {
   const router = useRouter();
@@ -120,6 +120,16 @@ export default function RideScreen() {
       {/* Bottom Sheet Card */}
       <View style={styles.bottomCardContainer}>
         <View style={styles.bottomCard}>
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.eyebrow}>BOOK RIDE</Text>
+              <Text style={styles.sheetTitle}>Set your route</Text>
+            </View>
+            <View style={styles.statusPill}>
+              <Ionicons name="radio-outline" size={14} color={teal} />
+              <Text style={styles.statusPillText}>{activeStep === 'PICKUP' ? 'Pickup' : 'Drop-off'}</Text>
+            </View>
+          </View>
           
           <View style={styles.inputContainer}>
             {/* Timeline Graphic */}
@@ -307,7 +317,7 @@ const styles = StyleSheet.create({
   },
   bottomCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -315,13 +325,46 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 8,
   },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  eyebrow: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 3,
+  },
+  sheetTitle: {
+    color: '#102A28',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  statusPill: {
+    minHeight: 30,
+    borderRadius: 15,
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  statusPillText: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   inputContainer: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#E6EFEF',
-    borderRadius: 14,
+    borderColor: '#D9E9E6',
+    borderRadius: 16,
     padding: 12,
     marginBottom: 16,
+    backgroundColor: '#F7FBFA',
   },
   timeline: {
     alignItems: 'center',
