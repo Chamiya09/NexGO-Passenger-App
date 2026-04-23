@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get('window');
+const teal = '#169F95';
 
 export default function ConfirmRouteScreen() {
   const router = useRouter();
@@ -227,20 +227,27 @@ export default function ConfirmRouteScreen() {
 
                 {/* Title Header */}
                 <View style={styles.sheetHeader}>
-                  <Text style={styles.sheetTitle}>Choose Your Ride</Text>
-                  <View style={styles.distancePill}>
-                    <Text style={styles.distancePillText}>{distance || '9.3 km'}</Text>
+                  <View>
+                    <Text style={styles.eyebrow}>TRIP DETAILS</Text>
+                    <Text style={styles.sheetTitle}>Choose your ride</Text>
+                  </View>
+                  <View style={styles.pillGroup}>
+                    <View style={styles.distancePill}>
+                      <Text style={styles.distancePillText}>{distance || '9.3 km'}</Text>
+                    </View>
+                    <View style={styles.distancePill}>
+                      <Text style={styles.distancePillText}>{duration || '26 min'}</Text>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
 
               {isExpanded && (
                 <>
-                  {/* Path Row */}
-                  <View style={styles.pathRow}>
-                    <Text style={styles.pathText} numberOfLines={1}>{pName?.split(',')[0]}...</Text>
-                    <Feather name="arrow-right" size={16} color="#017270" style={{ marginHorizontal: 8 }} />
-                    <Text style={styles.pathText} numberOfLines={1}>{dName?.split(',')[0]}...</Text>
+                  <View style={styles.routeBlock}>
+                    <RoutePoint icon="radio-button-on" label="Pickup" value={pName || 'Pickup'} />
+                    <View style={styles.routeDivider} />
+                    <RoutePoint icon="location" label="Drop-off" value={dName || 'Drop-off'} />
                   </View>
 
                   {(selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') && (
@@ -325,11 +332,33 @@ export default function ConfirmRouteScreen() {
 
               {/* Confirm Book Button */}
               <TouchableOpacity style={styles.superConfirmButton}>
-                <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} • {getPriceForSelected()}</Text>
+                <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} - {getPriceForSelected()}</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
+      </View>
+    </View>
+  );
+}
+
+function RoutePoint({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.routePoint}>
+      <View style={styles.routeIconWrap}>
+        <Ionicons name={icon} size={16} color={teal} />
+      </View>
+      <View style={styles.routeTextWrap}>
+        <Text style={styles.routeLabel}>{label}</Text>
+        <Text style={styles.routeValue} numberOfLines={1}>{value}</Text>
       </View>
     </View>
   );
@@ -428,7 +457,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   bottomCard: {
-    backgroundColor: '#F0F5F4',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 14,
@@ -455,34 +484,75 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 12,
+    marginBottom: 10,
+  },
+  eyebrow: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 3,
   },
   sheetTitle: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '900',
     color: '#102A28',
   },
+  pillGroup: {
+    alignItems: 'flex-end',
+    gap: 5,
+  },
   distancePill: {
-    backgroundColor: '#D9ECEB',
+    backgroundColor: '#E7F5F3',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   distancePillText: {
-    color: '#017270',
+    color: teal,
     fontWeight: '800',
     fontSize: 12,
   },
-  pathRow: {
+  routeBlock: {
+    borderRadius: 16,
+    backgroundColor: '#F7FBFA',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    padding: 12,
+    marginBottom: 10,
+  },
+  routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 10,
   },
-  pathText: {
-    fontSize: 13,
+  routeIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeTextWrap: {
+    flex: 1,
+  },
+  routeLabel: {
+    color: '#617C79',
+    fontSize: 11,
     fontWeight: '800',
-    color: '#017270',
-    maxWidth: '42%',
+    marginBottom: 2,
+  },
+  routeValue: {
+    color: '#102A28',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  routeDivider: {
+    height: 1,
+    backgroundColor: '#D9E9E6',
+    marginVertical: 10,
+    marginLeft: 40,
   },
   infoWarningText: {
     fontSize: 10,

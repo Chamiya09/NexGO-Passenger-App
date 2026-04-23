@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+const teal = '#169F95';
 
 export default function RideWebScreen() {
   const router = useRouter();
@@ -27,43 +30,67 @@ export default function RideWebScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.mapFallbackCard}>
-          <Ionicons name="map-outline" size={36} color="#14988F" />
-          <Text style={styles.fallbackTitle}>Interactive map is available on mobile app</Text>
-          <Text style={styles.fallbackHint}>
-            Web uses a simplified ride flow. You can continue and confirm your ride from here.
-          </Text>
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>BOOK RIDE</Text>
+          <Text style={styles.title}>Plan your trip</Text>
+          <Text style={styles.subtitle}>Choose pickup, drop-off, and vehicle type with the same NexGO ride flow.</Text>
         </View>
 
-        <View style={styles.routeCard}>
-          <Text style={styles.sectionTitle}>ROUTE</Text>
-          <View style={styles.routeRow}>
-            <Feather name="map-pin" size={16} color="#14988F" />
-            <Text style={styles.routeText}>Pickup: {pickup}</Text>
+        <View style={styles.statusCard}>
+          <View style={styles.statusIconWrap}>
+            <Ionicons name="map-outline" size={24} color="#FFFFFF" />
           </View>
-          <View style={styles.routeRow}>
-            <Feather name="flag" size={16} color="#14988F" />
-            <Text style={styles.routeText}>Drop-off: {dropoff}</Text>
+          <View style={styles.statusTextWrap}>
+            <Text style={styles.statusTitle}>Map preview</Text>
+            <Text style={styles.statusSubtitle}>Interactive map is available on mobile. Web keeps booking simple and clear.</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>CHOOSE VEHICLE</Text>
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Ionicons name="time-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>26m</Text>
+            <Text style={styles.summaryLabel}>ETA</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Ionicons name="navigate-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>9.3</Text>
+            <Text style={styles.summaryLabel}>Km</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Ionicons name="cash-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>{priceMap[selectedVehicle].replace('LKR ', '')}</Text>
+            <Text style={styles.summaryLabel}>Fare</Text>
+          </View>
+        </View>
+
+        <View style={styles.routeBlock}>
+          <RoutePoint icon="radio-button-on" label="Pickup" value={pickup} />
+          <View style={styles.routeDivider} />
+          <RoutePoint icon="location" label="Drop-off" value={dropoff} />
+        </View>
+
+        <View style={styles.sectionHeadingWrap}>
+          <Text style={styles.sectionHeading}>Choose Vehicle</Text>
+          <Text style={styles.sectionSubheading}>Select a ride type before confirming</Text>
+        </View>
+
         <View style={styles.vehicleRow}>
           {(['Mini', 'Sedan', 'Van'] as const).map((vehicle) => {
             const active = selectedVehicle === vehicle;
             return (
-              <TouchableOpacity
+              <Pressable
                 key={vehicle}
                 style={[styles.vehicleCard, active && styles.vehicleCardActive]}
                 onPress={() => setSelectedVehicle(vehicle)}>
                 <MaterialCommunityIcons
                   name={vehicle === 'Van' ? 'van-passenger' : vehicle === 'Sedan' ? 'car-estate' : 'car'}
                   size={24}
-                  color={active ? '#FFFFFF' : '#14988F'}
+                  color={active ? '#FFFFFF' : teal}
                 />
                 <Text style={[styles.vehicleName, active && styles.vehicleNameActive]}>{vehicle}</Text>
                 <Text style={[styles.vehiclePrice, active && styles.vehiclePriceActive]}>{priceMap[vehicle]}</Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>
@@ -84,9 +111,32 @@ export default function RideWebScreen() {
             })
           }>
           <Text style={styles.confirmText}>Confirm {selectedVehicle} - {priceMap[selectedVehicle]}</Text>
+          <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function RoutePoint({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.routePoint}>
+      <View style={styles.routeIconWrap}>
+        <Ionicons name={icon} size={16} color={teal} />
+      </View>
+      <View style={styles.routeTextWrap}>
+        <Text style={styles.routeLabel}>{label}</Text>
+        <Text style={styles.routeValue}>{value}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -99,51 +149,140 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 28,
   },
-  mapFallbackCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D9E9E6',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
+  header: {
+    marginBottom: 16,
   },
-  fallbackTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#123532',
-    marginTop: 10,
-    marginBottom: 6,
+  eyebrow: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 4,
   },
-  fallbackHint: {
+  title: {
+    color: '#102A28',
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 5,
+  },
+  subtitle: {
+    color: '#617C79',
     fontSize: 13,
     lineHeight: 19,
-    color: '#617C79',
+    fontWeight: '600',
   },
-  sectionTitle: {
+  statusCard: {
+    borderRadius: 22,
+    backgroundColor: teal,
+    padding: 16,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTextWrap: {
+    flex: 1,
+  },
+  statusTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 3,
+  },
+  statusSubtitle: {
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 12,
-    color: '#617C79',
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    marginBottom: 8,
+    lineHeight: 17,
+    fontWeight: '600',
   },
-  routeCard: {
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  summaryValue: {
+    color: '#102A28',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  summaryLabel: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  routeBlock: {
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D9E9E6',
-    borderRadius: 16,
     padding: 14,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  routeRow: {
+  routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: 10,
   },
-  routeText: {
+  routeIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeTextWrap: {
+    flex: 1,
+  },
+  routeLabel: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  routeValue: {
+    color: '#102A28',
     fontSize: 14,
-    color: '#123532',
-    fontWeight: '600',
+    fontWeight: '800',
+  },
+  routeDivider: {
+    height: 1,
+    backgroundColor: '#D9E9E6',
+    marginVertical: 10,
+    marginLeft: 42,
+  },
+  sectionHeadingWrap: {
+    marginBottom: 10,
+  },
+  sectionHeading: {
+    color: '#102A28',
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  sectionSubheading: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '500',
   },
   vehicleRow: {
     flexDirection: 'row',
@@ -155,18 +294,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D9E9E6',
-    borderRadius: 14,
+    borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
     gap: 5,
   },
   vehicleCardActive: {
-    backgroundColor: '#14988F',
-    borderColor: '#14988F',
+    backgroundColor: teal,
+    borderColor: teal,
   },
   vehicleName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#123532',
   },
   vehicleNameActive: {
@@ -174,17 +313,20 @@ const styles = StyleSheet.create({
   },
   vehiclePrice: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#617C79',
   },
   vehiclePriceActive: {
     color: '#FFFFFF',
   },
   confirmButton: {
-    backgroundColor: '#14988F',
+    backgroundColor: teal,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
   },
   confirmText: {
     color: '#FFFFFF',

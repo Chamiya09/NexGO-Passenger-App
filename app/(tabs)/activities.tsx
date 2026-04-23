@@ -1,203 +1,418 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, StatusBar as RNStatusBar, ScrollView } from 'react-native';
+import React from 'react';
+import {
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar as RNStatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
-import { CategoryTabs } from '@/components/ui/category-tabs';
+const teal = '#169F95';
 
-const CATEGORIES = ['All', 'Rides', 'Payments', 'Promos'];
-
-const ACTIVITIES = [
+const upcomingRides = [
   {
-    id: 'a1',
-    category: 'Rides',
-    title: 'Ride completed to Uptown Terminal',
-    subtitle: 'Driver: Alex M.',
-    time: 'Today, 08:42 AM',
-    meta: 'PHP 189.00',
-    icon: 'car-outline',
+    id: 'airport-ride',
+    time: '04:30 PM',
+    pickup: 'Colombo Fort Station',
+    dropoff: 'Bandaranaike Airport',
+    fare: 'LKR 4,850',
+    distance: '28.4 km',
   },
   {
-    id: 'a2',
-    category: 'Payments',
-    title: 'Wallet top-up successful',
-    subtitle: 'Added via card ending in 2408',
-    time: 'Yesterday, 05:10 PM',
-    meta: 'PHP 500.00',
-    icon: 'wallet-outline',
-  },
-  {
-    id: 'a3',
-    category: 'Promos',
-    title: 'Promo unlocked: City Saver',
-    subtitle: 'Use code CITYSAVE for 15% off',
-    time: 'Yesterday, 11:30 AM',
-    meta: 'Valid for 5 days',
-    icon: 'pricetag-outline',
-  },
-  {
-    id: 'a4',
-    category: 'Rides',
-    title: 'Ride canceled',
-    subtitle: 'No cancellation fee applied',
-    time: 'Apr 19, 09:27 PM',
-    meta: 'Downtown to Central Park',
-    icon: 'close-circle-outline',
+    id: 'hospital-ride',
+    time: '06:15 PM',
+    pickup: 'Nugegoda Junction',
+    dropoff: 'Asiri Central Hospital',
+    fare: 'LKR 1,620',
+    distance: '8.2 km',
   },
 ];
 
+const recentRides = [
+  { id: 'r1', route: 'Kollupitiya to Bambalapitiya', fare: 'LKR 780', status: 'Completed' },
+  { id: 'r2', route: 'Rajagiriya to Borella', fare: 'LKR 940', status: 'Completed' },
+  { id: 'r3', route: 'Wellawatte to Dehiwala', fare: 'LKR 690', status: 'Completed' },
+];
+
 export default function ActivitiesScreen() {
-  const [activeCategory, setActiveCategory] = useState('All');
-
-  const filteredActivities = useMemo(() => {
-    if (activeCategory === 'All') {
-      return ACTIVITIES;
-    }
-
-    return ACTIVITIES.filter((item) => item.category === activeCategory);
-  }, [activeCategory]);
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Activity Center</Text>
-        <Text style={styles.subtitle}>Track your rides, payments, and offers in one place.</Text>
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>TRIPS</Text>
+          <Text style={styles.title}>Ride activity</Text>
+          <Text style={styles.subtitle}>Track upcoming pickups, active ride flow, and recently completed trips.</Text>
+        </View>
 
-        <CategoryTabs
-          categories={CATEGORIES}
-          activeCategory={activeCategory}
-          onChange={setActiveCategory}
-        />
+        <View style={styles.statusCard}>
+          <View style={styles.statusIconWrap}>
+            <Ionicons name="radio-outline" size={24} color="#FFFFFF" />
+          </View>
+          <View style={styles.statusTextWrap}>
+            <Text style={styles.statusTitle}>No active ride</Text>
+            <Text style={styles.statusSubtitle}>Book a ride from Home to start receiving nearby driver updates.</Text>
+          </View>
+        </View>
 
-        <View style={styles.listContainer}>
-          {filteredActivities.map((activity) => (
-            <View style={styles.card} key={activity.id}>
-              <View style={styles.iconWrap}>
-                <Ionicons name={activity.icon as keyof typeof Ionicons.glyphMap} size={18} color="#169F95" />
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Ionicons name="calendar-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>2</Text>
+            <Text style={styles.summaryLabel}>Upcoming</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Ionicons name="checkmark-done-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>12</Text>
+            <Text style={styles.summaryLabel}>Today</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Ionicons name="time-outline" size={18} color={teal} />
+            <Text style={styles.summaryValue}>41h</Text>
+            <Text style={styles.summaryLabel}>Saved</Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeadingWrap}>
+          <Text style={styles.sectionHeading}>Upcoming Rides</Text>
+          <Text style={styles.sectionSubheading}>Scheduled pickups and accepted ride queue</Text>
+        </View>
+
+        {upcomingRides.map((ride) => (
+          <View key={ride.id} style={styles.rideCard}>
+            <View style={styles.rideHeader}>
+              <View style={styles.timePill}>
+                <Ionicons name="time-outline" size={14} color={teal} />
+                <Text style={styles.timePillText}>{ride.time}</Text>
               </View>
+              <Text style={styles.rideFare}>{ride.fare}</Text>
+            </View>
 
-              <View style={styles.textWrap}>
-                <Text style={styles.cardTitle}>{activity.title}</Text>
-                <Text style={styles.cardSubtitle}>{activity.subtitle}</Text>
+            <View style={styles.routeBlock}>
+              <RoutePoint icon="radio-button-on" label="Pickup" value={ride.pickup} />
+              <View style={styles.routeDivider} />
+              <RoutePoint icon="location" label="Drop-off" value={ride.dropoff} />
+            </View>
 
-                <View style={styles.metaRow}>
-                  <Feather name="clock" size={12} color="#7B9391" />
-                  <Text style={styles.cardTime}>{activity.time}</Text>
+            <View style={styles.rideFooter}>
+              <Text style={styles.distanceText}>{ride.distance}</Text>
+              <Pressable style={styles.detailButton}>
+                <Text style={styles.detailButtonText}>View Details</Text>
+                <Ionicons name="chevron-forward" size={15} color={teal} />
+              </Pressable>
+            </View>
+          </View>
+        ))}
+
+        <View style={styles.sectionHeadingWrap}>
+          <Text style={styles.sectionHeading}>Recent Trips</Text>
+          <Text style={styles.sectionSubheading}>Completed ride history for quick review</Text>
+        </View>
+
+        <View style={styles.recentCard}>
+          {recentRides.map((ride, index) => (
+            <View key={ride.id}>
+              {index > 0 ? <View style={styles.inlineDivider} /> : null}
+              <View style={styles.recentRow}>
+                <View style={styles.recentIconWrap}>
+                  <Ionicons name="car-outline" size={17} color={teal} />
                 </View>
+                <View style={styles.recentTextWrap}>
+                  <Text style={styles.recentRoute}>{ride.route}</Text>
+                  <Text style={styles.recentStatus}>{ride.status}</Text>
+                </View>
+                <Text style={styles.recentFare}>{ride.fare}</Text>
               </View>
-
-              <Text style={styles.cardMeta}>{activity.meta}</Text>
             </View>
           ))}
-
-          {filteredActivities.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateTitle}>No activity yet</Text>
-              <Text style={styles.emptyStateText}>Try choosing another category to view entries.</Text>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function RoutePoint({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.routePoint}>
+      <View style={styles.routeIconWrap}>
+        <Ionicons name={icon} size={16} color={teal} />
+      </View>
+      <View style={styles.routeTextWrap}>
+        <Text style={styles.routeLabel}>{label}</Text>
+        <Text style={styles.routeValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F4F8F7',
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 34,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#102A28',
-    marginBottom: 6,
+  header: {
+    marginBottom: 16,
   },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-    color: '#698280',
-    marginBottom: 18,
-  },
-  listContainer: {
-    marginTop: 18,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: '#F7FBFA',
-    borderRadius: 16,
-    padding: 14,
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#E5F5F3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  textWrap: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#143634',
-    marginBottom: 2,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#647A78',
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cardTime: {
-    fontSize: 12,
-    color: '#7B9391',
-    fontWeight: '500',
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: '#169F95',
-    fontWeight: '700',
-    maxWidth: 90,
-    textAlign: 'right',
-    lineHeight: 18,
-  },
-  emptyState: {
-    backgroundColor: '#F4FAF9',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#DCEBE9',
-    padding: 16,
-    alignItems: 'center',
-  },
-  emptyStateTitle: {
-    fontSize: 14,
-    color: '#173B38',
-    fontWeight: '700',
+  eyebrow: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
     marginBottom: 4,
   },
-  emptyStateText: {
+  title: {
+    color: '#102A28',
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 5,
+  },
+  subtitle: {
+    color: '#617C79',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  statusCard: {
+    borderRadius: 22,
+    backgroundColor: teal,
+    padding: 16,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#0C5E59',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  statusIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTextWrap: {
+    flex: 1,
+  },
+  statusTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 3,
+  },
+  statusSubtitle: {
+    color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 12,
-    color: '#6C8482',
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  summaryValue: {
+    color: '#102A28',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  summaryLabel: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  sectionHeadingWrap: {
+    marginBottom: 10,
+  },
+  sectionHeading: {
+    color: '#102A28',
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  sectionSubheading: {
+    color: '#617C79',
+    fontSize: 12,
     fontWeight: '500',
+  },
+  rideCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    marginBottom: 12,
+  },
+  rideHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  timePill: {
+    minHeight: 30,
+    borderRadius: 15,
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  timePillText: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  rideFare: {
+    color: '#102A28',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  routeBlock: {
+    borderRadius: 16,
+    backgroundColor: '#F7FBFA',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    padding: 12,
+  },
+  routePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  routeIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeTextWrap: {
+    flex: 1,
+  },
+  routeLabel: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  routeValue: {
+    color: '#102A28',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  routeDivider: {
+    height: 1,
+    backgroundColor: '#D9E9E6',
+    marginVertical: 10,
+    marginLeft: 40,
+  },
+  rideFooter: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+  },
+  distanceText: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  detailButton: {
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailButtonText: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  recentCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+  },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
+  recentIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recentTextWrap: {
+    flex: 1,
+  },
+  recentRoute: {
+    color: '#102A28',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  recentStatus: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  recentFare: {
+    color: '#102A28',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  inlineDivider: {
+    height: 1,
+    backgroundColor: '#D9E9E6',
+    marginVertical: 10,
   },
 });
