@@ -1,23 +1,31 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { io, Socket } from 'socket.io-client';
+import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
+
+// Strip the '/api' suffix from the API URL to get the raw server origin for Socket.IO
+const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 
 export default function ConfirmRouteScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
-  
+  const socketRef = useRef<Socket | null>(null);
+  const { user } = useAuth();
+
   const [routesData, setRoutesData] = useState<{coords: {latitude: number, longitude: number}[], distance: string, duration: string}[]>([]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [rideRequesting, setRideRequesting] = useState(false);
 
   // Safely parse parameters
   const pLat = parseFloat(params.pLat as string);
@@ -76,6 +84,89 @@ export default function ConfirmRouteScreen() {
       fetchRoute();
     }
   }, [pLat, pLng, dLat, dLng, selectedVehicle]);
+
+  // ── Socket.IO setup ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const socket = io(SOCKET_SERVER_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Passenger] Socket connected:', socket.id);
+      // Register this passenger so the server can route rideAccepted back to us
+      if (user?.id) {
+        socket.emit('registerPassenger', user.id);
+      }
+    });
+
+    // Listen for the driver's acceptance
+    socket.on('rideAccepted', (data) => {
+      console.log('[Passenger] rideAccepted received:', data);
+      setRideRequesting(false);
+      Alert.alert(
+        '🚗 Driver is on the way!',
+        `Your ${data.vehicleType} has been accepted. The driver is heading to your pickup location.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+    });
+
+    socket.on('rideError', (err) => {
+      console.error('[Passenger] rideError:', err);
+      setRideRequesting(false);
+      Alert.alert('Request Failed', err.message ?? 'Something went wrong. Please try again.');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[Passenger] Socket disconnected');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.id]);
+
+  // ── confirmRide ────────────────────────────────────────────────────────────
+  const PRICE_MAP: Record<string, number> = {
+    Bike: 850,
+    TukTuk: 1115,
+    Mini: 1301,
+    Sedan: 1450,
+    Van: 2100,
+  };
+
+  const confirmRide = () => {
+    if (!socketRef.current?.connected) {
+      Alert.alert('Not Connected', 'Unable to reach the server. Please check your connection.');
+      return;
+    }
+    if (!user?.id) {
+      Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
+      return;
+    }
+
+    setRideRequesting(true);
+
+    socketRef.current.emit('requestRide', {
+      passengerId: user.id,
+      passengerName: user.fullName ?? 'Passenger',
+      vehicleType: selectedVehicle,
+      price: PRICE_MAP[selectedVehicle] ?? 1301,
+      pickup: {
+        latitude: pLat,
+        longitude: pLng,
+        name: pName ?? '',
+      },
+      dropoff: {
+        latitude: dLat,
+        longitude: dLng,
+        name: dName ?? '',
+      },
+    });
+
+    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle);
+  };
 
   // Derived price calculator for dynamic button
   const getPriceForSelected = () => {
@@ -331,8 +422,18 @@ export default function ConfirmRouteScreen() {
               )}
 
               {/* Confirm Book Button */}
-              <TouchableOpacity style={styles.superConfirmButton}>
-                <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} - {getPriceForSelected()}</Text>
+              <TouchableOpacity
+                style={[styles.superConfirmButton, rideRequesting && styles.superConfirmButtonDisabled]}
+                onPress={confirmRide}
+                disabled={rideRequesting}>
+                {rideRequesting ? (
+                  <View style={styles.superConfirmButtonContent}>
+                    <ActivityIndicator size="small" color="#FFF" />
+                    <Text style={styles.superConfirmButtonText}>Finding a Driver...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} - {getPriceForSelected()}</Text>
+                )}
               </TouchableOpacity>
             </>
           )}
@@ -629,6 +730,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  superConfirmButtonDisabled: {
+    backgroundColor: '#4A9A98',
+  },
+  superConfirmButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   superConfirmButtonText: {
     color: '#FFF',
