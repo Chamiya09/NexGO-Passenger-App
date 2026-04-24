@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
+import { VehicleIcons } from '../src/constants/VehicleIcons';
 
 const teal = '#169F95';
 
@@ -19,12 +20,13 @@ export default function ConfirmRouteScreen() {
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
 
-  const [routesData, setRoutesData] = useState<{coords: {latitude: number, longitude: number}[], distance: string, duration: string}[]>([]);
+  const [routesData, setRoutesData] = useState<{ coords: { latitude: number, longitude: number }[], distance: string, duration: string }[]>([]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [availableDrivers, setAvailableDrivers] = useState<{ driverId: string, latitude: number, longitude: number, vehicleCategory?: string }[]>([]);
   const [rideRequesting, setRideRequesting] = useState(false);
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
   const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
@@ -32,7 +34,8 @@ export default function ConfirmRouteScreen() {
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
   const [currentRideStatus, setCurrentRideStatus] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const driversFadeAnim = useRef(new Animated.Value(1)).current;
   // ── One ride at a time guard ────────────────────────────────────────────────
   const [hasActiveRide, setHasActiveRide] = useState(false);
   const { token } = useAuth();
@@ -50,7 +53,7 @@ export default function ConfirmRouteScreen() {
         );
         setHasActiveRide(active);
       })
-      .catch(() => {}); // Silently ignore network errors
+      .catch(() => { }); // Silently ignore network errors
   }, [token]);
 
   // Safely parse parameters
@@ -66,7 +69,7 @@ export default function ConfirmRouteScreen() {
       setLoading(true);
       try {
         let url = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
-        
+
         if (selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') {
           // Use dedicated German OSM bike instance to physically force off-highway routing algorithms
           url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
@@ -74,7 +77,7 @@ export default function ConfirmRouteScreen() {
 
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (data && data.routes && data.routes.length > 0) {
           const parsedRoutes = data.routes.map((route: any) => {
             const coords = route.geometry.coordinates.map((coord: any) => ({
@@ -85,12 +88,12 @@ export default function ConfirmRouteScreen() {
             const durMin = Math.round(route.duration / 60);
             return { coords, distance: distKm, duration: durMin };
           });
-          
+
           setRoutesData(parsedRoutes);
-          
+
           setDistance(`${parsedRoutes[0].distance} km`);
           setDuration(`${parsedRoutes[0].duration} min`);
-          
+
           // Fit map to coordinates perfectly wrapping both markers and the primary polyline
           setTimeout(() => {
             mapRef.current?.fitToCoordinates(parsedRoutes[0].coords, {
@@ -105,7 +108,7 @@ export default function ConfirmRouteScreen() {
         setLoading(false);
       }
     };
-    
+
     if (pLat && pLng && dLat && dLng) {
       fetchRoute();
     }
@@ -132,6 +135,11 @@ export default function ConfirmRouteScreen() {
       setCurrentRideId(data.rideId);
     });
 
+    socket.on('available_drivers', (drivers) => {
+      setAvailableDrivers(drivers);
+      Animated.timing(driversFadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    });
+
     socket.on('rideAccepted', (data) => {
       console.log('[Passenger] rideAccepted received:', data);
       setRideRequesting(false);
@@ -154,10 +162,10 @@ export default function ConfirmRouteScreen() {
         Alert.alert('Trip Completed', 'You have arrived at your destination!');
         router.back();
       } else if (data.status === 'Cancelled') {
-         setOverlayState(null);
-         pulseAnim.stopAnimation();
-         setHasActiveRide(false);
-         setCurrentRideId(null);
+        setOverlayState(null);
+        pulseAnim.stopAnimation();
+        setHasActiveRide(false);
+        setCurrentRideId(null);
       }
     });
 
@@ -188,6 +196,24 @@ export default function ConfirmRouteScreen() {
     };
   }, [user?.id]);
 
+  // Request new category drivers with smooth fade transition
+  useEffect(() => {
+    Animated.timing(driversFadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+      }
+    });
+
+    // Fallback: poll every 7 seconds to keep drivers fresh
+    const interval = setInterval(() => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+      }
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [selectedVehicle]);
+
   // ── confirmRide ────────────────────────────────────────────────────────────
   const PRICE_MAP: Record<string, number> = {
     Bike: 850,
@@ -217,7 +243,7 @@ export default function ConfirmRouteScreen() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.18, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
       ])
     ).start();
 
@@ -263,7 +289,7 @@ export default function ConfirmRouteScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="dark" translucent backgroundColor="transparent" />
-      
+
       {/* Map Background */}
       <View style={styles.mapPlaceholder}>
         <MapView
@@ -290,7 +316,7 @@ export default function ConfirmRouteScreen() {
               <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
             </Marker>
           )}
-          
+
           {/* Dropoff Marker */}
           {dLat && dLng && (
             <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
@@ -364,6 +390,24 @@ export default function ConfirmRouteScreen() {
               </View>
             </Marker>
           )}
+
+          {/* Categorized Driver Markers with Fade Transition */}
+          {availableDrivers.map((driver) => (
+            <Marker
+              key={driver.driverId}
+              coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={5}
+              tracksViewChanges={false}
+            >
+              <Animated.View style={{ opacity: driversFadeAnim }}>
+                <Image
+                  source={{ uri: VehicleIcons[driver.vehicleCategory || selectedVehicle]?.uri }}
+                  style={{ width: 44, height: 44, resizeMode: 'contain', backgroundColor: '#FFF', borderRadius: 22, borderWidth: 2, borderColor: '#169F95' }}
+                />
+              </Animated.View>
+            </Marker>
+          ))}
         </MapView>
       </View>
 
@@ -593,7 +637,7 @@ export default function ConfirmRouteScreen() {
                   {currentRideStatus === 'InProgress' ? 'Ride is in progress!' : 'Driver is on the way!'}
                 </Text>
                 <Text style={styles.overlaySub}>
-                  {currentRideStatus === 'InProgress' 
+                  {currentRideStatus === 'InProgress'
                     ? `You are heading to your destination in your ${acceptedData?.vehicleType ?? selectedVehicle}.`
                     : `Your ${acceptedData?.vehicleType ?? selectedVehicle} has been confirmed. The driver is heading to your pickup location.`
                   }
