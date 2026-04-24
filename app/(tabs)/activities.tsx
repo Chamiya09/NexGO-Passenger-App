@@ -114,7 +114,7 @@ function PulseDot({ color }: { color: string }) {
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(scale, { toValue: 1.55, duration: 700, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 700, useNativeDriver: true }),
       ])
     );
     animation.start();
@@ -136,8 +136,14 @@ const pulseDotStyles = StyleSheet.create({
 });
 
 // ── Status Tag sub-component ──────────────────────────────────────────────────
-function StatusTag({ status }: { status: RideStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.Pending;
+function StatusTag({ status }: { status: string }) {
+  // Normalize status string natively mimicking backend enums
+  const normalizedKey = String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase();
+
+  // Custom patch for IN_TRANSIT which could compress 
+  const key = normalizedKey === 'In_transit' || normalizedKey === 'Inprogress' ? 'InProgress' : normalizedKey as RideStatus;
+
+  const cfg = STATUS_CONFIG[key] ?? STATUS_CONFIG.Pending;
   return (
     <View style={[tagStyles.badge, { backgroundColor: cfg.bg }]}>
       {cfg.pulse
@@ -163,7 +169,7 @@ const tagStyles = StyleSheet.create({
 
 // ── Ride Card sub-component ───────────────────────────────────────────────────
 function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => void }) {
-  const pickupName  = shortenLocation(ride.pickup?.name,  ride.pickup?.latitude,  ride.pickup?.longitude);
+  const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
 
   return (
@@ -209,9 +215,9 @@ function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => v
         </View>
         <Text style={cardStyles.fare}>LKR {ride.price.toLocaleString()}</Text>
       </View>
-      
+
       {/* Cancel button if active (only in Pending/Finding stage) */}
-      {ride.status === 'Pending' && onCancel && (
+      {(String(ride.status).toLowerCase() === 'pending' || String((ride as any).canonicalStatus).toLowerCase() === 'pending') && onCancel && (
         <TouchableOpacity
           style={cardStyles.cancelBtn}
           onPress={() => onCancel(ride.id)}
@@ -344,10 +350,10 @@ export default function ActivitiesScreen() {
   const { user, token } = useAuth();
   const socketRef = useRef<Socket | null>(null);
 
-  const [rides, setRides]           = useState<Ride[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // ── Fetch rides from API ───────────────────────────────────────────────────
   const fetchRides = useCallback(async (isRefresh = false) => {
@@ -393,13 +399,13 @@ export default function ActivitiesScreen() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.message ?? 'Failed to cancel ride');
       }
-      
+
       // Emit cancel payload to socket so driver gets notified live
       if (socketRef.current?.connected) {
         socketRef.current.emit('cancelRide', { rideId });
       }
 
-      setRides((prev) => 
+      setRides((prev) =>
         prev.map((r) => (r.id === rideId ? { ...r, status: 'Cancelled' } : r))
       );
     } catch (err: unknown) {
@@ -441,7 +447,7 @@ export default function ActivitiesScreen() {
   }, [user?.id]);
 
   // ── Summary counts ─────────────────────────────────────────────────────────
-  const pendingCount   = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
+  const pendingCount = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
   const completedCount = rides.filter((r) => r.status === 'Completed').length;
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -463,9 +469,9 @@ export default function ActivitiesScreen() {
       {/* Summary chips */}
       {rides.length > 0 && (
         <View style={styles.summaryRow}>
-          <SummaryChip icon="list-outline"         label="Total"     value={String(rides.length)} />
-          <SummaryChip icon="hourglass-outline"    label="Active"    value={String(pendingCount)} />
-          <SummaryChip icon="checkmark-done-outline" label="Done"   value={String(completedCount)} />
+          <SummaryChip icon="list-outline" label="Total" value={String(rides.length)} />
+          <SummaryChip icon="hourglass-outline" label="Active" value={String(pendingCount)} />
+          <SummaryChip icon="checkmark-done-outline" label="Done" value={String(completedCount)} />
         </View>
       )}
 
