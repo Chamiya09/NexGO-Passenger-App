@@ -14,7 +14,7 @@ import {
   View,
   StatusBar as RNStatusBar,
 } from 'react-native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
@@ -500,8 +500,10 @@ export default function SavedAddressesScreen() {
                   <View style={[styles.mapCard, { borderColor: colors.border }]}>
                     <MapView
                       style={StyleSheet.absoluteFillObject}
-                      provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                      mapType="standard"
+                      mapType="none"
+                      loadingEnabled={true}
+                      loadingBackgroundColor="#EAE6DF"
+                      loadingIndicatorColor="#169F95"
                       initialRegion={DEFAULT_REGION}
                       region={mapRegion}
                       onRegionChangeComplete={(region) => {
@@ -510,7 +512,9 @@ export default function SavedAddressesScreen() {
                           longitude: region.longitude,
                         });
                       }}
-                    />
+                    >
+                      <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                    </MapView>
 
                     <View pointerEvents="none" style={styles.fixedMarkerContainer}>
                       <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />

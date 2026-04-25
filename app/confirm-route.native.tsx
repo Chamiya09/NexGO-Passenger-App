@@ -1,23 +1,60 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { io, Socket } from 'socket.io-client';
+import { useAuth } from '@/context/auth-context';
+import { VehicleIcons } from '../src/constants/VehicleIcons';
 
 const teal = '#169F95';
+
+// Strip the '/api' suffix from the API URL to get the raw server origin for Socket.IO
+const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 
 export default function ConfirmRouteScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
-  
-  const [routesData, setRoutesData] = useState<{coords: {latitude: number, longitude: number}[], distance: string, duration: string}[]>([]);
+  const socketRef = useRef<Socket | null>(null);
+  const { user } = useAuth();
+
+  const [routesData, setRoutesData] = useState<{ coords: { latitude: number, longitude: number }[], distance: string, duration: string }[]>([]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [availableDrivers, setAvailableDrivers] = useState<{ driverId: string, latitude: number, longitude: number, vehicleCategory?: string }[]>([]);
+  const [rideRequesting, setRideRequesting] = useState(false);
+  // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
+  const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
+  const [acceptedData, setAcceptedData] = useState<{ vehicleType: string } | null>(null);
+  const [currentRideId, setCurrentRideId] = useState<string | null>(null);
+  const [currentRideStatus, setCurrentRideStatus] = useState<string | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const driversFadeAnim = useRef(new Animated.Value(1)).current;
+  // ── One ride at a time guard ────────────────────────────────────────────────
+  const [hasActiveRide, setHasActiveRide] = useState(false);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (!token) return;
+    // Check whether user already has a Pending or Accepted ride
+    fetch(`${(process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000/api').replace(/\/$/, '')}/rides/my-rides`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const active = (data.rides ?? []).some(
+          (r: { status: string }) => r.status === 'Pending' || r.status === 'Accepted'
+        );
+        setHasActiveRide(active);
+      })
+      .catch(() => { }); // Silently ignore network errors
+  }, [token]);
 
   // Safely parse parameters
   const pLat = parseFloat(params.pLat as string);
@@ -32,7 +69,7 @@ export default function ConfirmRouteScreen() {
       setLoading(true);
       try {
         let url = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
-        
+
         if (selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') {
           // Use dedicated German OSM bike instance to physically force off-highway routing algorithms
           url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
@@ -40,7 +77,7 @@ export default function ConfirmRouteScreen() {
 
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (data && data.routes && data.routes.length > 0) {
           const parsedRoutes = data.routes.map((route: any) => {
             const coords = route.geometry.coordinates.map((coord: any) => ({
@@ -51,12 +88,12 @@ export default function ConfirmRouteScreen() {
             const durMin = Math.round(route.duration / 60);
             return { coords, distance: distKm, duration: durMin };
           });
-          
+
           setRoutesData(parsedRoutes);
-          
+
           setDistance(`${parsedRoutes[0].distance} km`);
           setDuration(`${parsedRoutes[0].duration} min`);
-          
+
           // Fit map to coordinates perfectly wrapping both markers and the primary polyline
           setTimeout(() => {
             mapRef.current?.fitToCoordinates(parsedRoutes[0].coords, {
@@ -71,11 +108,164 @@ export default function ConfirmRouteScreen() {
         setLoading(false);
       }
     };
-    
+
     if (pLat && pLng && dLat && dLng) {
       fetchRoute();
     }
   }, [pLat, pLng, dLat, dLng, selectedVehicle]);
+
+  // ── Socket.IO setup ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const socket = io(SOCKET_SERVER_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Passenger] Socket connected:', socket.id);
+      // Register this passenger so the server can route rideAccepted back to us
+      if (user?.id) {
+        socket.emit('registerPassenger', user.id);
+      }
+    });
+
+    socket.on('rideCreated', (data) => {
+      console.log('[Passenger] rideCreated received:', data);
+      setCurrentRideId(data.rideId);
+    });
+
+    socket.on('available_drivers', (drivers) => {
+      setAvailableDrivers(drivers);
+      Animated.timing(driversFadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    });
+
+    socket.on('rideAccepted', (data) => {
+      console.log('[Passenger] rideAccepted received:', data);
+      setRideRequesting(false);
+      setAcceptedData({ vehicleType: data.vehicleType ?? selectedVehicle });
+      setOverlayState('accepted');
+      setCurrentRideStatus('Accepted');
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    });
+
+    socket.on('rideStatusUpdate', (data) => {
+      console.log('[Passenger] rideStatusUpdate received:', data);
+      setCurrentRideStatus(data.status);
+
+      if (data.status === 'Completed') {
+        // Stop animations, unlock app, and hide overlay
+        setOverlayState(null);
+        pulseAnim.stopAnimation();
+        setHasActiveRide(false);
+        setCurrentRideId(null);
+        Alert.alert('Trip Completed', 'You have arrived at your destination!');
+        router.back();
+      } else if (data.status === 'Cancelled') {
+        setOverlayState(null);
+        pulseAnim.stopAnimation();
+        setHasActiveRide(false);
+        setCurrentRideId(null);
+      }
+    });
+
+    socket.on('rideCancelled', () => {
+      console.log('[Passenger] rideCancelled received');
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
+      setHasActiveRide(false);
+      setCurrentRideId(null);
+    });
+
+    socket.on('rideError', (err) => {
+      console.error('[Passenger] rideError:', err);
+      setRideRequesting(false);
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
+      // Release the lock — the ride was never created successfully
+      setHasActiveRide(false);
+      Alert.alert('Request Failed', err.message ?? 'Something went wrong. Please try again.');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[Passenger] Socket disconnected');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.id]);
+
+  // Request new category drivers with smooth fade transition
+  useEffect(() => {
+    Animated.timing(driversFadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+      }
+    });
+
+    // Fallback: poll every 7 seconds to keep drivers fresh
+    const interval = setInterval(() => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+      }
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [selectedVehicle]);
+
+  // ── confirmRide ────────────────────────────────────────────────────────────
+  const PRICE_MAP: Record<string, number> = {
+    Bike: 850,
+    TukTuk: 1115,
+    Mini: 1301,
+    Sedan: 1450,
+    Van: 2100,
+  };
+
+  const confirmRide = () => {
+    if (!socketRef.current?.connected) {
+      Alert.alert('Not Connected', 'Unable to reach the server. Please check your connection.');
+      return;
+    }
+    if (!user?.id) {
+      Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
+      return;
+    }
+
+    // Lock the confirm button immediately — stays locked until driver accepts or error
+    setRideRequesting(true);
+    setHasActiveRide(true);
+    setOverlayState('finding');
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    // Pulse animation loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.18, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
+
+    socketRef.current.emit('requestRide', {
+      passengerId: user.id,
+      passengerName: user.fullName ?? 'Passenger',
+      vehicleType: selectedVehicle,
+      price: PRICE_MAP[selectedVehicle] ?? 1301,
+      pickup: {
+        latitude: pLat,
+        longitude: pLng,
+        name: pName ?? '',
+      },
+      dropoff: {
+        latitude: dLat,
+        longitude: dLng,
+        name: dName ?? '',
+      },
+    });
+
+    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle);
+  };
 
   // Derived price calculator for dynamic button
   const getPriceForSelected = () => {
@@ -99,20 +289,23 @@ export default function ConfirmRouteScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="dark" translucent backgroundColor="transparent" />
-      
+
       {/* Map Background */}
       <View style={styles.mapPlaceholder}>
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          mapType="standard"
+          mapType="none"
+          loadingEnabled={true}
+          loadingBackgroundColor="#EAE6DF"
+          loadingIndicatorColor="#169F95"
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}>
+          <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
           {/* Pickup Marker */}
           {pLat && pLng && (
             <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3}>
@@ -123,7 +316,7 @@ export default function ConfirmRouteScreen() {
               <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
             </Marker>
           )}
-          
+
           {/* Dropoff Marker */}
           {dLat && dLng && (
             <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
@@ -197,6 +390,24 @@ export default function ConfirmRouteScreen() {
               </View>
             </Marker>
           )}
+
+          {/* Categorized Driver Markers with Fade Transition */}
+          {availableDrivers.map((driver) => (
+            <Marker
+              key={driver.driverId}
+              coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={5}
+              tracksViewChanges={false}
+            >
+              <Animated.View style={{ opacity: driversFadeAnim }}>
+                <Image
+                  source={{ uri: VehicleIcons[driver.vehicleCategory || selectedVehicle]?.uri }}
+                  style={{ width: 44, height: 44, resizeMode: 'contain', backgroundColor: '#FFF', borderRadius: 22, borderWidth: 2, borderColor: '#169F95' }}
+                />
+              </Animated.View>
+            </Marker>
+          ))}
         </MapView>
       </View>
 
@@ -330,14 +541,141 @@ export default function ConfirmRouteScreen() {
                 </View>
               )}
 
+              {/* Active ride warning banner */}
+              {hasActiveRide && (
+                <View style={styles.activeRideBanner}>
+                  <Ionicons name="information-circle-outline" size={16} color="#D97706" />
+                  <Text style={styles.activeRideBannerText}>
+                    You already have an active ride. Complete or cancel it first.
+                  </Text>
+                </View>
+              )}
+
               {/* Confirm Book Button */}
-              <TouchableOpacity style={styles.superConfirmButton}>
-                <Text style={styles.superConfirmButtonText}>Confirm {selectedVehicle} - {getPriceForSelected()}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.superConfirmButton,
+                  (rideRequesting || hasActiveRide) && styles.superConfirmButtonDisabled,
+                ]}
+                onPress={confirmRide}
+                disabled={rideRequesting || hasActiveRide}>
+                {rideRequesting ? (
+                  <View style={styles.superConfirmButtonContent}>
+                    <ActivityIndicator size="small" color="#FFF" />
+                    <Text style={styles.superConfirmButtonText}>Finding a Driver...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.superConfirmButtonText}>
+                    {hasActiveRide ? 'Ride Already Active' : `Confirm ${selectedVehicle} - ${getPriceForSelected()}`}
+                  </Text>
+                )}
               </TouchableOpacity>
             </>
           )}
         </View>
       </View>
+
+      {/* ── Finding / Accepted Overlay ── */}
+      <Modal
+        visible={overlayState !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (overlayState === 'accepted') {
+            setOverlayState(null);
+            pulseAnim.stopAnimation();
+            setHasActiveRide(false);
+            router.back();
+          }
+        }}>
+        <View style={styles.overlayBackdrop}>
+          <Animated.View style={[styles.overlayCard, { opacity: fadeAnim }]}>
+            {overlayState === 'finding' ? (
+              /* ── Searching state (white card) ── */
+              <>
+                {/* Pulsing teal icon ring */}
+                <Animated.View style={[styles.overlayIconRing, { transform: [{ scale: pulseAnim }] }]}>
+                  <View style={styles.overlayIconInner}>
+                    <Text style={styles.overlayCarEmoji}>🚗</Text>
+                  </View>
+                </Animated.View>
+
+                <Text style={styles.overlayTitle}>Finding your NexGO...</Text>
+                <Text style={styles.overlaySub}>
+                  {'Matching you with the nearest '}{selectedVehicle}{' driver. Hang tight!'}
+                </Text>
+
+                <View style={styles.overlayDotsRow}>
+                  <ActivityIndicator size="small" color={teal} />
+                  <Text style={styles.overlayDotsText}>Connecting nearby drivers</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.overlayCancelBtn}
+                  onPress={() => {
+                    if (currentRideId && socketRef.current) {
+                      socketRef.current.emit('cancelRide', { rideId: currentRideId });
+                    }
+                    setOverlayState(null);
+                    setRideRequesting(false);
+                    setHasActiveRide(false);
+                    setCurrentRideId(null);
+                    pulseAnim.stopAnimation();
+                  }}>
+                  <Text style={styles.overlayCancelText}>Cancel Request</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* ── Accepted state (white card) ── */
+              <>
+                <View style={styles.overlayCheckCircle}>
+                  <Ionicons name="checkmark-circle" size={52} color={teal} />
+                </View>
+
+                <Text style={styles.overlayTitle}>
+                  {currentRideStatus === 'InProgress' ? 'Ride is in progress!' : 'Driver is on the way!'}
+                </Text>
+                <Text style={styles.overlaySub}>
+                  {currentRideStatus === 'InProgress'
+                    ? `You are heading to your destination in your ${acceptedData?.vehicleType ?? selectedVehicle}.`
+                    : `Your ${acceptedData?.vehicleType ?? selectedVehicle} has been confirmed. The driver is heading to your pickup location.`
+                  }
+                </Text>
+
+                {/* Route summary block */}
+                <View style={styles.overlayRouteBlock}>
+                  <View style={styles.overlayRouteRow}>
+                    <View style={[styles.overlayRouteDot, { backgroundColor: teal }]} />
+                    <Text style={styles.overlayRouteText} numberOfLines={1}>
+                      {(pName as string) || 'Pickup location'}
+                    </Text>
+                  </View>
+                  <View style={styles.overlayRouteConnector} />
+                  <View style={styles.overlayRouteRow}>
+                    <View style={[styles.overlayRouteDot, { backgroundColor: '#E74C3C' }]} />
+                    <Text style={styles.overlayRouteText} numberOfLines={1}>
+                      {(dName as string) || 'Drop-off location'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.overlayDoneBtn}
+                  onPress={() => {
+                    setOverlayState(null);
+                    pulseAnim.stopAnimation();
+                    setHasActiveRide(true); // lock confirm until ride completes
+                    router.back();
+                  }}>
+                  <Text style={styles.overlayDoneText}>Got it</Text>
+                  <Ionicons name="arrow-forward" size={17} color="#FFF" />
+                </TouchableOpacity>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -630,6 +968,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
+  superConfirmButtonDisabled: {
+    backgroundColor: '#4A9A98',
+  },
+  superConfirmButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   superConfirmButtonText: {
     color: '#FFF',
     fontSize: 15,
@@ -645,4 +991,172 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#017270',
   },
+  // ── Active ride banner ────────────────────────────────────────────────────
+  activeRideBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF8EC',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  activeRideBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+    lineHeight: 17,
+  },
+  // ── Finding / Accepted overlay ─────────────────────────────────────────────
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 28, 26, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  overlayCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',         // ← white card, system UI theme
+    borderRadius: 28,
+    padding: 28,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    elevation: 20,
+  },
+  overlayIconRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  overlayIconInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#D0EFEC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayCarEmoji: {
+    fontSize: 30,
+  },
+  overlayCheckCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#E9F8EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  overlayTitle: {
+    color: '#102A28',                    // ← dark text on white card
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  overlaySub: {
+    color: '#617C79',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  overlayDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F0F5F4',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 22,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  overlayDotsText: {
+    color: '#617C79',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  overlayCancelBtn: {
+    borderWidth: 1.5,
+    borderColor: '#D9E9E6',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+    width: '100%',
+    alignItems: 'center',
+  },
+  overlayCancelText: {
+    color: '#617C79',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  // Route block inside the accepted overlay
+  overlayRouteBlock: {
+    width: '100%',
+    backgroundColor: '#F7FBFA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  overlayRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  overlayRouteDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  overlayRouteText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#102A28',
+  },
+  overlayRouteConnector: {
+    width: 2,
+    height: 14,
+    backgroundColor: '#D9E9E6',
+    borderRadius: 1,
+    marginLeft: 4,
+    marginVertical: 3,
+  },
+  overlayDoneBtn: {
+    backgroundColor: teal,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  overlayDoneText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
 });
+
