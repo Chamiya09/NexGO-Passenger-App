@@ -597,7 +597,7 @@ export default function ConfirmRouteScreen() {
                 {/* Pulsing teal icon ring */}
                 <Animated.View style={[styles.overlayIconRing, { transform: [{ scale: pulseAnim }] }]}>
                   <View style={styles.overlayIconInner}>
-                    <Text style={styles.overlayCarEmoji}>🚗</Text>
+                    <MaterialCommunityIcons name="car-search" size={34} color={teal} />
                   </View>
                 </Animated.View>
 
@@ -1047,9 +1047,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#D0EFEC',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  overlayCarEmoji: {
-    fontSize: 30,
   },
   overlayCheckCircle: {
     width: 84,
