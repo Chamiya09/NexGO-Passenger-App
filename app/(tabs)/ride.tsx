@@ -4,7 +4,6 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
 
 const teal = '#169F95';
 
@@ -96,8 +95,10 @@ export default function RideScreen() {
       <View style={styles.mapPlaceholder}>
         <MapView
           style={StyleSheet.absoluteFillObject}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          mapType="standard"
+          mapType="none"
+          loadingEnabled={true}
+          loadingBackgroundColor="#EAE6DF"
+          loadingIndicatorColor="#169F95"
           initialRegion={{
             latitude: 6.9271,
             longitude: 79.8612,
@@ -107,7 +108,9 @@ export default function RideScreen() {
           onRegionChangeComplete={(region) => {
             setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
           }}
-        />
+        >
+          <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+        </MapView>
 
         {/* Fixed Center Selection Marker */}
         <View pointerEvents="none" style={styles.fixedMarkerContainer}>
