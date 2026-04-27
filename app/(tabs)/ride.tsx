@@ -12,6 +12,7 @@ const MARKER_TIP_TOP_RATIO = 0.4;
 export default function RideScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
+  const geocodeRequestRef = useRef(0);
   const { width, height } = useWindowDimensions();
   const markerTipTop = height * MARKER_TIP_TOP_RATIO;
 
@@ -32,32 +33,30 @@ export default function RideScreen() {
   });
 
   const formatCoordsFallback = (latitude: number, longitude: number) =>
-    `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
 
   const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined) => {
     if (!place) {
       return null;
     }
 
-    const primary =
-      place.name ||
-      place.street ||
-      place.district ||
-      place.subregion ||
-      place.city ||
-      place.region;
+    const streetAddress = [place.streetNumber, place.street].filter(Boolean).join(' ');
+    const addressParts = [
+      streetAddress,
+      place.district,
+      place.city || place.subregion,
+      place.region,
+      place.country,
+    ].filter((part, index, parts) => part && parts.indexOf(part) === index);
 
-    const secondary = place.city || place.subregion || place.region || place.country;
-
-    if (primary && secondary && primary !== secondary) {
-      return `${primary}, ${secondary}`;
-    }
-
-    return primary || secondary || null;
+    return addressParts.length > 0 ? addressParts.join(', ') : null;
   };
 
   useEffect(() => {
     const fetchLocationName = async () => {
+      const requestId = geocodeRequestRef.current + 1;
+      geocodeRequestRef.current = requestId;
+
       try {
         if (activeStep === 'PICKUP') {
           setPickupData(prev => ({ ...prev, name: 'Fetching...' }));
@@ -70,12 +69,20 @@ export default function RideScreen() {
           formatReverseGeocode(places?.[0]) ||
           formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
 
+        if (requestId !== geocodeRequestRef.current) {
+          return;
+        }
+
         if (activeStep === 'PICKUP') {
           setPickupData({ coords: selectedLocation, name: composedName });
         } else {
           setDropData({ coords: selectedLocation, name: composedName });
         }
       } catch {
+        if (requestId !== geocodeRequestRef.current) {
+          return;
+        }
+
         const fallbackName = formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
         if (activeStep === 'PICKUP') {
           setPickupData(prev => ({ ...prev, name: fallbackName }));
