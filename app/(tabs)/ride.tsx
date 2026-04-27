@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile } from 'react-native-maps';
 
 const teal = '#169F95';
+const MARKER_TIP_TOP_RATIO = 0.4;
 
 export default function RideScreen() {
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
+  const { width, height } = useWindowDimensions();
+  const markerTipTop = height * MARKER_TIP_TOP_RATIO;
 
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: 6.9271,
@@ -106,15 +110,29 @@ export default function RideScreen() {
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
+          ref={mapRef}
           onRegionChangeComplete={(region) => {
-            setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
+            const updateSelectedLocation = async () => {
+              try {
+                const coordinate = await mapRef.current?.coordinateForPoint({
+                  x: width / 2,
+                  y: markerTipTop,
+                });
+
+                setSelectedLocation(coordinate || { latitude: region.latitude, longitude: region.longitude });
+              } catch {
+                setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
+              }
+            };
+
+            updateSelectedLocation();
           }}
         >
           <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
         </MapView>
 
         {/* Fixed Center Selection Marker */}
-        <View pointerEvents="none" style={styles.fixedMarkerContainer}>
+        <View pointerEvents="none" style={[styles.fixedMarkerContainer, { top: markerTipTop }]}>
           <Ionicons name="location-sharp" size={40} color="#169F95" style={styles.fixedMarkerIcon} />
         </View>
       </View>
@@ -269,7 +287,6 @@ const styles = StyleSheet.create({
   },
   fixedMarkerContainer: {
     position: 'absolute',
-    top: '50%',
     left: '50%',
     marginLeft: -20, 
     marginTop: -40, 
