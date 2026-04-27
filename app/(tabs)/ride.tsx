@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 const teal = '#169F95';
 
@@ -26,6 +27,31 @@ export default function RideScreen() {
     name: 'Unknown Location',
   });
 
+  const formatCoordsFallback = (latitude: number, longitude: number) =>
+    `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+
+  const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined) => {
+    if (!place) {
+      return null;
+    }
+
+    const primary =
+      place.name ||
+      place.street ||
+      place.district ||
+      place.subregion ||
+      place.city ||
+      place.region;
+
+    const secondary = place.city || place.subregion || place.region || place.country;
+
+    if (primary && secondary && primary !== secondary) {
+      return `${primary}, ${secondary}`;
+    }
+
+    return primary || secondary || null;
+  };
+
   useEffect(() => {
     const fetchLocationName = async () => {
       try {
@@ -35,38 +61,22 @@ export default function RideScreen() {
           setDropData(prev => ({ ...prev, name: 'Fetching...' }));
         }
 
-        const response = await fetch(`https://photon.komoot.io/reverse?lon=${selectedLocation.longitude}&lat=${selectedLocation.latitude}`);
-        
-        if (!response.ok) throw new Error('Photon API offline');
-        
-        const data = await response.json();
-        
-        let composedName = 'Unknown Location';
-        if (data && data.features && data.features.length > 0) {
-          const p = data.features[0].properties;
-          const detail = p.street || p.name || p.district || p.locality;
-          const region = p.city || p.county || p.state;
-          
-          let name = detail ? `${detail}` : '';
-          if (region && detail && detail !== region) {
-            name += `, ${region}`;
-          } else if (!name && region) {
-            name = region;
-          }
-          if (name) composedName = name;
-        }
+        const places = await Location.reverseGeocodeAsync(selectedLocation);
+        const composedName =
+          formatReverseGeocode(places?.[0]) ||
+          formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
 
         if (activeStep === 'PICKUP') {
           setPickupData({ coords: selectedLocation, name: composedName });
         } else {
           setDropData({ coords: selectedLocation, name: composedName });
         }
-      } catch (error) {
-        console.error('Error fetching location name:', error);
+      } catch {
+        const fallbackName = formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
         if (activeStep === 'PICKUP') {
-          setPickupData(prev => ({ ...prev, name: 'Unknown Location' }));
+          setPickupData(prev => ({ ...prev, name: fallbackName }));
         } else {
-          setDropData(prev => ({ ...prev, name: 'Unknown Location' }));
+          setDropData(prev => ({ ...prev, name: fallbackName }));
         }
       }
     };
