@@ -55,6 +55,7 @@ export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
   const socketRef = useRef<Socket | null>(null);
+  const cancelRequestedRef = useRef(false);
   const { user } = useAuth();
 
   const [routesData, setRoutesData] = useState<{ coords: { latitude: number, longitude: number }[], distance: string, duration: string }[]>([]);
@@ -169,6 +170,11 @@ export default function ConfirmRouteScreen() {
 
     socket.on('rideCreated', (data) => {
       console.log('[Passenger] rideCreated received:', data);
+      if (cancelRequestedRef.current) {
+        socket.emit('cancelRide', { rideId: data.rideId });
+        setCurrentRideId(null);
+        return;
+      }
       setCurrentRideId(data.rideId);
     });
 
@@ -219,6 +225,7 @@ export default function ConfirmRouteScreen() {
       setRideRequesting(false);
       setOverlayState(null);
       pulseAnim.stopAnimation();
+      cancelRequestedRef.current = false;
       // Release the lock — the ride was never created successfully
       setHasActiveRide(false);
       Alert.alert('Request Failed', err.message ?? 'Something went wrong. Please try again.');
@@ -279,6 +286,7 @@ export default function ConfirmRouteScreen() {
     }
 
     // Lock the confirm button immediately — stays locked until driver accepts or error
+    cancelRequestedRef.current = false;
     setRideRequesting(true);
     setHasActiveRide(true);
     setOverlayState('finding');
@@ -677,6 +685,7 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={styles.overlayCancelBtn}
                   onPress={() => {
+                    cancelRequestedRef.current = true;
                     if (currentRideId && socketRef.current) {
                       socketRef.current.emit('cancelRide', { rideId: currentRideId });
                     }
