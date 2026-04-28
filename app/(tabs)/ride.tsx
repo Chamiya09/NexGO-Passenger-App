@@ -7,11 +7,12 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile } from 'react-native-maps';
 
 const teal = '#169F95';
-const MARKER_TIP_TOP_RATIO = 0.4;
+const MARKER_TIP_TOP_RATIO = 0.5;
 const DEFAULT_LOCATION = {
   latitude: 6.9271,
   longitude: 79.8612,
 };
+const CURRENT_LOCATION_REGION_DELTA = 0.018;
 const DEVICE_LOCATION_DEBOUNCE_MS = 100;
 const MAP_LOCATION_DEBOUNCE_MS = 550;
 
@@ -55,6 +56,7 @@ export default function RideScreen() {
   const [locationNameRefreshKey, setLocationNameRefreshKey] = useState(0);
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
   const [isLocating, setIsLocating] = useState(false);
+  const [hasLatestDeviceLocation, setHasLatestDeviceLocation] = useState(false);
   
   const [pickupData, setPickupData] = useState({
     coords: DEFAULT_LOCATION,
@@ -124,6 +126,7 @@ export default function RideScreen() {
 
   const applyDeviceLocation = useCallback((coords: Coordinates, animationDuration = 450, forceNameRefresh = false) => {
     latestDeviceLocationRef.current = coords;
+    setHasLatestDeviceLocation(true);
     const previousCoords = lastAppliedDeviceLocationRef.current;
     const isSameLocation =
       previousCoords &&
@@ -133,8 +136,23 @@ export default function RideScreen() {
     if (isSameLocation) {
       if (forceNameRefresh) {
         deviceLocationLockedRef.current = true;
+        programmaticMoveRef.current = true;
+        if (programmaticMoveTimerRef.current) {
+          clearTimeout(programmaticMoveTimerRef.current);
+        }
+        programmaticMoveTimerRef.current = setTimeout(() => {
+          programmaticMoveRef.current = false;
+        }, animationDuration + 250);
         setLocationSource('device');
         setLocationNameRefreshKey((current) => current + 1);
+        mapRef.current?.animateToRegion(
+          {
+            ...coords,
+            latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+            longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+          },
+          animationDuration
+        );
       }
       return;
     }
@@ -155,15 +173,15 @@ export default function RideScreen() {
     mapRef.current?.animateToRegion(
       {
         ...coords,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+        longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
       },
       animationDuration
     );
   }, []);
 
-  const moveToDeviceLocation = useCallback(async (showAlerts = false) => {
-    if (locatingRef.current) {
+  const moveToDeviceLocation = useCallback(async (showAlerts = false, useCachedLocation = true, forceFreshLocation = false) => {
+    if (locatingRef.current && !forceFreshLocation) {
       return;
     }
 
@@ -187,19 +205,21 @@ export default function RideScreen() {
         return;
       }
 
-      const lastKnownPosition = await Location.getLastKnownPositionAsync({
-        maxAge: 30000,
-        requiredAccuracy: 50,
-      });
-      if (lastKnownPosition) {
-        applyDeviceLocation(
-          {
-            latitude: lastKnownPosition.coords.latitude,
-            longitude: lastKnownPosition.coords.longitude,
-          },
-          250,
-          showAlerts
-        );
+      if (useCachedLocation) {
+        const lastKnownPosition = await Location.getLastKnownPositionAsync({
+          maxAge: 30000,
+          requiredAccuracy: 50,
+        });
+        if (lastKnownPosition) {
+          applyDeviceLocation(
+            {
+              latitude: lastKnownPosition.coords.latitude,
+              longitude: lastKnownPosition.coords.longitude,
+            },
+            250,
+            showAlerts
+          );
+        }
       }
 
       const currentPosition = await Location.getCurrentPositionAsync({
@@ -225,12 +245,12 @@ export default function RideScreen() {
     const latestDeviceLocation = latestDeviceLocationRef.current;
 
     if (latestDeviceLocation) {
-      applyDeviceLocation(latestDeviceLocation, 120, true);
-      void moveToDeviceLocation(false);
+      applyDeviceLocation(latestDeviceLocation, 350, true);
+      void moveToDeviceLocation(false, false, true);
       return;
     }
 
-    void moveToDeviceLocation(true);
+    void moveToDeviceLocation(true, false, true);
   }, [applyDeviceLocation, moveToDeviceLocation]);
 
   useEffect(() => {
@@ -240,17 +260,26 @@ export default function RideScreen() {
 
       try {
         if (activeStep === 'PICKUP') {
-          setPickupData(prev => ({ ...prev, name: 'Fetching...' }));
+          setPickupData(prev => ({ ...prev, name: locationSource === 'device' ? 'Current location' : 'Fetching...' }));
         } else {
-          setDropData(prev => ({ ...prev, name: 'Fetching...' }));
+          setDropData(prev => ({ ...prev, name: locationSource === 'device' ? 'Current location' : 'Fetching...' }));
         }
 
         const allowRegionOnly = locationSource !== 'device';
+        const places = await Location.reverseGeocodeAsync(selectedLocation).catch(() => []);
+        const expoName = formatReverseGeocode(places?.[0], allowRegionOnly);
+        if (expoName && requestId === geocodeRequestRef.current) {
+          if (activeStep === 'PICKUP') {
+            setPickupData({ coords: selectedLocation, name: expoName });
+          } else {
+            setDropData({ coords: selectedLocation, name: expoName });
+          }
+        }
+
         const detailedName = await fetchDetailedLocationName(selectedLocation, allowRegionOnly).catch(() => null);
-        const places = detailedName ? [] : await Location.reverseGeocodeAsync(selectedLocation);
         const composedName =
           detailedName ||
-          formatReverseGeocode(places?.[0], allowRegionOnly) ||
+          expoName ||
           (locationSource === 'device'
             ? 'Current location'
             : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude));
@@ -312,6 +341,7 @@ export default function RideScreen() {
           };
 
           latestDeviceLocationRef.current = watchedCoords;
+          setHasLatestDeviceLocation(true);
 
           if (activeStepRef.current !== 'PICKUP' || locationSourceRef.current !== 'device') {
             return;
@@ -395,13 +425,13 @@ export default function RideScreen() {
 
       {/* Target Location Button */}
       <TouchableOpacity
-        style={[styles.targetButton, isLocating && styles.targetButtonDisabled]}
+        style={[styles.targetButton, isLocating && !hasLatestDeviceLocation && styles.targetButtonDisabled]}
         onPress={handleUseCurrentLocation}
-        disabled={isLocating}
+        disabled={isLocating && !hasLatestDeviceLocation}
         accessibilityRole="button"
         accessibilityLabel="Use current location"
       >
-        {isLocating ? (
+        {isLocating && !hasLatestDeviceLocation ? (
           <ActivityIndicator color="#017270" />
         ) : (
           <Ionicons name="locate" size={24} color="#017270" />
