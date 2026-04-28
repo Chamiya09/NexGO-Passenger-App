@@ -80,7 +80,7 @@ export default function ConfirmRouteWebScreen() {
 
         <View style={styles.quickOptionsRow}>
           <VehicleOption name="Mini" price="LKR 1301" active />
-          <VehicleOption name="Sedan" price="LKR 1450" />
+          <VehicleOption name="Car" price="LKR 1450" />
           <VehicleOption name="Van" price="LKR 2100" />
         </View>
 

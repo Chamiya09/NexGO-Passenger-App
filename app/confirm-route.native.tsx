@@ -70,7 +70,7 @@ export default function ConfirmRouteScreen() {
       try {
         let url = `https://router.project-osrm.org/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
 
-        if (selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') {
+        if (selectedVehicle === 'Bike' || selectedVehicle === 'Tuk') {
           // Use dedicated German OSM bike instance to physically force off-highway routing algorithms
           url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${pLng},${pLat};${dLng},${dLat}?overview=full&geometries=geojson&alternatives=true`;
         }
@@ -217,9 +217,9 @@ export default function ConfirmRouteScreen() {
   // ── confirmRide ────────────────────────────────────────────────────────────
   const PRICE_MAP: Record<string, number> = {
     Bike: 850,
-    TukTuk: 1115,
+    Tuk: 1115,
     Mini: 1301,
-    Sedan: 1450,
+    Car: 1450,
     Van: 2100,
   };
 
@@ -272,11 +272,11 @@ export default function ConfirmRouteScreen() {
     switch (selectedVehicle) {
       case 'Bike':
         return 'LKR 850';
-      case 'TukTuk':
+      case 'Tuk':
         return 'LKR 1115';
       case 'Mini':
         return 'LKR 1301';
-      case 'Sedan':
+      case 'Car':
         return 'LKR 1450';
       case 'Van':
         return 'LKR 2100';
@@ -461,7 +461,7 @@ export default function ConfirmRouteScreen() {
                     <RoutePoint icon="location" label="Drop-off" value={dName || 'Drop-off'} />
                   </View>
 
-                  {(selectedVehicle === 'Bike' || selectedVehicle === 'TukTuk') && (
+                  {(selectedVehicle === 'Bike' || selectedVehicle === 'Tuk') && (
                     <Text style={styles.infoWarningText}>Bikes/Tuks are not allowed on expressways. Taking the alternative route.</Text>
                   )}
                 </>
@@ -482,12 +482,12 @@ export default function ConfirmRouteScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.rideSquare, selectedVehicle === 'TukTuk' && styles.activeRideSquare]}
-                  onPress={() => setSelectedVehicle('TukTuk')}>
-                  <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'TukTuk' ? '#FFF' : '#017270'} />
-                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'TukTuk' && { color: '#FFF' }]}>TukTuk</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'TukTuk' && { color: '#FFF' }]}>LKR 1115</Text>
-                  <Text style={[styles.rideSquareETA, selectedVehicle === 'TukTuk' && { color: '#FFF' }]}>28 min</Text>
+                  style={[styles.rideSquare, selectedVehicle === 'Tuk' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Tuk')}>
+                  <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'Tuk' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>Tuk</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>LKR 1115</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>28 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -500,12 +500,12 @@ export default function ConfirmRouteScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.rideSquare, selectedVehicle === 'Sedan' && styles.activeRideSquare]}
-                  onPress={() => setSelectedVehicle('Sedan')}>
-                  <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Sedan' ? '#FFF' : '#017270'} />
-                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Sedan' && { color: '#FFF' }]}>Sedan</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Sedan' && { color: '#FFF' }]}>LKR 1450</Text>
-                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Sedan' && { color: '#FFF' }]}>24 min</Text>
+                  style={[styles.rideSquare, selectedVehicle === 'Car' && styles.activeRideSquare]}
+                  onPress={() => setSelectedVehicle('Car')}>
+                  <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Car' ? '#FFF' : '#017270'} />
+                  <Text style={[styles.rideSquareTitle, selectedVehicle === 'Car' && { color: '#FFF' }]}>Car</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>LKR 1450</Text>
+                  <Text style={[styles.rideSquareETA, selectedVehicle === 'Car' && { color: '#FFF' }]}>24 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
