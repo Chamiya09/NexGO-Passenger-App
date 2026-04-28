@@ -220,7 +220,11 @@ export default function ConfirmRouteScreen() {
     });
 
     socket.on('rideError', (err) => {
-      console.error('[Passenger] rideError:', err);
+      if (err?.code === 'NO_MATCHING_DRIVER') {
+        console.log('[Passenger] No matching driver:', err.message);
+      } else {
+        console.error('[Passenger] rideError:', err);
+      }
       setRideRequesting(false);
       setOverlayState(null);
       pulseAnim.stopAnimation();
