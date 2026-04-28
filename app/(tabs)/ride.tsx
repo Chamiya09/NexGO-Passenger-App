@@ -21,6 +21,13 @@ type Coordinates = {
   longitude: number;
 };
 
+const getMarkerAlignedRegion = (coords: Coordinates) => ({
+  latitude: coords.latitude - (0.5 - MARKER_TIP_TOP_RATIO) * CURRENT_LOCATION_REGION_DELTA,
+  longitude: coords.longitude,
+  latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+  longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+});
+
 type PhotonReverseGeocodeResponse = {
   features?: {
     properties?: {
@@ -146,11 +153,7 @@ export default function RideScreen() {
         setLocationSource('device');
         setLocationNameRefreshKey((current) => current + 1);
         mapRef.current?.animateToRegion(
-          {
-            ...coords,
-            latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
-            longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
-          },
+          getMarkerAlignedRegion(coords),
           animationDuration
         );
       }
@@ -171,11 +174,7 @@ export default function RideScreen() {
     setLocationNameRefreshKey((current) => current + 1);
     setSelectedLocation(coords);
     mapRef.current?.animateToRegion(
-      {
-        ...coords,
-        latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
-        longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
-      },
+      getMarkerAlignedRegion(coords),
       animationDuration
     );
   }, []);
