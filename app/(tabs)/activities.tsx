@@ -18,6 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL } from '@/lib/api';
+import {
+  clearPassengerActiveRide,
+  loadPassengerActiveRide,
+  PassengerActiveRideParams,
+} from '@/lib/activeRideStorage';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -195,10 +200,14 @@ function RideCard({
   ride,
   onCancel,
   onViewDetails,
+  onResumeNavigation,
+  isResumeTarget,
 }: {
   ride: Ride;
   onCancel?: (id: string) => void;
   onViewDetails: (ride: Ride) => void;
+  onResumeNavigation?: () => void;
+  isResumeTarget?: boolean;
 }) {
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
@@ -251,6 +260,13 @@ function RideCard({
         <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
           <Ionicons name="receipt-outline" size={15} color={teal} />
           <Text style={cardStyles.detailsBtnText}>View details</Text>
+        </TouchableOpacity>
+      )}
+
+      {isResumeTarget && onResumeNavigation && (
+        <TouchableOpacity style={cardStyles.resumeBtn} onPress={onResumeNavigation}>
+          <Ionicons name="navigate" size={15} color="#FFFFFF" />
+          <Text style={cardStyles.resumeBtnText}>Return to live navigation</Text>
         </TouchableOpacity>
       )}
 
@@ -368,6 +384,21 @@ const cardStyles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 13,
   },
+  resumeBtn: {
+    marginTop: 12,
+    minHeight: 38,
+    borderRadius: 12,
+    backgroundColor: teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  resumeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13,
+  },
 });
 
 // ── Empty state ──────────────────────────────────────────────────────────────
@@ -410,6 +441,12 @@ export default function ActivitiesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [latestNavigation, setLatestNavigation] = useState<PassengerActiveRideParams | null>(null);
+
+  const loadLatestNavigation = useCallback(async () => {
+    const stored = await loadPassengerActiveRide();
+    setLatestNavigation(stored);
+  }, []);
 
   // ── Fetch rides from API ───────────────────────────────────────────────────
   const fetchRides = useCallback(async (isRefresh = false) => {
@@ -445,7 +482,8 @@ export default function ActivitiesScreen() {
   // Initial load
   useEffect(() => {
     fetchRides();
-  }, [fetchRides]);
+    loadLatestNavigation();
+  }, [fetchRides, loadLatestNavigation]);
 
   // ── Cancel ride via API ───────────────────────────────────────────────────
   const handleCancelRide = async (rideId: string) => {
@@ -537,6 +575,18 @@ export default function ActivitiesScreen() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!latestNavigation) return;
+
+    const matchedRide = rides.find((ride) => ride.id === latestNavigation.id);
+    if (!matchedRide) return;
+
+    if (matchedRide.status === 'Completed' || matchedRide.status === 'Cancelled') {
+      clearPassengerActiveRide();
+      setLatestNavigation(null);
+    }
+  }, [latestNavigation, rides]);
+
   // ── Summary counts ─────────────────────────────────────────────────────────
   const pendingCount = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
   const completedCount = rides.filter((r) => r.status === 'Completed').length;
@@ -566,6 +616,7 @@ export default function ActivitiesScreen() {
         </View>
       )}
 
+
       {/* Content */}
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -585,7 +636,24 @@ export default function ActivitiesScreen() {
           data={rides}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <RideCard ride={item} onCancel={handleCancelRide} onViewDetails={handleViewRideDetails} />
+            <RideCard
+              ride={item}
+              onCancel={handleCancelRide}
+              onViewDetails={handleViewRideDetails}
+              isResumeTarget={Boolean(latestNavigation?.id && item.id === latestNavigation.id)}
+              onResumeNavigation={
+                item.id === latestNavigation?.id
+                  ? () =>
+                      router.push({
+                        pathname: '/active-ride/[id]',
+                        params: {
+                          ...(latestNavigation ?? {}),
+                          status: item.status,
+                        },
+                      })
+                  : undefined
+              }
+            />
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}

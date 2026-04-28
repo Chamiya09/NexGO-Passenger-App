@@ -6,6 +6,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
+import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -65,6 +66,7 @@ export default function ActiveRideScreen() {
     const [driverHeading, setDriverHeading] = useState(0);
 
     const [phase, setPhase] = useState<MapPhase>(statusParam === 'InProgress' ? 'TRACK_TRIP' : 'TRACK_DRIVER');
+    const [activeStatus, setActiveStatus] = useState(statusParam);
     const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
     const [slicedRouteCoords, setSlicedRouteCoords] = useState<LatLng[]>([]);
 
@@ -74,6 +76,37 @@ export default function ActiveRideScreen() {
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
     const [paymentVisible, setPaymentVisible] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
+
+    useEffect(() => {
+        if (!rideId) return;
+
+        savePassengerActiveRide({
+            id: rideId,
+            driverId,
+            driverName,
+            vehicleType,
+            status: activeStatus,
+            pLat: String(pLat),
+            pLng: String(pLng),
+            dLat: String(dLat),
+            dLng: String(dLng),
+            ...(Number.isFinite(drLat) && Number.isFinite(drLng)
+                ? { drLat: String(drLat), drLng: String(drLng) }
+                : {}),
+        });
+    }, [
+        activeStatus,
+        dLat,
+        dLng,
+        driverId,
+        driverName,
+        drLat,
+        drLng,
+        pLat,
+        pLng,
+        rideId,
+        vehicleType,
+    ]);
 
     // Map Phase Route Computation
     useEffect(() => {
@@ -143,18 +176,24 @@ export default function ActiveRideScreen() {
 
         socket.on('rideStatusUpdate', (data: { rideId: string; status?: string; canonicalStatus?: string; invoice?: { amount?: number | string } }) => {
             if (data.rideId === rideId) {
+                if (data.status) {
+                    setActiveStatus(data.status);
+                }
                 const canonical = String(data.canonicalStatus ?? data.status ?? '').toUpperCase();
 
                 if (canonical === 'ARRIVED') {
                     setArrivalCode(null);
                 }
                 if (canonical === 'IN_TRANSIT' || canonical === 'INPROGRESS') {
+                    setActiveStatus('InProgress');
                     setPhase('TRACK_TRIP');
                 } else if (canonical === 'COMPLETED') {
+                    clearPassengerActiveRide();
                     setArrivalCode(null);
                     setPaymentAmount(formatMoney(data.invoice?.amount));
                     setPaymentVisible(true);
                 } else if (canonical === 'CANCELLED') {
+                    clearPassengerActiveRide();
                     router.replace('/(tabs)');
                 }
             }

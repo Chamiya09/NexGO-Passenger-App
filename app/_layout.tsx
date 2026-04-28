@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/context/auth-context';
+import ActiveRideOverlays from '@/components/ActiveRideOverlays';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -26,6 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+        <ActiveRideOverlays />
         <StatusBar style="dark" />
       </ThemeProvider>
     </AuthProvider>
