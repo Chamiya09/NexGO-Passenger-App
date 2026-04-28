@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { usePathname } from 'expo-router';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -21,13 +22,20 @@ const formatMoney = (value?: number | string | null) => {
 
 export default function ActiveRideOverlays() {
   const { user } = useAuth();
+  const pathname = usePathname();
   const socketRef = useRef<Socket | null>(null);
   const activeRideRef = useRef<PassengerActiveRideParams | null>(null);
+  const activeRideIdRef = useRef<string | null>(null);
 
   const [arrivalCode, setArrivalCode] = useState<string | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('LKR 0');
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
+
+  const setTrackedActiveRideId = (rideId: string | null) => {
+    activeRideIdRef.current = rideId;
+    setActiveRideId(rideId);
+  };
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
@@ -35,7 +43,7 @@ export default function ActiveRideOverlays() {
     const loadActiveRide = async () => {
       const stored = await loadPassengerActiveRide();
       activeRideRef.current = stored;
-      setActiveRideId(stored?.id ?? null);
+      setTrackedActiveRideId(stored?.id ?? activeRideIdRef.current);
     };
 
     void loadActiveRide();
@@ -66,29 +74,35 @@ export default function ActiveRideOverlays() {
       if (!activeRideRef.current?.id || data.rideId !== activeRideRef.current.id) {
         void loadPassengerActiveRide().then((stored) => {
           activeRideRef.current = stored;
-          setActiveRideId(stored?.id ?? null);
-          if (stored?.id === data.rideId) {
-            setArrivalCode(data.code);
-          }
+          setTrackedActiveRideId(stored?.id === data.rideId ? stored.id : data.rideId);
+          setArrivalCode(data.code);
         });
         return;
       }
+      setTrackedActiveRideId(data.rideId);
       setArrivalCode(data.code);
     });
 
     socket.on('rideStatusUpdate', (data: { rideId: string; status?: string; canonicalStatus?: string; invoice?: { amount?: number | string } }) => {
-      if (!activeRideRef.current?.id || data.rideId !== activeRideRef.current.id) return;
+      const trackedRideId = activeRideRef.current?.id ?? activeRideIdRef.current;
+      if (!trackedRideId || data.rideId !== trackedRideId) return;
 
       if (data.status) {
-        const nextRide = {
-          ...activeRideRef.current,
-          status: data.status,
-        } as PassengerActiveRideParams;
-        activeRideRef.current = nextRide;
-        savePassengerActiveRide(nextRide);
+        if (activeRideRef.current) {
+          const nextRide = {
+            ...activeRideRef.current,
+            status: data.status,
+          } as PassengerActiveRideParams;
+          activeRideRef.current = nextRide;
+          savePassengerActiveRide(nextRide);
+        }
       }
 
       const canonical = String(data.canonicalStatus ?? data.status ?? '').toUpperCase();
+      if (canonical === 'ARRIVED' || canonical === 'IN_TRANSIT' || canonical === 'INPROGRESS') {
+        setArrivalCode(null);
+      }
+
       if (canonical === 'COMPLETED') {
         setArrivalCode(null);
         setPaymentAmount(formatMoney(data.invoice?.amount));
@@ -96,7 +110,7 @@ export default function ActiveRideOverlays() {
       } else if (canonical === 'CANCELLED') {
         clearPassengerActiveRide();
         activeRideRef.current = null;
-        setActiveRideId(null);
+        setTrackedActiveRideId(null);
         setArrivalCode(null);
         setPaymentVisible(false);
       }
@@ -106,6 +120,10 @@ export default function ActiveRideOverlays() {
       socket.disconnect();
     };
   }, [user?.id]);
+
+  if (pathname.startsWith('/active-ride/')) {
+    return null;
+  }
 
   if (!activeRideId && !arrivalCode && !paymentVisible) {
     return null;

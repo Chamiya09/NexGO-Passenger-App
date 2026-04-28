@@ -6,6 +6,7 @@ import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
+import { savePassengerActiveRide } from '@/lib/activeRideStorage';
 
 const teal = '#169F95';
 
@@ -200,6 +201,21 @@ export default function ConfirmRouteScreen() {
 
     socket.on('rideAccepted', (data) => {
       console.log('[Passenger] rideAccepted received:', data);
+      void savePassengerActiveRide({
+        id: data.rideId,
+        driverId: data.driverId,
+        driverName: data.driverName ?? 'Driver',
+        vehicleType: data.vehicleType ?? selectedVehicle,
+        status: data.status ?? 'Accepted',
+        pLat: String(data.pickup?.latitude ?? pLat),
+        pLng: String(data.pickup?.longitude ?? pLng),
+        dLat: String(data.dropoff?.latitude ?? dLat),
+        dLng: String(data.dropoff?.longitude ?? dLng),
+        ...(data.driverLocation && {
+          drLat: String(data.driverLocation.latitude),
+          drLng: String(data.driverLocation.longitude),
+        }),
+      });
       setRideRequesting(false);
       setAcceptedData({
         rideId: data.rideId,
