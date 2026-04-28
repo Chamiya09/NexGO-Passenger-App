@@ -5,6 +5,7 @@ import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
+import { useAuth } from '@/context/auth-context';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -32,6 +33,7 @@ export default function ActiveRideScreen() {
     const params = useLocalSearchParams();
     const mapRef = useRef<MapView>(null);
     const socketRef = useRef<Socket | null>(null);
+    const { user } = useAuth();
 
     // Payload parsing
     const rideId = params.id as string;
@@ -40,6 +42,8 @@ export default function ActiveRideScreen() {
     const pLng = parseFloat(params.pLng as string);
     const dLat = parseFloat(params.dLat as string);
     const dLng = parseFloat(params.dLng as string);
+    const drLat = parseFloat(params.drLat as string);
+    const drLng = parseFloat(params.drLng as string);
     const vehicleType = params.vehicleType as string || 'Vehicle';
     const driverName = params.driverName as string || 'Driver';
     const statusParam = params.status as string || 'Accepted';
@@ -47,7 +51,11 @@ export default function ActiveRideScreen() {
     const pickup: LatLng = { latitude: pLat, longitude: pLng };
     const dropoff: LatLng = { latitude: dLat, longitude: dLng };
 
-    const [driverPos, setDriverPos] = useState<LatLng | null>(null);
+    const [driverPos, setDriverPos] = useState<LatLng | null>(
+        Number.isFinite(drLat) && Number.isFinite(drLng)
+            ? { latitude: drLat, longitude: drLng }
+            : null
+    );
     const [driverHeading, setDriverHeading] = useState(0);
 
     const [phase, setPhase] = useState<MapPhase>(statusParam === 'InProgress' ? 'TRACK_TRIP' : 'TRACK_DRIVER');
@@ -111,6 +119,10 @@ export default function ActiveRideScreen() {
         const socket = io(SOCKET_SERVER_URL, { transports: ['websocket'] });
         socketRef.current = socket;
 
+        socket.on('connect', () => {
+            if (user?.id) socket.emit('registerPassenger', user.id);
+        });
+
         if (driverId) {
             socket.on(`driver_location_${driverId}`, (loc: { latitude: number; longitude: number; heading?: number }) => {
                 setDriverPos({ latitude: loc.latitude, longitude: loc.longitude });
@@ -131,7 +143,7 @@ export default function ActiveRideScreen() {
         });
 
         return () => { socket.disconnect(); };
-    }, [driverId, rideId]);
+    }, [driverId, rideId, user?.id]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
 

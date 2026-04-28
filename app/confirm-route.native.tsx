@@ -22,6 +22,26 @@ type DriverMarker = {
   distanceKm?: number;
 };
 
+type AcceptedRideData = {
+  rideId: string;
+  driverId: string;
+  driverName?: string;
+  vehicleType: string;
+  status?: string;
+  pickup?: {
+    latitude: number;
+    longitude: number;
+  };
+  dropoff?: {
+    latitude: number;
+    longitude: number;
+  };
+  driverLocation?: {
+    latitude: number;
+    longitude: number;
+  } | null;
+};
+
 const normalizeVehicleCategory = (category?: string | null): VehicleCategory => {
   const value = String(category ?? '').trim();
   if (value === 'Bike') return 'Bike';
@@ -63,7 +83,7 @@ export default function ConfirmRouteScreen() {
   const [rideRequesting, setRideRequesting] = useState(false);
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
   const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
-  const [acceptedData, setAcceptedData] = useState<{ vehicleType: string } | null>(null);
+  const [acceptedData, setAcceptedData] = useState<AcceptedRideData | null>(null);
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
   const [currentRideStatus, setCurrentRideStatus] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -181,7 +201,16 @@ export default function ConfirmRouteScreen() {
     socket.on('rideAccepted', (data) => {
       console.log('[Passenger] rideAccepted received:', data);
       setRideRequesting(false);
-      setAcceptedData({ vehicleType: data.vehicleType ?? selectedVehicle });
+      setAcceptedData({
+        rideId: data.rideId,
+        driverId: data.driverId,
+        driverName: data.driverName ?? 'Driver',
+        vehicleType: data.vehicleType ?? selectedVehicle,
+        status: data.status ?? 'Accepted',
+        pickup: data.pickup,
+        dropoff: data.dropoff,
+        driverLocation: data.driverLocation ?? null,
+      });
       setOverlayState('accepted');
       setCurrentRideStatus('Accepted');
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -272,6 +301,32 @@ export default function ConfirmRouteScreen() {
     Mini: 1301,
     Car: 1450,
     Van: 2100,
+  };
+
+  const goToLiveTracking = () => {
+    if (!acceptedData) return;
+
+    setOverlayState(null);
+    pulseAnim.stopAnimation();
+    setHasActiveRide(true);
+    router.replace({
+      pathname: '/active-ride/[id]',
+      params: {
+        id: acceptedData.rideId,
+        driverId: acceptedData.driverId,
+        driverName: acceptedData.driverName ?? 'Driver',
+        vehicleType: acceptedData.vehicleType ?? selectedVehicle,
+        status: acceptedData.status ?? 'Accepted',
+        pLat: String(acceptedData.pickup?.latitude ?? pLat),
+        pLng: String(acceptedData.pickup?.longitude ?? pLng),
+        dLat: String(acceptedData.dropoff?.latitude ?? dLat),
+        dLng: String(acceptedData.dropoff?.longitude ?? dLng),
+        ...(acceptedData.driverLocation && {
+          drLat: String(acceptedData.driverLocation.latitude),
+          drLng: String(acceptedData.driverLocation.longitude),
+        }),
+      },
+    });
   };
 
   const confirmRide = () => {
@@ -649,10 +704,7 @@ export default function ConfirmRouteScreen() {
         statusBarTranslucent
         onRequestClose={() => {
           if (overlayState === 'accepted') {
-            setOverlayState(null);
-            pulseAnim.stopAnimation();
-            setHasActiveRide(false);
-            router.back();
+            goToLiveTracking();
           }
         }}>
         <View style={styles.overlayBackdrop}>
@@ -729,12 +781,7 @@ export default function ConfirmRouteScreen() {
 
                 <TouchableOpacity
                   style={styles.overlayDoneBtn}
-                  onPress={() => {
-                    setOverlayState(null);
-                    pulseAnim.stopAnimation();
-                    setHasActiveRide(true); // lock confirm until ride completes
-                    router.back();
-                  }}>
+                  onPress={goToLiveTracking}>
                   <Text style={styles.overlayDoneText}>Got it</Text>
                   <Ionicons name="arrow-forward" size={17} color="#FFF" />
                 </TouchableOpacity>
