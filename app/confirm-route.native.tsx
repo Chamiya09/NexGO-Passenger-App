@@ -44,6 +44,12 @@ const VEHICLE_MARKERS: Record<VehicleCategory, {
   Van: { icon: 'van-passenger', bg: '#F3ECFF', color: '#7C3AED' },
 };
 
+const getSocketVehicleType = (category: string) => {
+  if (category === 'Tuk') return 'TukTuk';
+  if (category === 'Car') return 'Sedan';
+  return category;
+};
+
 export default function ConfirmRouteScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -286,10 +292,12 @@ export default function ConfirmRouteScreen() {
       ])
     ).start();
 
+    const socketVehicleType = getSocketVehicleType(selectedVehicle);
+
     socketRef.current.emit('requestRide', {
       passengerId: user.id,
       passengerName: user.fullName ?? 'Passenger',
-      vehicleType: selectedVehicle,
+      vehicleType: socketVehicleType,
       price: PRICE_MAP[selectedVehicle] ?? 1301,
       pickup: {
         latitude: pLat,
@@ -303,7 +311,7 @@ export default function ConfirmRouteScreen() {
       },
     });
 
-    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle);
+    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle, socketVehicleType);
   };
 
   // Derived price calculator for dynamic button
