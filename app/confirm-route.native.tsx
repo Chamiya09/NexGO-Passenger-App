@@ -8,7 +8,6 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
-const DRIVER_MARKER_RADIUS_KM = 1;
 
 // Strip the '/api' suffix from the API URL to get the raw server origin for Socket.IO
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -509,11 +508,6 @@ export default function ConfirmRouteScreen() {
                     <Text style={styles.sheetTitle}>Choose your ride</Text>
                   </View>
                   <View style={styles.pillGroup}>
-                    <View style={styles.distancePill}>
-                      <Text style={styles.distancePillText}>
-                        {availableDrivers.length} near {DRIVER_MARKER_RADIUS_KM} km
-                      </Text>
-                    </View>
                     <View style={styles.distancePill}>
                       <Text style={styles.distancePillText}>{distance || '9.3 km'}</Text>
                     </View>
