@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -43,7 +43,6 @@ type RideAcceptedPayload = {
 export default function ActiveRideOverlays() {
   const { user } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
   const socketRef = useRef<Socket | null>(null);
   const activeRideRef = useRef<PassengerActiveRideParams | null>(null);
   const activeRideIdRef = useRef<string | null>(null);
@@ -56,16 +55,6 @@ export default function ActiveRideOverlays() {
   const setTrackedActiveRideId = (rideId: string | null) => {
     activeRideIdRef.current = rideId;
     setActiveRideId(rideId);
-  };
-
-  const returnToLiveNavigation = () => {
-    const ride = activeRideRef.current;
-    if (!ride?.id) return;
-
-    router.push({
-      pathname: '/active-ride/[id]',
-      params: ride,
-    });
   };
 
   useEffect(() => {
@@ -184,25 +173,6 @@ export default function ActiveRideOverlays() {
 
   return (
     <>
-      {activeRideRef.current?.id && !paymentVisible && (
-        <TouchableOpacity
-          style={styles.liveNavigationButton}
-          activeOpacity={0.9}
-          onPress={returnToLiveNavigation}
-        >
-          <View style={styles.liveNavigationIcon}>
-            <Ionicons name="navigate" size={18} color="#FFFFFF" />
-          </View>
-          <View style={styles.liveNavigationCopy}>
-            <Text style={styles.liveNavigationTitle}>Live navigation</Text>
-            <Text style={styles.liveNavigationText} numberOfLines={1}>
-              {activeRideRef.current.driverName ? `Ride with ${activeRideRef.current.driverName}` : 'Return to your active ride'}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#4D6F6C" />
-        </TouchableOpacity>
-      )}
-
       <Modal visible={!!arrivalCode} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.codeBackdrop}>
           <View style={styles.codeCard}>
@@ -213,12 +183,6 @@ export default function ActiveRideOverlays() {
             <Text style={styles.codeSubtitle}>Share this code with your driver after confirming the vehicle and driver.</Text>
             <Text style={styles.codeValue}>{arrivalCode}</Text>
             <Text style={styles.codeHint}>Do not share this code before the driver arrives.</Text>
-            {activeRideRef.current?.id && (
-              <TouchableOpacity style={styles.modalNavigationButton} onPress={returnToLiveNavigation}>
-                <Ionicons name="navigate" size={16} color="#FFFFFF" />
-                <Text style={styles.modalNavigationButtonText}>Return to live navigation</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </Modal>
@@ -251,49 +215,6 @@ export default function ActiveRideOverlays() {
 }
 
 const styles = StyleSheet.create({
-  liveNavigationButton: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 96,
-    zIndex: 80,
-    elevation: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#D9E9E6',
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    shadowColor: '#001F1E',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 18,
-  },
-  liveNavigationIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  liveNavigationCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  liveNavigationTitle: {
-    color: '#102A28',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  liveNavigationText: {
-    color: '#617C79',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-  },
   codeBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(6, 22, 21, 0.46)',
@@ -334,22 +255,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   codeHint: { fontSize: 12, fontWeight: '800', color: '#D97706', textAlign: 'center', marginTop: 14 },
-  modalNavigationButton: {
-    marginTop: 18,
-    backgroundColor: teal,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  modalNavigationButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
   paymentCard: {
     width: '100%',
     maxWidth: 360,

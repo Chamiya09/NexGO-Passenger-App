@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
@@ -485,6 +485,13 @@ export default function ActivitiesScreen() {
     loadLatestNavigation();
   }, [fetchRides, loadLatestNavigation]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadLatestNavigation();
+      void fetchRides(true);
+    }, [fetchRides, loadLatestNavigation])
+  );
+
   // ── Cancel ride via API ───────────────────────────────────────────────────
   const handleCancelRide = async (rideId: string) => {
     if (!token) return;
@@ -590,6 +597,13 @@ export default function ActivitiesScreen() {
   // ── Summary counts ─────────────────────────────────────────────────────────
   const pendingCount = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
   const completedCount = rides.filter((r) => r.status === 'Completed').length;
+  const latestRide = latestNavigation
+    ? rides.find((ride) => ride.id === latestNavigation.id)
+    : null;
+  const canResumeNavigation = Boolean(
+    latestNavigation &&
+    (!latestRide || (latestRide.status !== 'Completed' && latestRide.status !== 'Cancelled'))
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -614,6 +628,34 @@ export default function ActivitiesScreen() {
           <SummaryChip icon="hourglass-outline" label="Active" value={String(pendingCount)} />
           <SummaryChip icon="checkmark-done-outline" label="Done" value={String(completedCount)} />
         </View>
+      )}
+
+      {canResumeNavigation && (
+        <TouchableOpacity
+          style={styles.resumeNavBtn}
+          onPress={() =>
+            router.push({
+              pathname: '/active-ride/[id]',
+              params: {
+                ...(latestNavigation ?? {}),
+                status: latestRide?.status ?? latestNavigation?.status,
+              },
+            })
+          }
+        >
+          <View style={styles.resumeNavIcon}>
+            <Ionicons name="navigate" size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.resumeNavTextWrap}>
+            <Text style={styles.resumeNavTitle}>Return to live navigation</Text>
+            <Text style={styles.resumeNavSubtitle}>
+              {latestRide?.status === 'InProgress'
+                ? 'Ride in progress'
+                : 'Driver heading to pickup'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
       )}
 
 
@@ -746,6 +788,44 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     marginBottom: 14,
+  },
+  resumeNavBtn: {
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: teal,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  resumeNavIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeNavTextWrap: {
+    flex: 1,
+  },
+  resumeNavTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  resumeNavSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   list: {
     paddingHorizontal: 20,
