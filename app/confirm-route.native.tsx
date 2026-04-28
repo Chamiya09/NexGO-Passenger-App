@@ -43,11 +43,7 @@ const VEHICLE_MARKERS: Record<VehicleCategory, {
   Van: { icon: 'van-passenger', bg: '#F3ECFF', color: '#7C3AED' },
 };
 
-const getSocketVehicleType = (category: string) => {
-  if (category === 'Tuk') return 'TukTuk';
-  if (category === 'Car') return 'Sedan';
-  return category;
-};
+const getSocketVehicleType = (category: string) => normalizeVehicleCategory(category);
 
 export default function ConfirmRouteScreen() {
   const router = useRouter();
