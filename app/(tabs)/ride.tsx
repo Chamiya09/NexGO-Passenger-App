@@ -12,6 +12,28 @@ const DEFAULT_LOCATION = {
   latitude: 6.9271,
   longitude: 79.8612,
 };
+const DEVICE_LOCATION_DEBOUNCE_MS = 100;
+const MAP_LOCATION_DEBOUNCE_MS = 550;
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+type PhotonReverseGeocodeResponse = {
+  features?: {
+    properties?: {
+      name?: string;
+      street?: string;
+      district?: string;
+      locality?: string;
+      city?: string;
+      county?: string;
+      state?: string;
+      country?: string;
+    };
+  }[];
+};
 
 export default function RideScreen() {
   const router = useRouter();
@@ -20,11 +42,16 @@ export default function RideScreen() {
   const locatingRef = useRef(false);
   const programmaticMoveRef = useRef(false);
   const programmaticMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedDeviceLocationRef = useRef<Coordinates | null>(null);
+  const deviceLocationLockedRef = useRef(false);
+  const activeStepRef = useRef<'PICKUP' | 'DROP'>('PICKUP');
+  const locationSourceRef = useRef<'map' | 'device'>('map');
   const { width, height } = useWindowDimensions();
   const markerTipTop = height * MARKER_TIP_TOP_RATIO;
 
   const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
   const [locationSource, setLocationSource] = useState<'map' | 'device'>('map');
+  const [locationNameRefreshKey, setLocationNameRefreshKey] = useState(0);
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
   const [isLocating, setIsLocating] = useState(false);
   
@@ -38,15 +65,29 @@ export default function RideScreen() {
     name: 'Unknown Location',
   });
 
+  useEffect(() => {
+    activeStepRef.current = activeStep;
+  }, [activeStep]);
+
+  useEffect(() => {
+    locationSourceRef.current = locationSource;
+  }, [locationSource]);
+
   const formatCoordsFallback = (latitude: number, longitude: number) =>
     `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
 
-  const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined) => {
+  const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined, allowRegionOnly = true) => {
     if (!place) {
       return null;
     }
 
     const streetAddress = [place.streetNumber, place.street].filter(Boolean).join(' ');
+    const hasSpecificPlace = Boolean(streetAddress || place.district || place.city || place.subregion);
+
+    if (!allowRegionOnly && !hasSpecificPlace) {
+      return null;
+    }
+
     const addressParts = [
       streetAddress,
       place.district,
@@ -57,6 +98,67 @@ export default function RideScreen() {
 
     return addressParts.length > 0 ? addressParts.join(', ') : null;
   };
+
+  const fetchDetailedLocationName = async ({ latitude, longitude }: Coordinates, allowRegionOnly: boolean) => {
+    const response = await fetch(`https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}`);
+
+    if (!response.ok) {
+      throw new Error('Unable to resolve location');
+    }
+
+    const data = (await response.json()) as PhotonReverseGeocodeResponse;
+    const properties = data.features?.[0]?.properties;
+
+    if (!properties) {
+      return null;
+    }
+
+    const detail = properties.name || properties.street || properties.district || properties.locality;
+    const region = properties.city || properties.county || (allowRegionOnly ? properties.state : undefined);
+    const country = properties.country;
+    const parts = [detail, region, country].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const applyDeviceLocation = useCallback((coords: Coordinates, animationDuration = 450, forceNameRefresh = false) => {
+    const previousCoords = lastAppliedDeviceLocationRef.current;
+    const isSameLocation =
+      previousCoords &&
+      Math.abs(previousCoords.latitude - coords.latitude) < 0.00001 &&
+      Math.abs(previousCoords.longitude - coords.longitude) < 0.00001;
+
+    if (isSameLocation) {
+      if (forceNameRefresh) {
+        deviceLocationLockedRef.current = true;
+        setLocationSource('device');
+        setLocationNameRefreshKey((current) => current + 1);
+      }
+      return;
+    }
+
+    lastAppliedDeviceLocationRef.current = coords;
+    deviceLocationLockedRef.current = true;
+    programmaticMoveRef.current = true;
+    if (programmaticMoveTimerRef.current) {
+      clearTimeout(programmaticMoveTimerRef.current);
+    }
+    programmaticMoveTimerRef.current = setTimeout(() => {
+      programmaticMoveRef.current = false;
+    }, animationDuration + 250);
+
+    setLocationSource('device');
+    setLocationNameRefreshKey((current) => current + 1);
+    setSelectedLocation(coords);
+    mapRef.current?.animateToRegion(
+      {
+        ...coords,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      animationDuration
+    );
+  }, []);
 
   const moveToDeviceLocation = useCallback(async (showAlerts = false) => {
     if (locatingRef.current) {
@@ -83,32 +185,30 @@ export default function RideScreen() {
         return;
       }
 
+      const lastKnownPosition = await Location.getLastKnownPositionAsync({
+        maxAge: 30000,
+        requiredAccuracy: 50,
+      });
+      if (lastKnownPosition) {
+        applyDeviceLocation(
+          {
+            latitude: lastKnownPosition.coords.latitude,
+            longitude: lastKnownPosition.coords.longitude,
+          },
+          250,
+          showAlerts
+        );
+      }
+
       const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest,
+        accuracy: Location.Accuracy.High,
       });
       const currentCoords = {
         latitude: currentPosition.coords.latitude,
         longitude: currentPosition.coords.longitude,
       };
 
-      programmaticMoveRef.current = true;
-      if (programmaticMoveTimerRef.current) {
-        clearTimeout(programmaticMoveTimerRef.current);
-      }
-      programmaticMoveTimerRef.current = setTimeout(() => {
-        programmaticMoveRef.current = false;
-      }, 900);
-
-      setLocationSource('device');
-      setSelectedLocation(currentCoords);
-      mapRef.current?.animateToRegion(
-        {
-          ...currentCoords,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        650
-      );
+      applyDeviceLocation(currentCoords, 450, showAlerts);
     } catch {
       if (showAlerts) {
         Alert.alert('Unable to find location', 'Please try again or move the map manually.');
@@ -117,7 +217,7 @@ export default function RideScreen() {
       locatingRef.current = false;
       setIsLocating(false);
     }
-  }, []);
+  }, [applyDeviceLocation]);
 
   const handleUseCurrentLocation = useCallback(() => {
     moveToDeviceLocation(true);
@@ -135,9 +235,12 @@ export default function RideScreen() {
           setDropData(prev => ({ ...prev, name: 'Fetching...' }));
         }
 
-        const places = await Location.reverseGeocodeAsync(selectedLocation);
+        const allowRegionOnly = locationSource !== 'device';
+        const detailedName = await fetchDetailedLocationName(selectedLocation, allowRegionOnly).catch(() => null);
+        const places = detailedName ? [] : await Location.reverseGeocodeAsync(selectedLocation);
         const composedName =
-          formatReverseGeocode(places?.[0]) ||
+          detailedName ||
+          formatReverseGeocode(places?.[0], allowRegionOnly) ||
           (locationSource === 'device'
             ? 'Current location'
             : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude));
@@ -156,7 +259,10 @@ export default function RideScreen() {
           return;
         }
 
-        const fallbackName = formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
+        const fallbackName =
+          locationSource === 'device'
+            ? 'Current location'
+            : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
         if (activeStep === 'PICKUP') {
           setPickupData(prev => ({ ...prev, name: fallbackName }));
         } else {
@@ -167,20 +273,53 @@ export default function RideScreen() {
 
     const debounceTimer = setTimeout(() => {
       fetchLocationName();
-    }, 800);
+    }, locationSource === 'device' ? DEVICE_LOCATION_DEBOUNCE_MS : MAP_LOCATION_DEBOUNCE_MS);
 
     return () => clearTimeout(debounceTimer);
-  }, [selectedLocation, activeStep, locationSource]);
+  }, [selectedLocation, activeStep, locationSource, locationNameRefreshKey]);
 
   useEffect(() => {
-    moveToDeviceLocation(false);
+    let watchSubscription: Location.LocationSubscription | null = null;
+
+    const startPassengerLocationWatch = async () => {
+      await moveToDeviceLocation(false);
+
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        return;
+      }
+
+      watchSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        (location) => {
+          if (activeStepRef.current !== 'PICKUP' || locationSourceRef.current !== 'device') {
+            return;
+          }
+
+          applyDeviceLocation(
+            {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            },
+            250
+          );
+        }
+      );
+    };
+
+    startPassengerLocationWatch();
 
     return () => {
+      watchSubscription?.remove();
       if (programmaticMoveTimerRef.current) {
         clearTimeout(programmaticMoveTimerRef.current);
       }
     };
-  }, [moveToDeviceLocation]);
+  }, [applyDeviceLocation, moveToDeviceLocation]);
 
   return (
     <View style={styles.container}>
@@ -201,8 +340,12 @@ export default function RideScreen() {
             longitudeDelta: 0.05,
           }}
           ref={mapRef}
+          onPanDrag={() => {
+            deviceLocationLockedRef.current = false;
+            setLocationSource('map');
+          }}
           onRegionChangeComplete={(region) => {
-            if (programmaticMoveRef.current) {
+            if (programmaticMoveRef.current || deviceLocationLockedRef.current) {
               return;
             }
 
