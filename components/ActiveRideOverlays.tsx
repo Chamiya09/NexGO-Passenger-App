@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { usePathname } from 'expo-router';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import {
   clearPassengerActiveRide,
   loadPassengerActiveRide,
@@ -40,8 +41,14 @@ type RideAcceptedPayload = {
   } | null;
 };
 
+type ArrivalVerificationCodePayload = {
+  rideId: string;
+  code: string;
+  passengerId?: string;
+};
+
 export default function ActiveRideOverlays() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const pathname = usePathname();
   const socketRef = useRef<Socket | null>(null);
   const activeRideRef = useRef<PassengerActiveRideParams | null>(null);
@@ -112,7 +119,9 @@ export default function ActiveRideOverlays() {
       savePassengerActiveRide(nextRide);
     });
 
-    socket.on('arrivalVerificationCode', (data: { rideId: string; code: string }) => {
+    const handleArrivalVerificationCode = (data: ArrivalVerificationCodePayload) => {
+      if (data.passengerId && data.passengerId !== user.id) return;
+
       if (!activeRideRef.current?.id || data.rideId !== activeRideRef.current.id) {
         void loadPassengerActiveRide().then((stored) => {
           activeRideRef.current = stored;
@@ -123,7 +132,10 @@ export default function ActiveRideOverlays() {
       }
       setTrackedActiveRideId(data.rideId);
       setArrivalCode(data.code);
-    });
+    };
+
+    socket.on('arrivalVerificationCode', handleArrivalVerificationCode);
+    socket.on('arrivalVerificationCodeBroadcast', handleArrivalVerificationCode);
 
     socket.on('rideStatusUpdate', (data: { rideId: string; status?: string; canonicalStatus?: string; invoice?: { amount?: number | string } }) => {
       const trackedRideId = activeRideRef.current?.id ?? activeRideIdRef.current;
@@ -159,9 +171,38 @@ export default function ActiveRideOverlays() {
     });
 
     return () => {
+      socket.off('arrivalVerificationCode', handleArrivalVerificationCode);
+      socket.off('arrivalVerificationCodeBroadcast', handleArrivalVerificationCode);
       socket.disconnect();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!token || !activeRideId) return;
+
+    let cancelled = false;
+    const fetchArrivalCode = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/rides/${activeRideId}/arrival-code`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await parseApiResponse<{ code: string | null }>(response);
+        if (!cancelled && data.code) {
+          setArrivalCode(data.code);
+        }
+      } catch (error) {
+        console.log('[ActiveRideOverlays] arrival code fallback failed:', error);
+      }
+    };
+
+    void fetchArrivalCode();
+    const interval = setInterval(fetchArrivalCode, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeRideId, token]);
 
   if (pathname.startsWith('/active-ride/')) {
     return null;

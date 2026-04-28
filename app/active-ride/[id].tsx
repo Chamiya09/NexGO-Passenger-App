@@ -6,6 +6,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -20,6 +21,7 @@ const formatMoney = (value?: number | string | null) => {
 // Types
 type LatLng = { latitude: number; longitude: number };
 type MapPhase = 'TRACK_DRIVER' | 'TRACK_TRIP';
+type ArrivalVerificationCodePayload = { rideId: string; code: string; passengerId?: string };
 
 // OSRM fetcher
 async function fetchOsrmRoute(from: LatLng, to: LatLng) {
@@ -40,7 +42,7 @@ export default function ActiveRideScreen() {
     const params = useLocalSearchParams();
     const mapRef = useRef<MapView>(null);
     const socketRef = useRef<Socket | null>(null);
-    const { user } = useAuth();
+    const { user, token } = useAuth();
 
     // Payload parsing
     const rideId = params.id as string;
@@ -199,14 +201,46 @@ export default function ActiveRideScreen() {
             }
         });
 
-        socket.on('arrivalVerificationCode', (data: { rideId: string; code: string }) => {
+        const handleArrivalVerificationCode = (data: ArrivalVerificationCodePayload) => {
+            if (data.passengerId && user?.id && data.passengerId !== user.id) return;
+
             if (data.rideId === rideId) {
                 setArrivalCode(data.code);
             }
-        });
+        };
+
+        socket.on('arrivalVerificationCode', handleArrivalVerificationCode);
+        socket.on('arrivalVerificationCodeBroadcast', handleArrivalVerificationCode);
 
         return () => { socket.disconnect(); };
     }, [driverId, rideId, user?.id]);
+
+    useEffect(() => {
+        if (!token || !rideId) return;
+
+        let cancelled = false;
+        const fetchArrivalCode = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/rides/${rideId}/arrival-code`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await parseApiResponse<{ code: string | null }>(response);
+                if (!cancelled && data.code) {
+                    setArrivalCode(data.code);
+                }
+            } catch (error) {
+                console.log('[ActiveRide] arrival code fallback failed:', error);
+            }
+        };
+
+        void fetchArrivalCode();
+        const interval = setInterval(fetchArrivalCode, 2000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [rideId, token]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
 
