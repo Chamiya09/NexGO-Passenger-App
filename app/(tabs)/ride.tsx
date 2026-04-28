@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ export default function RideScreen() {
     longitude: 79.8612,
   });
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
+  const [isLocating, setIsLocating] = useState(false);
   
   const [pickupData, setPickupData] = useState({
     coords: { latitude: 6.9271, longitude: 79.8612 },
@@ -51,6 +52,50 @@ export default function RideScreen() {
 
     return addressParts.length > 0 ? addressParts.join(', ') : null;
   };
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    if (isLocating) {
+      return;
+    }
+
+    setIsLocating(true);
+
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('Location is turned off', 'Please enable location services to use your current location.');
+        return;
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        Alert.alert('Location permission needed', 'Allow NexGO to access your location so we can select your current place.');
+        return;
+      }
+
+      const currentPosition = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const currentCoords = {
+        latitude: currentPosition.coords.latitude,
+        longitude: currentPosition.coords.longitude,
+      };
+
+      setSelectedLocation(currentCoords);
+      mapRef.current?.animateToRegion(
+        {
+          ...currentCoords,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        650
+      );
+    } catch {
+      Alert.alert('Unable to find location', 'Please try again or move the map manually.');
+    } finally {
+      setIsLocating(false);
+    }
+  }, [isLocating]);
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -152,8 +197,18 @@ export default function RideScreen() {
       </SafeAreaView>
 
       {/* Target Location Button */}
-      <TouchableOpacity style={styles.targetButton}>
-        <Ionicons name="locate" size={24} color="#017270" />
+      <TouchableOpacity
+        style={[styles.targetButton, isLocating && styles.targetButtonDisabled]}
+        onPress={handleUseCurrentLocation}
+        disabled={isLocating}
+        accessibilityRole="button"
+        accessibilityLabel="Use current location"
+      >
+        {isLocating ? (
+          <ActivityIndicator color="#017270" />
+        ) : (
+          <Ionicons name="locate" size={24} color="#017270" />
+        )}
       </TouchableOpacity>
 
       {/* Bottom Sheet Card */}
@@ -344,6 +399,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     zIndex: 10,
+  },
+  targetButtonDisabled: {
+    opacity: 0.75,
   },
   bottomCardContainer: {
     position: 'absolute',
