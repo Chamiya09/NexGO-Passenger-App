@@ -331,11 +331,11 @@ export default function ActiveRideScreen() {
             <Modal visible={paymentVisible} transparent animationType="fade" statusBarTranslucent>
                 <View style={styles.codeBackdrop}>
                     <View style={styles.paymentCard}>
-                        <View style={styles.codeIcon}>
-                            <Ionicons name="receipt-outline" size={30} color={teal} />
+                        <View style={styles.completedIcon}>
+                            <Ionicons name="checkmark-done" size={30} color={teal} />
                         </View>
-                        <Text style={styles.codeTitle}>Payment Confirmation</Text>
-                        <Text style={styles.codeSubtitle}>Please confirm the payment for this trip.</Text>
+                        <Text style={styles.codeTitle}>Trip Completed</Text>
+                        <Text style={styles.codeSubtitle}>Your ride has ended. Please confirm the trip payment.</Text>
                         <Text style={styles.paymentValue}>{paymentAmount}</Text>
                         <TouchableOpacity
                             style={styles.paymentButton}
@@ -461,6 +461,17 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         padding: 24,
         alignItems: 'center'
+    },
+    completedIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E7F5F3',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#BFE7E2'
     },
     paymentValue: {
         width: '100%',
