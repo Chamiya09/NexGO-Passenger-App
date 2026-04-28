@@ -310,6 +310,13 @@ export default function ActiveRideScreen() {
             <Modal visible={!!arrivalCode} transparent animationType="fade" statusBarTranslucent>
                 <View style={styles.codeBackdrop}>
                     <View style={styles.codeCard}>
+                        <TouchableOpacity
+                            style={styles.codeCloseButton}
+                            onPress={() => setArrivalCode(null)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Close confirm your driver popup">
+                            <Ionicons name="close" size={20} color="#4D6F6C" />
+                        </TouchableOpacity>
                         <View style={styles.codeIcon}>
                             <Ionicons name="shield-checkmark" size={32} color={teal} />
                         </View>
@@ -409,6 +416,18 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         padding: 24,
         alignItems: 'center'
+    },
+    codeCloseButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F0F7F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2
     },
     codeIcon: {
         width: 60,

@@ -47,6 +47,43 @@ type ArrivalVerificationCodePayload = {
   passengerId?: string;
 };
 
+type RideApiItem = {
+  id: string;
+  driverId?: string | null;
+  driver?: {
+    id?: string | null;
+    fullName?: string;
+  } | null;
+  vehicleType?: string;
+  status?: string;
+  canonicalStatus?: string;
+  pickup?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  dropoff?: {
+    latitude?: number;
+    longitude?: number;
+  };
+};
+
+const isActiveRideStatus = (ride: RideApiItem) => {
+  const status = String(ride.canonicalStatus ?? ride.status ?? '').toUpperCase();
+  return status === 'ACCEPTED' || status === 'ARRIVED' || status === 'IN_TRANSIT' || status === 'INPROGRESS';
+};
+
+const toActiveRideParams = (ride: RideApiItem): PassengerActiveRideParams => ({
+  id: ride.id,
+  driverId: ride.driverId ?? ride.driver?.id ?? undefined,
+  driverName: ride.driver?.fullName ?? 'Driver',
+  vehicleType: ride.vehicleType,
+  status: ride.status,
+  pLat: ride.pickup?.latitude != null ? String(ride.pickup.latitude) : undefined,
+  pLng: ride.pickup?.longitude != null ? String(ride.pickup.longitude) : undefined,
+  dLat: ride.dropoff?.latitude != null ? String(ride.dropoff.latitude) : undefined,
+  dLng: ride.dropoff?.longitude != null ? String(ride.dropoff.longitude) : undefined,
+});
+
 export default function ActiveRideOverlays() {
   const { user, token } = useAuth();
   const pathname = usePathname();
@@ -204,6 +241,38 @@ export default function ActiveRideOverlays() {
     };
   }, [activeRideId, token]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    const recoverActiveRide = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/rides/my-rides`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await parseApiResponse<{ rides: RideApiItem[] }>(response);
+        const activeRide = data.rides?.find(isActiveRideStatus);
+
+        if (cancelled || !activeRide?.id) return;
+
+        const nextRide = toActiveRideParams(activeRide);
+        activeRideRef.current = nextRide;
+        setTrackedActiveRideId(nextRide.id);
+        savePassengerActiveRide(nextRide);
+      } catch (error) {
+        console.log('[ActiveRideOverlays] active ride recovery failed:', error);
+      }
+    };
+
+    void recoverActiveRide();
+    const interval = setInterval(recoverActiveRide, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [token]);
+
   if (pathname.startsWith('/active-ride/')) {
     return null;
   }
@@ -217,6 +286,13 @@ export default function ActiveRideOverlays() {
       <Modal visible={!!arrivalCode} transparent animationType="fade" statusBarTranslucent>
         <View style={styles.codeBackdrop}>
           <View style={styles.codeCard}>
+            <TouchableOpacity
+              style={styles.codeCloseButton}
+              onPress={() => setArrivalCode(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Close confirm your driver popup">
+              <Ionicons name="close" size={20} color="#4D6F6C" />
+            </TouchableOpacity>
             <View style={styles.codeIcon}>
               <Ionicons name="shield-checkmark" size={32} color={teal} />
             </View>
@@ -270,6 +346,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
+  },
+  codeCloseButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0F7F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   codeIcon: {
     width: 60,
