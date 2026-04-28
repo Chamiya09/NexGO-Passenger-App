@@ -7,12 +7,12 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile } from 'react-native-maps';
 
 const teal = '#169F95';
-const MARKER_TIP_TOP_RATIO = 0.5;
+const MARKER_TIP_TOP_RATIO = 0.4;
 const DEFAULT_LOCATION = {
   latitude: 6.9271,
   longitude: 79.8612,
 };
-const CURRENT_LOCATION_REGION_DELTA = 0.018;
+const CURRENT_LOCATION_REGION_DELTA = 0.008;
 const DEVICE_LOCATION_DEBOUNCE_MS = 100;
 const MAP_LOCATION_DEBOUNCE_MS = 550;
 
@@ -581,7 +581,8 @@ const styles = StyleSheet.create({
     marginTop: -40, 
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 30,
+    elevation: 30,
   },
   fixedMarkerIcon: {
     textShadowColor: 'rgba(0,0,0,0.3)', 
