@@ -10,6 +10,12 @@ import { useAuth } from '@/context/auth-context';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
 
+const formatMoney = (value?: number | string | null) => {
+    const amount = Number(value ?? 0);
+    if (!Number.isFinite(amount)) return 'LKR 0';
+    return `LKR ${amount.toLocaleString()}`;
+};
+
 // Types
 type LatLng = { latitude: number; longitude: number };
 type MapPhase = 'TRACK_DRIVER' | 'TRACK_TRIP';
@@ -66,6 +72,8 @@ export default function ActiveRideScreen() {
     const [duration, setDuration] = useState('—');
     const [loadingRoute, setLoadingRoute] = useState(true);
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
+    const [paymentVisible, setPaymentVisible] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
 
     // Map Phase Route Computation
     useEffect(() => {
@@ -133,14 +141,20 @@ export default function ActiveRideScreen() {
             });
         }
 
-        socket.on('rideStatusUpdate', (data: { rideId: string; status: string }) => {
+        socket.on('rideStatusUpdate', (data: { rideId: string; status?: string; canonicalStatus?: string; invoice?: { amount?: number | string } }) => {
             if (data.rideId === rideId) {
-                if (data.status === 'Arrived') {
+                const canonical = String(data.canonicalStatus ?? data.status ?? '').toUpperCase();
+
+                if (canonical === 'ARRIVED') {
                     setArrivalCode(null);
                 }
-                if (data.status === 'InProgress') {
+                if (canonical === 'IN_TRANSIT' || canonical === 'INPROGRESS') {
                     setPhase('TRACK_TRIP');
-                } else if (data.status === 'Completed' || data.status === 'Cancelled') {
+                } else if (canonical === 'COMPLETED') {
+                    setArrivalCode(null);
+                    setPaymentAmount(formatMoney(data.invoice?.amount));
+                    setPaymentVisible(true);
+                } else if (canonical === 'CANCELLED') {
                     router.replace('/(tabs)');
                 }
             }
@@ -230,6 +244,27 @@ export default function ActiveRideScreen() {
                         <Text style={styles.codeSubtitle}>Share this code with your driver after confirming the vehicle and driver.</Text>
                         <Text style={styles.codeValue}>{arrivalCode}</Text>
                         <Text style={styles.codeHint}>Do not share this code before the driver arrives.</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={paymentVisible} transparent animationType="fade" statusBarTranslucent>
+                <View style={styles.codeBackdrop}>
+                    <View style={styles.paymentCard}>
+                        <View style={styles.codeIcon}>
+                            <Ionicons name="receipt-outline" size={30} color={teal} />
+                        </View>
+                        <Text style={styles.codeTitle}>Payment Confirmation</Text>
+                        <Text style={styles.codeSubtitle}>Please confirm the payment for this trip.</Text>
+                        <Text style={styles.paymentValue}>{paymentAmount}</Text>
+                        <TouchableOpacity
+                            style={styles.paymentButton}
+                            onPress={() => {
+                                setPaymentVisible(false);
+                                router.replace('/(tabs)');
+                            }}>
+                            <Text style={styles.paymentButtonText}>Confirm Payment</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -326,5 +361,34 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingVertical: 14
     },
-    codeHint: { fontSize: 12, fontWeight: '800', color: '#D97706', textAlign: 'center', marginTop: 14 }
+    codeHint: { fontSize: 12, fontWeight: '800', color: '#D97706', textAlign: 'center', marginTop: 14 },
+    paymentCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center'
+    },
+    paymentValue: {
+        width: '100%',
+        borderRadius: 18,
+        backgroundColor: '#F7FBFA',
+        borderWidth: 1,
+        borderColor: '#D9E9E6',
+        color: '#102A28',
+        fontSize: 30,
+        fontWeight: '900',
+        textAlign: 'center',
+        paddingVertical: 16,
+        marginTop: 6
+    },
+    paymentButton: {
+        marginTop: 18,
+        backgroundColor: teal,
+        borderRadius: 18,
+        paddingVertical: 12,
+        paddingHorizontal: 22
+    },
+    paymentButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 }
 });
