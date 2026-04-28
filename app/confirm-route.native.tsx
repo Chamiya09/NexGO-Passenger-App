@@ -2,13 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Circle, Marker, Polyline, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
-const DRIVER_SEARCH_RADIUS_METERS = 5000;
 
 // Strip the '/api' suffix from the API URL to get the raw server origin for Socket.IO
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -361,17 +360,6 @@ export default function ConfirmRouteScreen() {
             longitudeDelta: 0.05,
           }}>
           <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
-
-          {pLat && pLng && (
-            <Circle
-              center={{ latitude: pLat, longitude: pLng }}
-              radius={DRIVER_SEARCH_RADIUS_METERS}
-              strokeWidth={2}
-              strokeColor={VEHICLE_MARKERS[normalizeVehicleCategory(selectedVehicle)].color}
-              fillColor={`${VEHICLE_MARKERS[normalizeVehicleCategory(selectedVehicle)].color}22`}
-              zIndex={0}
-            />
-          )}
 
           {/* Pickup Marker */}
           {pLat && pLng && (
