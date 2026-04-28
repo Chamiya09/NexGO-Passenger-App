@@ -43,6 +43,7 @@ export default function RideScreen() {
   const programmaticMoveRef = useRef(false);
   const programmaticMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedDeviceLocationRef = useRef<Coordinates | null>(null);
+  const latestDeviceLocationRef = useRef<Coordinates | null>(null);
   const deviceLocationLockedRef = useRef(false);
   const activeStepRef = useRef<'PICKUP' | 'DROP'>('PICKUP');
   const locationSourceRef = useRef<'map' | 'device'>('map');
@@ -122,6 +123,7 @@ export default function RideScreen() {
   };
 
   const applyDeviceLocation = useCallback((coords: Coordinates, animationDuration = 450, forceNameRefresh = false) => {
+    latestDeviceLocationRef.current = coords;
     const previousCoords = lastAppliedDeviceLocationRef.current;
     const isSameLocation =
       previousCoords &&
@@ -220,8 +222,16 @@ export default function RideScreen() {
   }, [applyDeviceLocation]);
 
   const handleUseCurrentLocation = useCallback(() => {
-    moveToDeviceLocation(true);
-  }, [moveToDeviceLocation]);
+    const latestDeviceLocation = latestDeviceLocationRef.current;
+
+    if (latestDeviceLocation) {
+      applyDeviceLocation(latestDeviceLocation, 120, true);
+      void moveToDeviceLocation(false);
+      return;
+    }
+
+    void moveToDeviceLocation(true);
+  }, [applyDeviceLocation, moveToDeviceLocation]);
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -296,17 +306,18 @@ export default function RideScreen() {
           distanceInterval: 10,
         },
         (location) => {
+          const watchedCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+
+          latestDeviceLocationRef.current = watchedCoords;
+
           if (activeStepRef.current !== 'PICKUP' || locationSourceRef.current !== 'device') {
             return;
           }
 
-          applyDeviceLocation(
-            {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            },
-            250
-          );
+          applyDeviceLocation(watchedCoords, 250);
         }
       );
     };
