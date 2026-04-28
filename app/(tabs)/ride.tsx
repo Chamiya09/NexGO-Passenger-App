@@ -8,23 +8,28 @@ import MapView, { UrlTile } from 'react-native-maps';
 
 const teal = '#169F95';
 const MARKER_TIP_TOP_RATIO = 0.4;
+const DEFAULT_LOCATION = {
+  latitude: 6.9271,
+  longitude: 79.8612,
+};
 
 export default function RideScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const geocodeRequestRef = useRef(0);
+  const locatingRef = useRef(false);
+  const programmaticMoveRef = useRef(false);
+  const programmaticMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width, height } = useWindowDimensions();
   const markerTipTop = height * MARKER_TIP_TOP_RATIO;
 
-  const [selectedLocation, setSelectedLocation] = useState({
-    latitude: 6.9271,
-    longitude: 79.8612,
-  });
+  const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
+  const [locationSource, setLocationSource] = useState<'map' | 'device'>('map');
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
   const [isLocating, setIsLocating] = useState(false);
   
   const [pickupData, setPickupData] = useState({
-    coords: { latitude: 6.9271, longitude: 79.8612 },
+    coords: DEFAULT_LOCATION,
     name: 'Fetching...',
   });
 
@@ -53,34 +58,48 @@ export default function RideScreen() {
     return addressParts.length > 0 ? addressParts.join(', ') : null;
   };
 
-  const handleUseCurrentLocation = useCallback(async () => {
-    if (isLocating) {
+  const moveToDeviceLocation = useCallback(async (showAlerts = false) => {
+    if (locatingRef.current) {
       return;
     }
 
+    locatingRef.current = true;
     setIsLocating(true);
 
     try {
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
-        Alert.alert('Location is turned off', 'Please enable location services to use your current location.');
+        if (showAlerts) {
+          Alert.alert('Location is turned off', 'Please enable location services to use your current location.');
+        }
         return;
       }
 
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
-        Alert.alert('Location permission needed', 'Allow NexGO to access your location so we can select your current place.');
+        if (showAlerts) {
+          Alert.alert('Location permission needed', 'Allow NexGO to access your location so we can select your current place.');
+        }
         return;
       }
 
       const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.Highest,
       });
       const currentCoords = {
         latitude: currentPosition.coords.latitude,
         longitude: currentPosition.coords.longitude,
       };
 
+      programmaticMoveRef.current = true;
+      if (programmaticMoveTimerRef.current) {
+        clearTimeout(programmaticMoveTimerRef.current);
+      }
+      programmaticMoveTimerRef.current = setTimeout(() => {
+        programmaticMoveRef.current = false;
+      }, 900);
+
+      setLocationSource('device');
       setSelectedLocation(currentCoords);
       mapRef.current?.animateToRegion(
         {
@@ -91,11 +110,18 @@ export default function RideScreen() {
         650
       );
     } catch {
-      Alert.alert('Unable to find location', 'Please try again or move the map manually.');
+      if (showAlerts) {
+        Alert.alert('Unable to find location', 'Please try again or move the map manually.');
+      }
     } finally {
+      locatingRef.current = false;
       setIsLocating(false);
     }
-  }, [isLocating]);
+  }, []);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    moveToDeviceLocation(true);
+  }, [moveToDeviceLocation]);
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -112,7 +138,9 @@ export default function RideScreen() {
         const places = await Location.reverseGeocodeAsync(selectedLocation);
         const composedName =
           formatReverseGeocode(places?.[0]) ||
-          formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
+          (locationSource === 'device'
+            ? 'Current location'
+            : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude));
 
         if (requestId !== geocodeRequestRef.current) {
           return;
@@ -142,7 +170,17 @@ export default function RideScreen() {
     }, 800);
 
     return () => clearTimeout(debounceTimer);
-  }, [selectedLocation, activeStep]);
+  }, [selectedLocation, activeStep, locationSource]);
+
+  useEffect(() => {
+    moveToDeviceLocation(false);
+
+    return () => {
+      if (programmaticMoveTimerRef.current) {
+        clearTimeout(programmaticMoveTimerRef.current);
+      }
+    };
+  }, [moveToDeviceLocation]);
 
   return (
     <View style={styles.container}>
@@ -157,14 +195,19 @@ export default function RideScreen() {
           loadingBackgroundColor="#EAE6DF"
           loadingIndicatorColor="#169F95"
           initialRegion={{
-            latitude: 6.9271,
-            longitude: 79.8612,
+            latitude: DEFAULT_LOCATION.latitude,
+            longitude: DEFAULT_LOCATION.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
           ref={mapRef}
           onRegionChangeComplete={(region) => {
+            if (programmaticMoveRef.current) {
+              return;
+            }
+
             const updateSelectedLocation = async () => {
+              setLocationSource('map');
               try {
                 const coordinate = await mapRef.current?.coordinateForPoint({
                   x: width / 2,
