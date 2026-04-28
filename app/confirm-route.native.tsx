@@ -1,17 +1,48 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
-import { VehicleIcons } from '../src/constants/VehicleIcons';
 
 const teal = '#169F95';
+const DRIVER_MARKER_RADIUS_KM = 1;
 
 // Strip the '/api' suffix from the API URL to get the raw server origin for Socket.IO
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
+
+type VehicleCategory = 'Bike' | 'Tuk' | 'Mini' | 'Car' | 'Van';
+
+type DriverMarker = {
+  driverId: string;
+  latitude: number;
+  longitude: number;
+  vehicleCategory?: string;
+  distanceKm?: number;
+};
+
+const normalizeVehicleCategory = (category?: string | null): VehicleCategory => {
+  const value = String(category ?? '').trim();
+  if (value === 'Bike') return 'Bike';
+  if (value === 'Tuk' || value === 'TukTuk') return 'Tuk';
+  if (value === 'Mini') return 'Mini';
+  if (value === 'Van') return 'Van';
+  return 'Car';
+};
+
+const VEHICLE_MARKERS: Record<VehicleCategory, {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  bg: string;
+  color: string;
+}> = {
+  Bike: { icon: 'motorbike', bg: '#EAF7FF', color: '#0077B6' },
+  Tuk: { icon: 'rickshaw', bg: '#FFF7E8', color: '#D97706' },
+  Mini: { icon: 'car-hatchback', bg: '#E7F5F3', color: teal },
+  Car: { icon: 'car-estate', bg: '#F1F5FF', color: '#4A6FA5' },
+  Van: { icon: 'van-passenger', bg: '#F3ECFF', color: '#7C3AED' },
+};
 
 export default function ConfirmRouteScreen() {
   const router = useRouter();
@@ -26,7 +57,7 @@ export default function ConfirmRouteScreen() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
-  const [availableDrivers, setAvailableDrivers] = useState<{ driverId: string, latitude: number, longitude: number, vehicleCategory?: string }[]>([]);
+  const [availableDrivers, setAvailableDrivers] = useState<DriverMarker[]>([]);
   const [rideRequesting, setRideRequesting] = useState(false);
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
   const [overlayState, setOverlayState] = useState<'finding' | 'accepted' | null>(null);
@@ -200,19 +231,27 @@ export default function ConfirmRouteScreen() {
   useEffect(() => {
     Animated.timing(driversFadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
       if (socketRef.current?.connected) {
-        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+        socketRef.current.emit('get_available_drivers', {
+          category: selectedVehicle,
+          latitude: pLat,
+          longitude: pLng,
+        });
       }
     });
 
     // Fallback: poll every 7 seconds to keep drivers fresh
     const interval = setInterval(() => {
       if (socketRef.current?.connected) {
-        socketRef.current.emit('get_available_drivers', { category: selectedVehicle });
+        socketRef.current.emit('get_available_drivers', {
+          category: selectedVehicle,
+          latitude: pLat,
+          longitude: pLng,
+        });
       }
     }, 7000);
 
     return () => clearInterval(interval);
-  }, [selectedVehicle]);
+  }, [selectedVehicle, pLat, pLng]);
 
   // ── confirmRide ────────────────────────────────────────────────────────────
   const PRICE_MAP: Record<string, number> = {
@@ -392,22 +431,33 @@ export default function ConfirmRouteScreen() {
           )}
 
           {/* Categorized Driver Markers with Fade Transition */}
-          {availableDrivers.map((driver) => (
-            <Marker
-              key={driver.driverId}
-              coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              zIndex={5}
-              tracksViewChanges={false}
-            >
-              <Animated.View style={{ opacity: driversFadeAnim }}>
-                <Image
-                  source={{ uri: VehicleIcons[driver.vehicleCategory || selectedVehicle]?.uri }}
-                  style={{ width: 44, height: 44, resizeMode: 'contain', backgroundColor: '#FFF', borderRadius: 22, borderWidth: 2, borderColor: '#169F95' }}
-                />
-              </Animated.View>
-            </Marker>
-          ))}
+          {availableDrivers.map((driver) => {
+            const markerCategory = normalizeVehicleCategory(driver.vehicleCategory || selectedVehicle);
+            const marker = VEHICLE_MARKERS[markerCategory];
+
+            return (
+              <Marker
+                key={driver.driverId}
+                coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                zIndex={5}
+                tracksViewChanges={false}
+              >
+                <Animated.View
+                  style={[
+                    styles.driverMarker,
+                    {
+                      opacity: driversFadeAnim,
+                      backgroundColor: marker.bg,
+                      borderColor: marker.color,
+                    },
+                  ]}>
+                  <MaterialCommunityIcons name={marker.icon} size={21} color={marker.color} />
+                  <View style={[styles.driverMarkerDot, { backgroundColor: marker.color }]} />
+                </Animated.View>
+              </Marker>
+            );
+          })}
         </MapView>
       </View>
 
@@ -443,6 +493,11 @@ export default function ConfirmRouteScreen() {
                     <Text style={styles.sheetTitle}>Choose your ride</Text>
                   </View>
                   <View style={styles.pillGroup}>
+                    <View style={styles.distancePill}>
+                      <Text style={styles.distancePillText}>
+                        {availableDrivers.length} near {DRIVER_MARKER_RADIUS_KM} km
+                      </Text>
+                    </View>
                     <View style={styles.distancePill}>
                       <Text style={styles.distancePillText}>{distance || '9.3 km'}</Text>
                     </View>
@@ -786,6 +841,23 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: '800',
+  },
+  driverMarker: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverMarkerDot: {
+    position: 'absolute',
+    bottom: -3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
   },
   bottomCardContainer: {
     position: 'absolute',
