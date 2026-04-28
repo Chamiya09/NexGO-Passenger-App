@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
@@ -33,8 +34,30 @@ type Ride = {
   vehicleType: string;
   price: number;
   status: RideStatus;
+  canonicalStatus?: RideStatus;
   requestedAt: string;
+  acceptedAt?: string | null;
+  completedAt?: string | null;
+  driver?: {
+    id?: string | null;
+    fullName?: string;
+    phoneNumber?: string;
+    profileImageUrl?: string;
+    vehicle?: {
+      make?: string;
+      model?: string;
+      plateNumber?: string;
+      color?: string;
+      category?: string;
+    } | null;
+  } | null;
 };
+
+const isCompletedRide = (ride: Ride) =>
+  String(ride.canonicalStatus ?? ride.status).toLowerCase() === 'completed';
+
+const isCancellableRide = (ride: Ride) =>
+  String(ride.status).toLowerCase() === 'pending';
 
 // ── Status tag config ─────────────────────────────────────────────────────────
 type StatusConfig = {
@@ -168,7 +191,15 @@ const tagStyles = StyleSheet.create({
 });
 
 // ── Ride Card sub-component ───────────────────────────────────────────────────
-function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => void }) {
+function RideCard({
+  ride,
+  onCancel,
+  onViewDetails,
+}: {
+  ride: Ride;
+  onCancel?: (id: string) => void;
+  onViewDetails: (ride: Ride) => void;
+}) {
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
 
@@ -216,8 +247,15 @@ function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => v
         <Text style={cardStyles.fare}>LKR {ride.price.toLocaleString()}</Text>
       </View>
 
+      {isCompletedRide(ride) && (
+        <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
+          <Ionicons name="receipt-outline" size={15} color={teal} />
+          <Text style={cardStyles.detailsBtnText}>View details</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Cancel button if active (only in Pending/Finding stage) */}
-      {(String(ride.status).toLowerCase() === 'pending' || String((ride as any).canonicalStatus).toLowerCase() === 'pending') && onCancel && (
+      {isCancellableRide(ride) && onCancel && (
         <TouchableOpacity
           style={cardStyles.cancelBtn}
           onPress={() => onCancel(ride.id)}
@@ -313,6 +351,23 @@ const cardStyles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 14,
   },
+  detailsBtn: {
+    marginTop: 12,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  detailsBtnText: {
+    color: teal,
+    fontWeight: '900',
+    fontSize: 13,
+  },
 });
 
 // ── Empty state ──────────────────────────────────────────────────────────────
@@ -348,6 +403,7 @@ const emptyStyles = StyleSheet.create({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function ActivitiesScreen() {
   const { user, token } = useAuth();
+  const router = useRouter();
   const socketRef = useRef<Socket | null>(null);
 
   const [rides, setRides] = useState<Ride[]>([]);
@@ -359,7 +415,11 @@ export default function ActivitiesScreen() {
   const fetchRides = useCallback(async (isRefresh = false) => {
     if (!token) return;
 
-    isRefresh ? setRefreshing(true) : setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -406,11 +466,42 @@ export default function ActivitiesScreen() {
       }
 
       setRides((prev) =>
-        prev.map((r) => (r.id === rideId ? { ...r, status: 'Cancelled' } : r))
+        prev.map((r) => (
+          r.id === rideId ? { ...r, status: 'Cancelled', canonicalStatus: 'Cancelled' } : r
+        ))
       );
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Unable to cancel ride');
     }
+  };
+
+  const handleViewRideDetails = (ride: Ride) => {
+    router.push({
+      pathname: '/ride-details/[id]',
+      params: {
+        id: ride.id,
+        status: ride.status,
+        vehicleType: ride.vehicleType,
+        price: String(ride.price),
+        requestedAt: ride.requestedAt,
+        acceptedAt: ride.acceptedAt ?? '',
+        completedAt: ride.completedAt ?? '',
+        pName: ride.pickup?.name ?? '',
+        pLat: String(ride.pickup?.latitude ?? ''),
+        pLng: String(ride.pickup?.longitude ?? ''),
+        dName: ride.dropoff?.name ?? '',
+        dLat: String(ride.dropoff?.latitude ?? ''),
+        dLng: String(ride.dropoff?.longitude ?? ''),
+        driverName: ride.driver?.fullName ?? '',
+        driverPhone: ride.driver?.phoneNumber ?? '',
+        driverImage: ride.driver?.profileImageUrl ?? '',
+        vehicleMake: ride.driver?.vehicle?.make ?? '',
+        vehicleModel: ride.driver?.vehicle?.model ?? '',
+        vehiclePlate: ride.driver?.vehicle?.plateNumber ?? '',
+        vehicleColor: ride.driver?.vehicle?.color ?? '',
+        vehicleCategory: ride.driver?.vehicle?.category ?? '',
+      },
+    });
   };
 
   // ── Socket: real-time status updates ──────────────────────────────────────
@@ -493,7 +584,9 @@ export default function ActivitiesScreen() {
         <FlatList
           data={rides}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RideCard ride={item} onCancel={handleCancelRide} />}
+          renderItem={({ item }) => (
+            <RideCard ride={item} onCancel={handleCancelRide} onViewDetails={handleViewRideDetails} />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<EmptyState />}
