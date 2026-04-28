@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -65,6 +65,7 @@ export default function ActiveRideScreen() {
     const [distance, setDistance] = useState('—');
     const [duration, setDuration] = useState('—');
     const [loadingRoute, setLoadingRoute] = useState(true);
+    const [arrivalCode, setArrivalCode] = useState<string | null>(null);
 
     // Map Phase Route Computation
     useEffect(() => {
@@ -134,11 +135,21 @@ export default function ActiveRideScreen() {
 
         socket.on('rideStatusUpdate', (data: { rideId: string; status: string }) => {
             if (data.rideId === rideId) {
+                if (data.status === 'Arrived') {
+                    setArrivalCode(null);
+                }
                 if (data.status === 'InProgress') {
+                    setArrivalCode(null);
                     setPhase('TRACK_TRIP');
                 } else if (data.status === 'Completed' || data.status === 'Cancelled') {
                     router.replace('/(tabs)');
                 }
+            }
+        });
+
+        socket.on('arrivalVerificationCode', (data: { rideId: string; code: string }) => {
+            if (data.rideId === rideId) {
+                setArrivalCode(data.code);
             }
         });
 
@@ -209,6 +220,20 @@ export default function ActiveRideScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            <Modal visible={!!arrivalCode} transparent animationType="fade" statusBarTranslucent>
+                <View style={styles.codeBackdrop}>
+                    <View style={styles.codeCard}>
+                        <View style={styles.codeIcon}>
+                            <Ionicons name="shield-checkmark" size={32} color={teal} />
+                        </View>
+                        <Text style={styles.codeTitle}>Confirm Your Driver</Text>
+                        <Text style={styles.codeSubtitle}>Share this code with your driver after confirming the vehicle and driver.</Text>
+                        <Text style={styles.codeValue}>{arrivalCode}</Text>
+                        <Text style={styles.codeHint}>Do not share this code before the driver arrives.</Text>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -262,5 +287,45 @@ const styles = StyleSheet.create({
     },
     callIcon: {
         width: 44, height: 44, borderRadius: 22, backgroundColor: teal, justifyContent: 'center', alignItems: 'center', elevation: 4
-    }
+    },
+    codeBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(6, 22, 21, 0.46)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24
+    },
+    codeCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center'
+    },
+    codeIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E7F5F3',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14
+    },
+    codeTitle: { fontSize: 22, fontWeight: '900', color: '#102A28', marginBottom: 8 },
+    codeSubtitle: { fontSize: 14, fontWeight: '700', color: '#617C79', textAlign: 'center', lineHeight: 20, marginBottom: 18 },
+    codeValue: {
+        width: '100%',
+        borderRadius: 18,
+        backgroundColor: '#F7FBFA',
+        borderWidth: 1,
+        borderColor: '#D9E9E6',
+        color: '#102A28',
+        fontSize: 34,
+        fontWeight: '900',
+        letterSpacing: 8,
+        textAlign: 'center',
+        paddingVertical: 14
+    },
+    codeHint: { fontSize: 12, fontWeight: '800', color: '#D97706', textAlign: 'center', marginTop: 14 }
 });
