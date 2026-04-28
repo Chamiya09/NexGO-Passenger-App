@@ -135,6 +135,9 @@ export default function ActiveRideScreen() {
 
         socket.on('rideStatusUpdate', (data: { rideId: string; status: string }) => {
             if (data.rideId === rideId) {
+                if (data.status === 'Arrived') {
+                    setArrivalCode(null);
+                }
                 if (data.status === 'InProgress') {
                     setPhase('TRACK_TRIP');
                 } else if (data.status === 'Completed' || data.status === 'Cancelled') {
