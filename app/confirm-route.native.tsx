@@ -354,6 +354,10 @@ export default function ConfirmRouteScreen() {
       Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
       return;
     }
+    if (availableDrivers.length === 0) {
+      Alert.alert('No Drivers Online', `No online ${selectedVehicle} drivers are nearby right now. Please try another category or try again later.`);
+      return;
+    }
 
     // Lock the confirm button immediately — stays locked until driver accepts or error
     cancelRequestedRef.current = false;
@@ -692,10 +696,10 @@ export default function ConfirmRouteScreen() {
               <TouchableOpacity
                 style={[
                   styles.superConfirmButton,
-                  (rideRequesting || hasActiveRide) && styles.superConfirmButtonDisabled,
+                  (rideRequesting || hasActiveRide || availableDrivers.length === 0) && styles.superConfirmButtonDisabled,
                 ]}
                 onPress={confirmRide}
-                disabled={rideRequesting || hasActiveRide}>
+                disabled={rideRequesting || hasActiveRide || availableDrivers.length === 0}>
                 {rideRequesting ? (
                   <View style={styles.superConfirmButtonContent}>
                     <ActivityIndicator size="small" color="#FFF" />
@@ -703,7 +707,11 @@ export default function ConfirmRouteScreen() {
                   </View>
                 ) : (
                   <Text style={styles.superConfirmButtonText}>
-                    {hasActiveRide ? 'Ride Already Active' : `Confirm ${selectedVehicle} - ${getPriceForSelected()}`}
+                    {hasActiveRide
+                      ? 'Ride Already Active'
+                      : availableDrivers.length === 0
+                        ? `No ${selectedVehicle} Drivers Online`
+                        : `Confirm ${selectedVehicle} - ${getPriceForSelected()}`}
                   </Text>
                 )}
               </TouchableOpacity>
