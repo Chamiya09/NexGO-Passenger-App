@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Modal } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
+import { MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -22,6 +23,15 @@ const formatMoney = (value?: number | string | null) => {
 type LatLng = { latitude: number; longitude: number };
 type MapPhase = 'TRACK_DRIVER' | 'TRACK_TRIP';
 type ArrivalVerificationCodePayload = { rideId: string; code: string; passengerId?: string };
+
+function createDirectRoute(origin: LatLng, destination: LatLng) {
+    if (!Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude) ||
+        !Number.isFinite(destination.latitude) || !Number.isFinite(destination.longitude)) {
+        return [];
+    }
+
+    return [origin, destination];
+}
 
 // OSRM fetcher
 async function fetchOsrmRoute(from: LatLng, to: LatLng) {
@@ -57,8 +67,8 @@ export default function ActiveRideScreen() {
     const driverName = params.driverName as string || 'Driver';
     const statusParam = params.status as string || 'Accepted';
 
-    const pickup: LatLng = { latitude: pLat, longitude: pLng };
-    const dropoff: LatLng = { latitude: dLat, longitude: dLng };
+    const pickup = useMemo<LatLng>(() => ({ latitude: pLat, longitude: pLng }), [pLat, pLng]);
+    const dropoff = useMemo<LatLng>(() => ({ latitude: dLat, longitude: dLng }), [dLat, dLng]);
 
     const [driverPos, setDriverPos] = useState<LatLng | null>(
         Number.isFinite(drLat) && Number.isFinite(drLng)
@@ -74,7 +84,6 @@ export default function ActiveRideScreen() {
 
     const [distance, setDistance] = useState('—');
     const [duration, setDuration] = useState('—');
-    const [loadingRoute, setLoadingRoute] = useState(true);
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
     const [paymentVisible, setPaymentVisible] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
@@ -114,10 +123,15 @@ export default function ActiveRideScreen() {
     useEffect(() => {
         let active = true;
         const fetchPath = async () => {
-            setLoadingRoute(true);
             try {
                 const fromPos = phase === 'TRACK_DRIVER' ? (driverPos || pickup) : pickup;
                 const toPos = phase === 'TRACK_DRIVER' ? pickup : dropoff;
+                const directRoute = createDirectRoute(fromPos, toPos);
+
+                if (directRoute.length > 1) {
+                    setRouteCoords(directRoute);
+                    setSlicedRouteCoords(directRoute);
+                }
 
                 // Wait till we have a valid driver pos if in track driver phase to fetch Osrm route
                 if (phase === 'TRACK_DRIVER' && !driverPos) return;
@@ -138,14 +152,12 @@ export default function ActiveRideScreen() {
                 }
             } catch (err) {
                 console.error('Route fetch err:', err);
-            } finally {
-                if (active) setLoadingRoute(false);
             }
         };
 
         fetchPath();
         return () => { active = false; };
-    }, [phase, pickup.latitude, dropoff.latitude, driverPos?.latitude]); // Include driver start pos just once
+    }, [phase, pickup, dropoff, driverPos]);
 
     // Geolib slice on raw position updates
     useEffect(() => {
@@ -213,7 +225,7 @@ export default function ActiveRideScreen() {
         socket.on('arrivalVerificationCodeBroadcast', handleArrivalVerificationCode);
 
         return () => { socket.disconnect(); };
-    }, [driverId, rideId, user?.id]);
+    }, [driverId, rideId, router, user?.id]);
 
     useEffect(() => {
         if (!token || !rideId) return;
@@ -251,10 +263,19 @@ export default function ActiveRideScreen() {
                 ref={mapRef}
                 style={StyleSheet.absoluteFillObject}
                 mapType="none"
+                loadingEnabled={true}
+                loadingBackgroundColor="#EAE6DF"
+                loadingIndicatorColor="#169F95"
+                showsUserLocation={false}
+                showsMyLocationButton={false}
+                toolbarEnabled={false}
                 initialRegion={{
-                    latitude: pLat, longitude: pLng, latitudeDelta: 0.05, longitudeDelta: 0.05
+                    latitude: Number.isFinite(pLat) ? pLat : 6.9271,
+                    longitude: Number.isFinite(pLng) ? pLng : 79.8612,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05
                 }}>
-                <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
 
                 {/* Dynamic Route */}
                 {slicedRouteCoords.length > 0 && (
@@ -263,7 +284,7 @@ export default function ActiveRideScreen() {
 
                 {/* Driver Marker */}
                 {driverPos && (
-                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5}>
+                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5} tracksViewChanges={false}>
                         <View style={styles.driverCar}>
                             <Ionicons name="car-sport" size={20} color="#FFF" />
                         </View>
@@ -271,7 +292,7 @@ export default function ActiveRideScreen() {
                 )}
 
                 {/* Target Marker */}
-                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
+                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
                     <View style={styles.nexusMarker}>
                         <View style={[styles.markerRing, { backgroundColor: pathColor }]} />
                     </View>

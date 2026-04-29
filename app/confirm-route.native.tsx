@@ -7,6 +7,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
+import { MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const teal = '#169F95';
 
@@ -428,17 +429,20 @@ export default function ConfirmRouteScreen() {
           loadingEnabled={true}
           loadingBackgroundColor="#EAE6DF"
           loadingIndicatorColor="#169F95"
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          toolbarEnabled={false}
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}>
-          <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+          <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
 
           {/* Pickup Marker */}
           {pLat && pLng && (
-            <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3}>
+            <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3} tracksViewChanges={false}>
               <View style={styles.mapLabelPill}>
                 <View style={[styles.mapLabelDot, { backgroundColor: '#169F95' }]} />
                 <Text style={styles.mapLabelText} numberOfLines={1}>Pickup</Text>
@@ -449,7 +453,7 @@ export default function ConfirmRouteScreen() {
 
           {/* Dropoff Marker */}
           {dLat && dLng && (
-            <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
+            <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
               <View style={styles.mapLabelPill}>
                 <View style={[styles.mapLabelDot, { backgroundColor: '#E74C3C' }]} />
                 <Text style={styles.mapLabelText} numberOfLines={1}>Dropoff</Text>
@@ -505,7 +509,7 @@ export default function ConfirmRouteScreen() {
 
           {/* Primary Route Label Midway */}
           {routesData.length > 0 && (
-            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={5}>
+            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={5} tracksViewChanges={false}>
               <View style={styles.routeTagPill}>
                 <Text style={styles.routeTagText}>Local Fastest</Text>
               </View>
@@ -514,7 +518,7 @@ export default function ConfirmRouteScreen() {
 
           {/* Alternative Route Label Midway */}
           {routesData.length > 1 && (
-            <Marker coordinate={routesData[1].coords[Math.floor(routesData[1].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4}>
+            <Marker coordinate={routesData[1].coords[Math.floor(routesData[1].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4} tracksViewChanges={false}>
               <View style={[styles.routeTagPill, { backgroundColor: '#FFFFFF', borderColor: '#B0B0B0' }]}>
                 <Text style={[styles.routeTagText, { color: '#526E6C' }]}>Short Way</Text>
               </View>
