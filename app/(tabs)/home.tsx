@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -15,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import { loadPassengerActiveRide, PassengerActiveRideParams } from '@/lib/activeRideStorage';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
 const palette = {
   background: '#F4F8F7',
@@ -43,6 +45,18 @@ type ServiceCard = {
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   tone: 'primary' | 'light';
+};
+
+type PromotionSummary = {
+  id: string;
+  name: string;
+  code: string;
+  discountType: 'Percentage' | 'Fixed';
+  discountValue: string;
+  imageUrl: string;
+  endDate: string;
+  status: string;
+  active: boolean;
 };
 
 const serviceCards: ServiceCard[] = [
@@ -134,6 +148,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [activeRide, setActiveRide] = useState<PassengerActiveRideParams | null>(null);
+  const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -149,6 +164,37 @@ export default function HomeScreen() {
         mounted = false;
       };
     }, [])
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch(`${API_BASE_URL}/promotions`)
+      .then(parseApiResponse<{ promotions: PromotionSummary[] }>)
+      .then((data) => {
+        if (!mounted) return;
+        const now = Date.now();
+        const activePromotions = (data.promotions ?? []).filter((item) => {
+          if (!item.active || item.status !== 'Active') return false;
+          if (!item.endDate || item.endDate === 'No end date') return true;
+          const endDate = new Date(item.endDate).getTime();
+          return Number.isFinite(endDate) && endDate >= now;
+        });
+        setPromotions(activePromotions);
+      })
+      .catch(() => {
+        if (mounted) setPromotions([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const getPromoCaption = (promotion: PromotionSummary) => (
+    promotion.discountType === 'Percentage'
+      ? `Use code ${promotion.code} to get ${Math.min(100, Math.max(0, Number(promotion.discountValue)))}% off your next ride.`
+      : `Use code ${promotion.code} to save LKR ${Math.max(0, Math.round(Number(promotion.discountValue)))} on your next ride.`
   );
 
   const quickActions: QuickAction[] = [
@@ -213,6 +259,55 @@ export default function HomeScreen() {
           ))}
         </View>
 
+        {promotions.length > 0 ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Ride Promotions</Text>
+                <Text style={styles.sectionCaption}>Limited-time offers from NexGO</Text>
+              </View>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.promoScroll}>
+              {promotions.map((promotion) => (
+                <View key={promotion.id} style={styles.promoCard}>
+                  <View style={styles.promoMedia}>
+                    {promotion.imageUrl ? (
+                      <Image
+                        source={{ uri: promotion.imageUrl }}
+                        style={styles.promoImage}
+                      />
+                    ) : (
+                      <View style={styles.promoMediaFallback}>
+                        <Ionicons name="pricetag" size={34} color="#FFFFFF" />
+                      </View>
+                    )}
+                    <View style={styles.promoBadge}>
+                      <Text style={styles.promoBadgeText}>{promotion.code}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.promoBody}>
+                    <Text style={styles.promoTitle} numberOfLines={2}>{promotion.name}</Text>
+                    <Text style={styles.promoText} numberOfLines={2}>{getPromoCaption(promotion)}</Text>
+                    <View style={styles.promoFooter}>
+                      <View style={styles.promoMetaPill}>
+                        <Ionicons name="sparkles" size={12} color="#017270" />
+                        <Text style={styles.promoMetaText}>Limited offer</Text>
+                      </View>
+                      <Pressable style={styles.promoCta} onPress={() => router.push('/(tabs)/ride')}>
+                        <Text style={styles.promoCtaText}>Use code</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
+
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>Ride Options</Text>
@@ -228,19 +323,6 @@ export default function HomeScreen() {
             <ServiceTile key={service.title} service={service} onPress={() => router.push('/(tabs)/ride')} />
           ))}
         </ScrollView>
-
-        <View style={styles.promoCard}>
-          <View style={styles.promoContent}>
-            <View style={styles.promoBadge}>
-              <Text style={styles.promoBadgeText}>WEEKEND</Text>
-            </View>
-            <Text style={styles.promoTitle}>Save on Colombo city rides</Text>
-            <Text style={styles.promoText}>Use NexGO points on eligible rides and keep your trip budget light.</Text>
-          </View>
-          <View style={styles.promoIconWrap}>
-            <Ionicons name="pricetag-outline" size={30} color="#FFFFFF" />
-          </View>
-        </View>
 
         <View style={styles.safetyCard}>
           <View style={styles.safetyIcon}>
@@ -472,49 +554,96 @@ const styles = StyleSheet.create({
   serviceSubtitleLight: {
     color: palette.secondary,
   },
-  promoCard: {
-    backgroundColor: palette.accentDark,
-    borderRadius: 22,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  promoScroll: {
+    gap: 12,
+    paddingRight: 20,
   },
-  promoContent: {
+  promoCard: {
+    width: 300,
+    borderRadius: 22,
+    backgroundColor: '#0F3431',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  promoMedia: {
+    height: 128,
+    backgroundColor: '#1C5B56',
+  },
+  promoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  promoMediaFallback: {
     flex: 1,
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   promoBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 14,
+    position: 'absolute',
+    left: 14,
+    bottom: 12,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(15,52,49,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   promoBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  promoBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
   },
   promoTitle: {
     color: '#FFFFFF',
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '900',
   },
   promoText: {
-    color: 'rgba(255,255,255,0.86)',
-    fontSize: 13,
-    lineHeight: 19,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '600',
   },
-  promoIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+  promoFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 6,
+  },
+  promoMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#E7F5F3',
+  },
+  promoMetaText: {
+    color: '#017270',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  promoCta: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#F59E0B',
+  },
+  promoCtaText: {
+    color: '#1F1300',
+    fontSize: 11,
+    fontWeight: '900',
   },
   safetyCard: {
     backgroundColor: palette.warningBg,
