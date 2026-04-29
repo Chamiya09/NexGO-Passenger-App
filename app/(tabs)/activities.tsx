@@ -601,7 +601,7 @@ export default function ActivitiesScreen() {
     ? rides.find((ride) => ride.id === latestNavigation.id)
     : null;
   const canResumeNavigation = Boolean(
-    latestNavigation &&
+    latestNavigation?.id &&
     (!latestRide || (latestRide.status !== 'Completed' && latestRide.status !== 'Cancelled'))
   );
 
@@ -633,15 +633,18 @@ export default function ActivitiesScreen() {
       {canResumeNavigation && (
         <TouchableOpacity
           style={styles.resumeNavBtn}
-          onPress={() =>
+          onPress={() => {
+            if (!latestNavigation?.id) return;
+
             router.push({
               pathname: '/active-ride/[id]',
               params: {
-                ...(latestNavigation ?? {}),
+                ...latestNavigation,
+                id: latestNavigation.id,
                 status: latestRide?.status ?? latestNavigation?.status,
               },
-            })
-          }
+            });
+          }}
         >
           <View style={styles.resumeNavIcon}>
             <Ionicons name="navigate" size={18} color="#FFFFFF" />
@@ -685,14 +688,18 @@ export default function ActivitiesScreen() {
               isResumeTarget={Boolean(latestNavigation?.id && item.id === latestNavigation.id)}
               onResumeNavigation={
                 item.id === latestNavigation?.id
-                  ? () =>
+                  ? () => {
+                      if (!latestNavigation?.id) return;
+
                       router.push({
                         pathname: '/active-ride/[id]',
                         params: {
-                          ...(latestNavigation ?? {}),
+                          ...latestNavigation,
+                          id: latestNavigation.id,
                           status: item.status,
                         },
-                      })
+                      });
+                    }
                   : undefined
               }
             />
