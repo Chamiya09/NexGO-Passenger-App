@@ -7,6 +7,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const teal = '#169F95';
@@ -42,6 +43,16 @@ type AcceptedRideData = {
     latitude: number;
     longitude: number;
   } | null;
+};
+
+type PromotionSummary = {
+  id: string;
+  code: string;
+  discountType: 'Percentage' | 'Fixed';
+  discountValue: string;
+  endDate: string;
+  status: string;
+  active: boolean;
 };
 
 const normalizeVehicleCategory = (category?: string | null): VehicleCategory => {
@@ -82,6 +93,10 @@ export default function ConfirmRouteScreen() {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
   const [promoCode, setPromoCode] = useState('');
+  const [promoStatus, setPromoStatus] = useState<'idle' | 'applied' | 'error'>('idle');
+  const [promoMessage, setPromoMessage] = useState('');
+  const [appliedPromotion, setAppliedPromotion] = useState<PromotionSummary | null>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [availableDrivers, setAvailableDrivers] = useState<DriverMarker[]>([]);
   const [rideRequesting, setRideRequesting] = useState(false);
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
@@ -321,6 +336,77 @@ export default function ConfirmRouteScreen() {
     Van: 2100,
   };
 
+  const formatMoney = (value: number) => `LKR ${Math.max(0, Math.round(value))}`;
+
+  const getDiscountAmount = (promotion: PromotionSummary, price: number) => {
+    const numericValue = Number(promotion.discountValue);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      return 0;
+    }
+    if (promotion.discountType === 'Percentage') {
+      const percent = Math.min(100, Math.max(0, numericValue));
+      return Math.min(price, price * (percent / 100));
+    }
+    return Math.min(price, numericValue);
+  };
+
+  const basePrice = PRICE_MAP[selectedVehicle] ?? PRICE_MAP.Mini;
+  const discountAmount = appliedPromotion ? getDiscountAmount(appliedPromotion, basePrice) : 0;
+  const finalPrice = Math.max(0, basePrice - discountAmount);
+
+  const applyPromotionCode = async () => {
+    const trimmedCode = promoCode.trim().toUpperCase();
+    if (!trimmedCode) {
+      setPromoStatus('error');
+      setPromoMessage('Enter a promo code to apply.');
+      setAppliedPromotion(null);
+      return;
+    }
+
+    setIsApplyingPromo(true);
+    setPromoStatus('idle');
+    setPromoMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/promotions`);
+      const data = await parseApiResponse<{ promotions: PromotionSummary[] }>(response);
+      const promotion = (data.promotions ?? []).find((item) => item.code === trimmedCode);
+
+      if (!promotion) {
+        setPromoStatus('error');
+        setPromoMessage('Promo code not found.');
+        setAppliedPromotion(null);
+        return;
+      }
+
+      const isActive = Boolean(promotion.active) && promotion.status === 'Active';
+      const hasEndDate = promotion.endDate && promotion.endDate !== 'No end date';
+      const endDate = hasEndDate ? new Date(promotion.endDate) : null;
+      const isExpired = endDate ? endDate.getTime() < Date.now() : false;
+
+      if (!isActive || isExpired) {
+        setPromoStatus('error');
+        setPromoMessage(isExpired ? 'Promo code has expired.' : 'Promo code is not active.');
+        setAppliedPromotion(null);
+        return;
+      }
+
+      setAppliedPromotion(promotion);
+      const discountValue = Number(promotion.discountValue);
+      const discountLabel = promotion.discountType === 'Percentage'
+        ? `${Math.min(100, Math.max(0, discountValue))}% off`
+        : `${formatMoney(discountValue)} off`;
+      setPromoStatus('applied');
+      setPromoMessage(`Promo applied: ${discountLabel}`);
+    } catch (error) {
+      setPromoStatus('error');
+      setPromoMessage(error instanceof Error ? error.message : 'Unable to apply promo code.');
+      setAppliedPromotion(null);
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
   const goToLiveTracking = () => {
     if (!acceptedData) return;
 
@@ -377,12 +463,13 @@ export default function ConfirmRouteScreen() {
     ).start();
 
     const socketVehicleType = getSocketVehicleType(selectedVehicle);
+    const ridePrice = finalPrice;
 
     socketRef.current.emit('requestRide', {
       passengerId: user.id,
       passengerName: user.fullName ?? 'Passenger',
       vehicleType: socketVehicleType,
-      price: PRICE_MAP[selectedVehicle] ?? 1301,
+      price: ridePrice,
       pickup: {
         latitude: pLat,
         longitude: pLng,
@@ -399,22 +486,8 @@ export default function ConfirmRouteScreen() {
   };
 
   // Derived price calculator for dynamic button
-  const getPriceForSelected = () => {
-    switch (selectedVehicle) {
-      case 'Bike':
-        return 'LKR 850';
-      case 'Tuk':
-        return 'LKR 1115';
-      case 'Mini':
-        return 'LKR 1301';
-      case 'Car':
-        return 'LKR 1450';
-      case 'Van':
-        return 'LKR 2100';
-      default:
-        return 'LKR 1301';
-    }
-  };
+  const displayBasePrice = formatMoney(basePrice);
+  const displayFinalPrice = formatMoney(finalPrice);
 
   return (
     <View style={styles.container}>
@@ -677,15 +750,37 @@ export default function ConfirmRouteScreen() {
                       <TextInput
                         style={styles.promoInput}
                         value={promoCode}
-                        onChangeText={(value) => setPromoCode(value.toUpperCase())}
+                        onChangeText={(value) => {
+                          setPromoCode(value.toUpperCase());
+                          if (appliedPromotion) {
+                            setAppliedPromotion(null);
+                            setPromoStatus('idle');
+                            setPromoMessage('');
+                          }
+                        }}
                         placeholder="Enter promo code"
                         placeholderTextColor="#8A9A9A"
                         autoCapitalize="characters"
                       />
-                      <TouchableOpacity style={styles.applyPromoButton} activeOpacity={0.8}>
-                        <Text style={styles.applyPromoButtonText}>Apply</Text>
+                      <TouchableOpacity
+                        style={[styles.applyPromoButton, isApplyingPromo && styles.applyPromoButtonDisabled]}
+                        activeOpacity={0.8}
+                        onPress={applyPromotionCode}
+                        disabled={isApplyingPromo}>
+                        <Text style={styles.applyPromoButtonText}>
+                          {isApplyingPromo ? 'Applying...' : 'Apply'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
+                    {!!promoMessage && (
+                      <Text
+                        style={[
+                          styles.promoFeedback,
+                          promoStatus === 'error' && styles.promoFeedbackError,
+                        ]}>
+                        {promoMessage}
+                      </Text>
+                    )}
                   </View>
 
                   <View style={styles.formDivider} />
@@ -708,7 +803,14 @@ export default function ConfirmRouteScreen() {
                       <Text style={styles.totalPriceLabel}>Total price</Text>
                       <Text style={styles.totalPriceHint}>{selectedVehicle} ride fare</Text>
                     </View>
-                    <Text style={styles.totalPriceValue}>{getPriceForSelected()}</Text>
+                    {appliedPromotion ? (
+                      <View style={styles.totalPriceValueStack}>
+                        <Text style={styles.totalPriceOriginalValue}>{displayBasePrice}</Text>
+                        <Text style={styles.totalPriceValue}>{displayFinalPrice}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.totalPriceValue}>{displayBasePrice}</Text>
+                    )}
                   </View>
                 </View>
               )}
@@ -742,7 +844,7 @@ export default function ConfirmRouteScreen() {
                       ? 'Ride Already Active'
                       : availableDrivers.length === 0
                         ? `No ${selectedVehicle} Drivers Online`
-                        : `Confirm ${selectedVehicle} - ${getPriceForSelected()}`}
+                        : `Confirm ${selectedVehicle} - ${displayFinalPrice}`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1169,6 +1271,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     paddingVertical: 0,
   },
+  promoFeedback: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#017270',
+  },
+  promoFeedbackError: {
+    color: '#B45309',
+  },
   applyPromoButton: {
     minHeight: 32,
     borderRadius: 10,
@@ -1176,6 +1286,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  applyPromoButtonDisabled: {
+    opacity: 0.7,
   },
   applyPromoButtonText: {
     color: '#FFFFFF',
@@ -1238,6 +1351,15 @@ const styles = StyleSheet.create({
     color: '#017270',
     fontSize: 18,
     fontWeight: '900',
+  },
+  totalPriceValueStack: {
+    alignItems: 'flex-end',
+  },
+  totalPriceOriginalValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B7C7A',
+    textDecorationLine: 'line-through',
   },
   superConfirmButton: {
     backgroundColor: '#017270',
