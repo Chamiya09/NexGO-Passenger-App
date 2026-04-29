@@ -7,7 +7,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
-import { MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const teal = '#169F95';
 
@@ -426,7 +426,7 @@ export default function ConfirmRouteScreen() {
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           mapType="none"
-          loadingEnabled={true}
+          loadingEnabled={MAP_LOADING_ENABLED}
           loadingBackgroundColor="#EAE6DF"
           loadingIndicatorColor="#169F95"
           showsUserLocation={false}

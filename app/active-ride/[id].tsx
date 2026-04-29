@@ -8,7 +8,7 @@ import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
-import { MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -263,7 +263,7 @@ export default function ActiveRideScreen() {
                 ref={mapRef}
                 style={StyleSheet.absoluteFillObject}
                 mapType="none"
-                loadingEnabled={true}
+                loadingEnabled={MAP_LOADING_ENABLED}
                 loadingBackgroundColor="#EAE6DF"
                 loadingIndicatorColor="#169F95"
                 showsUserLocation={false}

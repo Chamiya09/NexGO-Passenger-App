@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile } from 'react-native-maps';
-import { MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const teal = '#169F95';
 const MARKER_TIP_TOP_RATIO = 0.4;
@@ -371,7 +371,7 @@ export default function RideScreen() {
         <MapView
           style={StyleSheet.absoluteFillObject}
           mapType="none"
-          loadingEnabled={true}
+          loadingEnabled={MAP_LOADING_ENABLED}
           loadingBackgroundColor="#EAE6DF"
           loadingIndicatorColor="#169F95"
           showsUserLocation={false}
