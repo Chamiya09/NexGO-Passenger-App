@@ -1,23 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { UrlTile } from 'react-native-maps';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const teal = '#169F95';
+const MARKER_TIP_TOP_RATIO = 0.4;
+const DEFAULT_LOCATION = {
+  latitude: 6.9271,
+  longitude: 79.8612,
+};
+const CURRENT_LOCATION_REGION_DELTA = 0.008;
+const DEVICE_LOCATION_DEBOUNCE_MS = 100;
+const MAP_LOCATION_DEBOUNCE_MS = 550;
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const getMarkerAlignedRegion = (coords: Coordinates) => ({
+  latitude: coords.latitude - (0.5 - MARKER_TIP_TOP_RATIO) * CURRENT_LOCATION_REGION_DELTA,
+  longitude: coords.longitude,
+  latitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+  longitudeDelta: CURRENT_LOCATION_REGION_DELTA,
+});
+
+type PhotonReverseGeocodeResponse = {
+  features?: {
+    properties?: {
+      name?: string;
+      street?: string;
+      district?: string;
+      locality?: string;
+      city?: string;
+      county?: string;
+      state?: string;
+      country?: string;
+    };
+  }[];
+};
 
 export default function RideScreen() {
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
+  const geocodeRequestRef = useRef(0);
+  const locatingRef = useRef(false);
+  const programmaticMoveRef = useRef(false);
+  const programmaticMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedDeviceLocationRef = useRef<Coordinates | null>(null);
+  const latestDeviceLocationRef = useRef<Coordinates | null>(null);
+  const deviceLocationLockedRef = useRef(false);
+  const activeStepRef = useRef<'PICKUP' | 'DROP'>('PICKUP');
+  const locationSourceRef = useRef<'map' | 'device'>('map');
+  const { width, height } = useWindowDimensions();
+  const markerTipTop = height * MARKER_TIP_TOP_RATIO;
 
-  const [selectedLocation, setSelectedLocation] = useState({
-    latitude: 6.9271,
-    longitude: 79.8612,
-  });
+  const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
+  const [locationSource, setLocationSource] = useState<'map' | 'device'>('map');
+  const [locationNameRefreshKey, setLocationNameRefreshKey] = useState(0);
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
+  const [isLocating, setIsLocating] = useState(false);
+  const [hasLatestDeviceLocation, setHasLatestDeviceLocation] = useState(false);
   
   const [pickupData, setPickupData] = useState({
-    coords: { latitude: 6.9271, longitude: 79.8612 },
+    coords: DEFAULT_LOCATION,
     name: 'Fetching...',
   });
 
@@ -26,44 +76,217 @@ export default function RideScreen() {
     name: 'Unknown Location',
   });
 
-  const formatCoordsFallback = (latitude: number, longitude: number) =>
-    `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  useEffect(() => {
+    activeStepRef.current = activeStep;
+  }, [activeStep]);
 
-  const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined) => {
+  useEffect(() => {
+    locationSourceRef.current = locationSource;
+  }, [locationSource]);
+
+  const formatCoordsFallback = (latitude: number, longitude: number) =>
+    `Pinned location (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
+
+  const formatReverseGeocode = (place: Location.LocationGeocodedAddress | null | undefined, allowRegionOnly = true) => {
     if (!place) {
       return null;
     }
 
-    const primary =
-      place.name ||
-      place.street ||
-      place.district ||
-      place.subregion ||
-      place.city ||
-      place.region;
+    const streetAddress = [place.streetNumber, place.street].filter(Boolean).join(' ');
+    const hasSpecificPlace = Boolean(streetAddress || place.district || place.city || place.subregion);
 
-    const secondary = place.city || place.subregion || place.region || place.country;
-
-    if (primary && secondary && primary !== secondary) {
-      return `${primary}, ${secondary}`;
+    if (!allowRegionOnly && !hasSpecificPlace) {
+      return null;
     }
 
-    return primary || secondary || null;
+    const addressParts = [
+      streetAddress,
+      place.district,
+      place.city || place.subregion,
+      place.region,
+      place.country,
+    ].filter((part, index, parts) => part && parts.indexOf(part) === index);
+
+    return addressParts.length > 0 ? addressParts.join(', ') : null;
   };
+
+  const fetchDetailedLocationName = async ({ latitude, longitude }: Coordinates, allowRegionOnly: boolean) => {
+    const response = await fetch(`https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}`);
+
+    if (!response.ok) {
+      throw new Error('Unable to resolve location');
+    }
+
+    const data = (await response.json()) as PhotonReverseGeocodeResponse;
+    const properties = data.features?.[0]?.properties;
+
+    if (!properties) {
+      return null;
+    }
+
+    const detail = properties.name || properties.street || properties.district || properties.locality;
+    const region = properties.city || properties.county || (allowRegionOnly ? properties.state : undefined);
+    const country = properties.country;
+    const parts = [detail, region, country].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const applyDeviceLocation = useCallback((coords: Coordinates, animationDuration = 450, forceNameRefresh = false) => {
+    latestDeviceLocationRef.current = coords;
+    setHasLatestDeviceLocation(true);
+    const previousCoords = lastAppliedDeviceLocationRef.current;
+    const isSameLocation =
+      previousCoords &&
+      Math.abs(previousCoords.latitude - coords.latitude) < 0.00001 &&
+      Math.abs(previousCoords.longitude - coords.longitude) < 0.00001;
+
+    if (isSameLocation) {
+      if (forceNameRefresh) {
+        deviceLocationLockedRef.current = true;
+        programmaticMoveRef.current = true;
+        if (programmaticMoveTimerRef.current) {
+          clearTimeout(programmaticMoveTimerRef.current);
+        }
+        programmaticMoveTimerRef.current = setTimeout(() => {
+          programmaticMoveRef.current = false;
+        }, animationDuration + 250);
+        setLocationSource('device');
+        setLocationNameRefreshKey((current) => current + 1);
+        mapRef.current?.animateToRegion(
+          getMarkerAlignedRegion(coords),
+          animationDuration
+        );
+      }
+      return;
+    }
+
+    lastAppliedDeviceLocationRef.current = coords;
+    deviceLocationLockedRef.current = true;
+    programmaticMoveRef.current = true;
+    if (programmaticMoveTimerRef.current) {
+      clearTimeout(programmaticMoveTimerRef.current);
+    }
+    programmaticMoveTimerRef.current = setTimeout(() => {
+      programmaticMoveRef.current = false;
+    }, animationDuration + 250);
+
+    setLocationSource('device');
+    setLocationNameRefreshKey((current) => current + 1);
+    setSelectedLocation(coords);
+    mapRef.current?.animateToRegion(
+      getMarkerAlignedRegion(coords),
+      animationDuration
+    );
+  }, []);
+
+  const moveToDeviceLocation = useCallback(async (showAlerts = false, useCachedLocation = true, forceFreshLocation = false) => {
+    if (locatingRef.current && !forceFreshLocation) {
+      return;
+    }
+
+    locatingRef.current = true;
+    setIsLocating(true);
+
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        if (showAlerts) {
+          Alert.alert('Location is turned off', 'Please enable location services to use your current location.');
+        }
+        return;
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        if (showAlerts) {
+          Alert.alert('Location permission needed', 'Allow NexGO to access your location so we can select your current place.');
+        }
+        return;
+      }
+
+      if (useCachedLocation) {
+        const lastKnownPosition = await Location.getLastKnownPositionAsync({
+          maxAge: 30000,
+          requiredAccuracy: 50,
+        });
+        if (lastKnownPosition) {
+          applyDeviceLocation(
+            {
+              latitude: lastKnownPosition.coords.latitude,
+              longitude: lastKnownPosition.coords.longitude,
+            },
+            250,
+            showAlerts
+          );
+        }
+      }
+
+      const currentPosition = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const currentCoords = {
+        latitude: currentPosition.coords.latitude,
+        longitude: currentPosition.coords.longitude,
+      };
+
+      applyDeviceLocation(currentCoords, 450, showAlerts);
+    } catch {
+      if (showAlerts) {
+        Alert.alert('Unable to find location', 'Please try again or move the map manually.');
+      }
+    } finally {
+      locatingRef.current = false;
+      setIsLocating(false);
+    }
+  }, [applyDeviceLocation]);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    const latestDeviceLocation = latestDeviceLocationRef.current;
+
+    if (latestDeviceLocation) {
+      applyDeviceLocation(latestDeviceLocation, 350, true);
+      void moveToDeviceLocation(false, false, true);
+      return;
+    }
+
+    void moveToDeviceLocation(true, false, true);
+  }, [applyDeviceLocation, moveToDeviceLocation]);
 
   useEffect(() => {
     const fetchLocationName = async () => {
+      const requestId = geocodeRequestRef.current + 1;
+      geocodeRequestRef.current = requestId;
+
       try {
         if (activeStep === 'PICKUP') {
-          setPickupData(prev => ({ ...prev, name: 'Fetching...' }));
+          setPickupData(prev => ({ ...prev, name: locationSource === 'device' ? 'Current location' : 'Fetching...' }));
         } else {
-          setDropData(prev => ({ ...prev, name: 'Fetching...' }));
+          setDropData(prev => ({ ...prev, name: locationSource === 'device' ? 'Current location' : 'Fetching...' }));
         }
 
-        const places = await Location.reverseGeocodeAsync(selectedLocation);
+        const allowRegionOnly = locationSource !== 'device';
+        const places = await Location.reverseGeocodeAsync(selectedLocation).catch(() => []);
+        const expoName = formatReverseGeocode(places?.[0], allowRegionOnly);
+        if (expoName && requestId === geocodeRequestRef.current) {
+          if (activeStep === 'PICKUP') {
+            setPickupData({ coords: selectedLocation, name: expoName });
+          } else {
+            setDropData({ coords: selectedLocation, name: expoName });
+          }
+        }
+
+        const detailedName = await fetchDetailedLocationName(selectedLocation, allowRegionOnly).catch(() => null);
         const composedName =
-          formatReverseGeocode(places?.[0]) ||
-          formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
+          detailedName ||
+          expoName ||
+          (locationSource === 'device'
+            ? 'Current location'
+            : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude));
+
+        if (requestId !== geocodeRequestRef.current) {
+          return;
+        }
 
         if (activeStep === 'PICKUP') {
           setPickupData({ coords: selectedLocation, name: composedName });
@@ -71,7 +294,14 @@ export default function RideScreen() {
           setDropData({ coords: selectedLocation, name: composedName });
         }
       } catch {
-        const fallbackName = formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
+        if (requestId !== geocodeRequestRef.current) {
+          return;
+        }
+
+        const fallbackName =
+          locationSource === 'device'
+            ? 'Current location'
+            : formatCoordsFallback(selectedLocation.latitude, selectedLocation.longitude);
         if (activeStep === 'PICKUP') {
           setPickupData(prev => ({ ...prev, name: fallbackName }));
         } else {
@@ -82,10 +312,55 @@ export default function RideScreen() {
 
     const debounceTimer = setTimeout(() => {
       fetchLocationName();
-    }, 800);
+    }, locationSource === 'device' ? DEVICE_LOCATION_DEBOUNCE_MS : MAP_LOCATION_DEBOUNCE_MS);
 
     return () => clearTimeout(debounceTimer);
-  }, [selectedLocation, activeStep]);
+  }, [selectedLocation, activeStep, locationSource, locationNameRefreshKey]);
+
+  useEffect(() => {
+    let watchSubscription: Location.LocationSubscription | null = null;
+
+    const startPassengerLocationWatch = async () => {
+      await moveToDeviceLocation(false);
+
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        return;
+      }
+
+      watchSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        (location) => {
+          const watchedCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+
+          latestDeviceLocationRef.current = watchedCoords;
+          setHasLatestDeviceLocation(true);
+
+          if (activeStepRef.current !== 'PICKUP' || locationSourceRef.current !== 'device') {
+            return;
+          }
+
+          applyDeviceLocation(watchedCoords, 250);
+        }
+      );
+    };
+
+    startPassengerLocationWatch();
+
+    return () => {
+      watchSubscription?.remove();
+      if (programmaticMoveTimerRef.current) {
+        clearTimeout(programmaticMoveTimerRef.current);
+      }
+    };
+  }, [applyDeviceLocation, moveToDeviceLocation]);
 
   return (
     <View style={styles.container}>
@@ -96,24 +371,50 @@ export default function RideScreen() {
         <MapView
           style={StyleSheet.absoluteFillObject}
           mapType="none"
-          loadingEnabled={true}
+          loadingEnabled={MAP_LOADING_ENABLED}
           loadingBackgroundColor="#EAE6DF"
           loadingIndicatorColor="#169F95"
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          toolbarEnabled={false}
           initialRegion={{
-            latitude: 6.9271,
-            longitude: 79.8612,
+            latitude: DEFAULT_LOCATION.latitude,
+            longitude: DEFAULT_LOCATION.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
+          ref={mapRef}
+          onPanDrag={() => {
+            deviceLocationLockedRef.current = false;
+            setLocationSource('map');
+          }}
           onRegionChangeComplete={(region) => {
-            setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
+            if (programmaticMoveRef.current || deviceLocationLockedRef.current) {
+              return;
+            }
+
+            const updateSelectedLocation = async () => {
+              setLocationSource('map');
+              try {
+                const coordinate = await mapRef.current?.coordinateForPoint({
+                  x: width / 2,
+                  y: markerTipTop,
+                });
+
+                setSelectedLocation(coordinate || { latitude: region.latitude, longitude: region.longitude });
+              } catch {
+                setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
+              }
+            };
+
+            updateSelectedLocation();
           }}
         >
-          <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+          <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
         </MapView>
 
         {/* Fixed Center Selection Marker */}
-        <View pointerEvents="none" style={styles.fixedMarkerContainer}>
+        <View pointerEvents="none" style={[styles.fixedMarkerContainer, { top: markerTipTop }]}>
           <Ionicons name="location-sharp" size={40} color="#169F95" style={styles.fixedMarkerIcon} />
         </View>
       </View>
@@ -126,8 +427,18 @@ export default function RideScreen() {
       </SafeAreaView>
 
       {/* Target Location Button */}
-      <TouchableOpacity style={styles.targetButton}>
-        <Ionicons name="locate" size={24} color="#017270" />
+      <TouchableOpacity
+        style={[styles.targetButton, isLocating && !hasLatestDeviceLocation && styles.targetButtonDisabled]}
+        onPress={handleUseCurrentLocation}
+        disabled={isLocating && !hasLatestDeviceLocation}
+        accessibilityRole="button"
+        accessibilityLabel="Use current location"
+      >
+        {isLocating && !hasLatestDeviceLocation ? (
+          <ActivityIndicator color="#017270" />
+        ) : (
+          <Ionicons name="locate" size={24} color="#017270" />
+        )}
       </TouchableOpacity>
 
       {/* Bottom Sheet Card */}
@@ -268,13 +579,13 @@ const styles = StyleSheet.create({
   },
   fixedMarkerContainer: {
     position: 'absolute',
-    top: '50%',
     left: '50%',
     marginLeft: -20, 
     marginTop: -40, 
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 30,
+    elevation: 30,
   },
   fixedMarkerIcon: {
     textShadowColor: 'rgba(0,0,0,0.3)', 
@@ -319,6 +630,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     zIndex: 10,
+  },
+  targetButtonDisabled: {
+    opacity: 0.75,
   },
   bottomCardContainer: {
     position: 'absolute',

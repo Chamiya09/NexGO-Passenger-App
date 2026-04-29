@@ -13,10 +13,16 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL } from '@/lib/api';
+import {
+  clearPassengerActiveRide,
+  loadPassengerActiveRide,
+  PassengerActiveRideParams,
+} from '@/lib/activeRideStorage';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -33,8 +39,30 @@ type Ride = {
   vehicleType: string;
   price: number;
   status: RideStatus;
+  canonicalStatus?: RideStatus;
   requestedAt: string;
+  acceptedAt?: string | null;
+  completedAt?: string | null;
+  driver?: {
+    id?: string | null;
+    fullName?: string;
+    phoneNumber?: string;
+    profileImageUrl?: string;
+    vehicle?: {
+      make?: string;
+      model?: string;
+      plateNumber?: string;
+      color?: string;
+      category?: string;
+    } | null;
+  } | null;
 };
+
+const isCompletedRide = (ride: Ride) =>
+  String(ride.canonicalStatus ?? ride.status).toLowerCase() === 'completed';
+
+const isCancellableRide = (ride: Ride) =>
+  String(ride.status).toLowerCase() === 'pending';
 
 // ── Status tag config ─────────────────────────────────────────────────────────
 type StatusConfig = {
@@ -168,7 +196,19 @@ const tagStyles = StyleSheet.create({
 });
 
 // ── Ride Card sub-component ───────────────────────────────────────────────────
-function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => void }) {
+function RideCard({
+  ride,
+  onCancel,
+  onViewDetails,
+  onResumeNavigation,
+  isResumeTarget,
+}: {
+  ride: Ride;
+  onCancel?: (id: string) => void;
+  onViewDetails: (ride: Ride) => void;
+  onResumeNavigation?: () => void;
+  isResumeTarget?: boolean;
+}) {
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
 
@@ -216,8 +256,22 @@ function RideCard({ ride, onCancel }: { ride: Ride; onCancel?: (id: string) => v
         <Text style={cardStyles.fare}>LKR {ride.price.toLocaleString()}</Text>
       </View>
 
+      {isCompletedRide(ride) && (
+        <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
+          <Ionicons name="receipt-outline" size={15} color={teal} />
+          <Text style={cardStyles.detailsBtnText}>View details</Text>
+        </TouchableOpacity>
+      )}
+
+      {isResumeTarget && onResumeNavigation && (
+        <TouchableOpacity style={cardStyles.resumeBtn} onPress={onResumeNavigation}>
+          <Ionicons name="navigate" size={15} color="#FFFFFF" />
+          <Text style={cardStyles.resumeBtnText}>Return to live navigation</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Cancel button if active (only in Pending/Finding stage) */}
-      {(String(ride.status).toLowerCase() === 'pending' || String((ride as any).canonicalStatus).toLowerCase() === 'pending') && onCancel && (
+      {isCancellableRide(ride) && onCancel && (
         <TouchableOpacity
           style={cardStyles.cancelBtn}
           onPress={() => onCancel(ride.id)}
@@ -313,6 +367,38 @@ const cardStyles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 14,
   },
+  detailsBtn: {
+    marginTop: 12,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  detailsBtnText: {
+    color: teal,
+    fontWeight: '900',
+    fontSize: 13,
+  },
+  resumeBtn: {
+    marginTop: 12,
+    minHeight: 38,
+    borderRadius: 12,
+    backgroundColor: teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  resumeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 13,
+  },
 });
 
 // ── Empty state ──────────────────────────────────────────────────────────────
@@ -348,18 +434,29 @@ const emptyStyles = StyleSheet.create({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function ActivitiesScreen() {
   const { user, token } = useAuth();
+  const router = useRouter();
   const socketRef = useRef<Socket | null>(null);
 
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [latestNavigation, setLatestNavigation] = useState<PassengerActiveRideParams | null>(null);
+
+  const loadLatestNavigation = useCallback(async () => {
+    const stored = await loadPassengerActiveRide();
+    setLatestNavigation(stored);
+  }, []);
 
   // ── Fetch rides from API ───────────────────────────────────────────────────
   const fetchRides = useCallback(async (isRefresh = false) => {
     if (!token) return;
 
-    isRefresh ? setRefreshing(true) : setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -385,7 +482,15 @@ export default function ActivitiesScreen() {
   // Initial load
   useEffect(() => {
     fetchRides();
-  }, [fetchRides]);
+    loadLatestNavigation();
+  }, [fetchRides, loadLatestNavigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadLatestNavigation();
+      void fetchRides(true);
+    }, [fetchRides, loadLatestNavigation])
+  );
 
   // ── Cancel ride via API ───────────────────────────────────────────────────
   const handleCancelRide = async (rideId: string) => {
@@ -406,11 +511,42 @@ export default function ActivitiesScreen() {
       }
 
       setRides((prev) =>
-        prev.map((r) => (r.id === rideId ? { ...r, status: 'Cancelled' } : r))
+        prev.map((r) => (
+          r.id === rideId ? { ...r, status: 'Cancelled', canonicalStatus: 'Cancelled' } : r
+        ))
       );
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Unable to cancel ride');
     }
+  };
+
+  const handleViewRideDetails = (ride: Ride) => {
+    router.push({
+      pathname: '/ride-details/[id]',
+      params: {
+        id: ride.id,
+        status: ride.status,
+        vehicleType: ride.vehicleType,
+        price: String(ride.price),
+        requestedAt: ride.requestedAt,
+        acceptedAt: ride.acceptedAt ?? '',
+        completedAt: ride.completedAt ?? '',
+        pName: ride.pickup?.name ?? '',
+        pLat: String(ride.pickup?.latitude ?? ''),
+        pLng: String(ride.pickup?.longitude ?? ''),
+        dName: ride.dropoff?.name ?? '',
+        dLat: String(ride.dropoff?.latitude ?? ''),
+        dLng: String(ride.dropoff?.longitude ?? ''),
+        driverName: ride.driver?.fullName ?? '',
+        driverPhone: ride.driver?.phoneNumber ?? '',
+        driverImage: ride.driver?.profileImageUrl ?? '',
+        vehicleMake: ride.driver?.vehicle?.make ?? '',
+        vehicleModel: ride.driver?.vehicle?.model ?? '',
+        vehiclePlate: ride.driver?.vehicle?.plateNumber ?? '',
+        vehicleColor: ride.driver?.vehicle?.color ?? '',
+        vehicleCategory: ride.driver?.vehicle?.category ?? '',
+      },
+    });
   };
 
   // ── Socket: real-time status updates ──────────────────────────────────────
@@ -446,9 +582,28 @@ export default function ActivitiesScreen() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!latestNavigation) return;
+
+    const matchedRide = rides.find((ride) => ride.id === latestNavigation.id);
+    if (!matchedRide) return;
+
+    if (matchedRide.status === 'Completed' || matchedRide.status === 'Cancelled') {
+      clearPassengerActiveRide();
+      setLatestNavigation(null);
+    }
+  }, [latestNavigation, rides]);
+
   // ── Summary counts ─────────────────────────────────────────────────────────
   const pendingCount = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
   const completedCount = rides.filter((r) => r.status === 'Completed').length;
+  const latestRide = latestNavigation
+    ? rides.find((ride) => ride.id === latestNavigation.id)
+    : null;
+  const canResumeNavigation = Boolean(
+    latestNavigation?.id &&
+    (!latestRide || (latestRide.status !== 'Completed' && latestRide.status !== 'Cancelled'))
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -475,6 +630,38 @@ export default function ActivitiesScreen() {
         </View>
       )}
 
+      {canResumeNavigation && (
+        <TouchableOpacity
+          style={styles.resumeNavBtn}
+          onPress={() => {
+            if (!latestNavigation?.id) return;
+
+            router.push({
+              pathname: '/active-ride/[id]',
+              params: {
+                ...latestNavigation,
+                id: latestNavigation.id,
+                status: latestRide?.status ?? latestNavigation?.status,
+              },
+            });
+          }}
+        >
+          <View style={styles.resumeNavIcon}>
+            <Ionicons name="navigate" size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.resumeNavTextWrap}>
+            <Text style={styles.resumeNavTitle}>Return to live navigation</Text>
+            <Text style={styles.resumeNavSubtitle}>
+              {latestRide?.status === 'InProgress'
+                ? 'Ride in progress'
+                : 'Driver heading to pickup'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
+
+
       {/* Content */}
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -493,7 +680,30 @@ export default function ActivitiesScreen() {
         <FlatList
           data={rides}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <RideCard ride={item} onCancel={handleCancelRide} />}
+          renderItem={({ item }) => (
+            <RideCard
+              ride={item}
+              onCancel={handleCancelRide}
+              onViewDetails={handleViewRideDetails}
+              isResumeTarget={Boolean(latestNavigation?.id && item.id === latestNavigation.id)}
+              onResumeNavigation={
+                item.id === latestNavigation?.id
+                  ? () => {
+                      if (!latestNavigation?.id) return;
+
+                      router.push({
+                        pathname: '/active-ride/[id]',
+                        params: {
+                          ...latestNavigation,
+                          id: latestNavigation.id,
+                          status: item.status,
+                        },
+                      });
+                    }
+                  : undefined
+              }
+            />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<EmptyState />}
@@ -585,6 +795,44 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     marginBottom: 14,
+  },
+  resumeNavBtn: {
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: teal,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  resumeNavIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resumeNavTextWrap: {
+    flex: 1,
+  },
+  resumeNavTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  resumeNavSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   list: {
     paddingHorizontal: 20,

@@ -1,17 +1,37 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
+import { useAuth } from '@/context/auth-context';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
 
+const formatMoney = (value?: number | string | null) => {
+    const amount = Number(value ?? 0);
+    if (!Number.isFinite(amount)) return 'LKR 0';
+    return `LKR ${amount.toLocaleString()}`;
+};
+
 // Types
 type LatLng = { latitude: number; longitude: number };
 type MapPhase = 'TRACK_DRIVER' | 'TRACK_TRIP';
+type ArrivalVerificationCodePayload = { rideId: string; code: string; passengerId?: string };
+
+function createDirectRoute(origin: LatLng, destination: LatLng) {
+    if (!Number.isFinite(origin.latitude) || !Number.isFinite(origin.longitude) ||
+        !Number.isFinite(destination.latitude) || !Number.isFinite(destination.longitude)) {
+        return [];
+    }
+
+    return [origin, destination];
+}
 
 // OSRM fetcher
 async function fetchOsrmRoute(from: LatLng, to: LatLng) {
@@ -32,6 +52,7 @@ export default function ActiveRideScreen() {
     const params = useLocalSearchParams();
     const mapRef = useRef<MapView>(null);
     const socketRef = useRef<Socket | null>(null);
+    const { user, token } = useAuth();
 
     // Payload parsing
     const rideId = params.id as string;
@@ -40,32 +61,77 @@ export default function ActiveRideScreen() {
     const pLng = parseFloat(params.pLng as string);
     const dLat = parseFloat(params.dLat as string);
     const dLng = parseFloat(params.dLng as string);
+    const drLat = parseFloat(params.drLat as string);
+    const drLng = parseFloat(params.drLng as string);
     const vehicleType = params.vehicleType as string || 'Vehicle';
     const driverName = params.driverName as string || 'Driver';
     const statusParam = params.status as string || 'Accepted';
 
-    const pickup: LatLng = { latitude: pLat, longitude: pLng };
-    const dropoff: LatLng = { latitude: dLat, longitude: dLng };
+    const pickup = useMemo<LatLng>(() => ({ latitude: pLat, longitude: pLng }), [pLat, pLng]);
+    const dropoff = useMemo<LatLng>(() => ({ latitude: dLat, longitude: dLng }), [dLat, dLng]);
 
-    const [driverPos, setDriverPos] = useState<LatLng | null>(null);
+    const [driverPos, setDriverPos] = useState<LatLng | null>(
+        Number.isFinite(drLat) && Number.isFinite(drLng)
+            ? { latitude: drLat, longitude: drLng }
+            : null
+    );
     const [driverHeading, setDriverHeading] = useState(0);
 
     const [phase, setPhase] = useState<MapPhase>(statusParam === 'InProgress' ? 'TRACK_TRIP' : 'TRACK_DRIVER');
+    const [activeStatus, setActiveStatus] = useState(statusParam);
     const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
     const [slicedRouteCoords, setSlicedRouteCoords] = useState<LatLng[]>([]);
 
     const [distance, setDistance] = useState('—');
     const [duration, setDuration] = useState('—');
-    const [loadingRoute, setLoadingRoute] = useState(true);
+    const [arrivalCode, setArrivalCode] = useState<string | null>(null);
+    const [paymentVisible, setPaymentVisible] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
+
+    useEffect(() => {
+        if (!rideId) return;
+
+        savePassengerActiveRide({
+            id: rideId,
+            driverId,
+            driverName,
+            vehicleType,
+            status: activeStatus,
+            pLat: String(pLat),
+            pLng: String(pLng),
+            dLat: String(dLat),
+            dLng: String(dLng),
+            ...(Number.isFinite(drLat) && Number.isFinite(drLng)
+                ? { drLat: String(drLat), drLng: String(drLng) }
+                : {}),
+        });
+    }, [
+        activeStatus,
+        dLat,
+        dLng,
+        driverId,
+        driverName,
+        drLat,
+        drLng,
+        pLat,
+        pLng,
+        rideId,
+        vehicleType,
+    ]);
 
     // Map Phase Route Computation
     useEffect(() => {
         let active = true;
         const fetchPath = async () => {
-            setLoadingRoute(true);
             try {
                 const fromPos = phase === 'TRACK_DRIVER' ? (driverPos || pickup) : pickup;
                 const toPos = phase === 'TRACK_DRIVER' ? pickup : dropoff;
+                const directRoute = createDirectRoute(fromPos, toPos);
+
+                if (directRoute.length > 1) {
+                    setRouteCoords(directRoute);
+                    setSlicedRouteCoords(directRoute);
+                }
 
                 // Wait till we have a valid driver pos if in track driver phase to fetch Osrm route
                 if (phase === 'TRACK_DRIVER' && !driverPos) return;
@@ -86,14 +152,12 @@ export default function ActiveRideScreen() {
                 }
             } catch (err) {
                 console.error('Route fetch err:', err);
-            } finally {
-                if (active) setLoadingRoute(false);
             }
         };
 
         fetchPath();
         return () => { active = false; };
-    }, [phase, pickup.latitude, dropoff.latitude, driverPos?.latitude]); // Include driver start pos just once
+    }, [phase, pickup, dropoff, driverPos]);
 
     // Geolib slice on raw position updates
     useEffect(() => {
@@ -111,6 +175,10 @@ export default function ActiveRideScreen() {
         const socket = io(SOCKET_SERVER_URL, { transports: ['websocket'] });
         socketRef.current = socket;
 
+        socket.on('connect', () => {
+            if (user?.id) socket.emit('registerPassenger', user.id);
+        });
+
         if (driverId) {
             socket.on(`driver_location_${driverId}`, (loc: { latitude: number; longitude: number; heading?: number }) => {
                 setDriverPos({ latitude: loc.latitude, longitude: loc.longitude });
@@ -120,18 +188,71 @@ export default function ActiveRideScreen() {
             });
         }
 
-        socket.on('rideStatusUpdate', (data: { rideId: string; status: string }) => {
+        socket.on('rideStatusUpdate', (data: { rideId: string; status?: string; canonicalStatus?: string; invoice?: { amount?: number | string } }) => {
             if (data.rideId === rideId) {
-                if (data.status === 'InProgress') {
+                if (data.status) {
+                    setActiveStatus(data.status);
+                }
+                const canonical = String(data.canonicalStatus ?? data.status ?? '').toUpperCase();
+
+                if (canonical === 'ARRIVED') {
+                    setArrivalCode(null);
+                }
+                if (canonical === 'IN_TRANSIT' || canonical === 'INPROGRESS') {
+                    setActiveStatus('InProgress');
                     setPhase('TRACK_TRIP');
-                } else if (data.status === 'Completed' || data.status === 'Cancelled') {
+                } else if (canonical === 'COMPLETED') {
+                    clearPassengerActiveRide();
+                    setArrivalCode(null);
+                    setPaymentAmount(formatMoney(data.invoice?.amount));
+                    setPaymentVisible(true);
+                } else if (canonical === 'CANCELLED') {
+                    clearPassengerActiveRide();
                     router.replace('/(tabs)');
                 }
             }
         });
 
+        const handleArrivalVerificationCode = (data: ArrivalVerificationCodePayload) => {
+            if (data.passengerId && user?.id && data.passengerId !== user.id) return;
+
+            if (data.rideId === rideId) {
+                setArrivalCode(data.code);
+            }
+        };
+
+        socket.on('arrivalVerificationCode', handleArrivalVerificationCode);
+        socket.on('arrivalVerificationCodeBroadcast', handleArrivalVerificationCode);
+
         return () => { socket.disconnect(); };
-    }, [driverId, rideId]);
+    }, [driverId, rideId, router, user?.id]);
+
+    useEffect(() => {
+        if (!token || !rideId) return;
+
+        let cancelled = false;
+        const fetchArrivalCode = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/rides/${rideId}/arrival-code`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await parseApiResponse<{ code: string | null }>(response);
+                if (!cancelled && data.code) {
+                    setArrivalCode(data.code);
+                }
+            } catch (error) {
+                console.log('[ActiveRide] arrival code fallback failed:', error);
+            }
+        };
+
+        void fetchArrivalCode();
+        const interval = setInterval(fetchArrivalCode, 2000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [rideId, token]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
 
@@ -142,10 +263,19 @@ export default function ActiveRideScreen() {
                 ref={mapRef}
                 style={StyleSheet.absoluteFillObject}
                 mapType="none"
+                loadingEnabled={MAP_LOADING_ENABLED}
+                loadingBackgroundColor="#EAE6DF"
+                loadingIndicatorColor="#169F95"
+                showsUserLocation={false}
+                showsMyLocationButton={false}
+                toolbarEnabled={false}
                 initialRegion={{
-                    latitude: pLat, longitude: pLng, latitudeDelta: 0.05, longitudeDelta: 0.05
+                    latitude: Number.isFinite(pLat) ? pLat : 6.9271,
+                    longitude: Number.isFinite(pLng) ? pLng : 79.8612,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05
                 }}>
-                <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
 
                 {/* Dynamic Route */}
                 {slicedRouteCoords.length > 0 && (
@@ -154,7 +284,7 @@ export default function ActiveRideScreen() {
 
                 {/* Driver Marker */}
                 {driverPos && (
-                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5}>
+                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5} tracksViewChanges={false}>
                         <View style={styles.driverCar}>
                             <Ionicons name="car-sport" size={20} color="#FFF" />
                         </View>
@@ -162,7 +292,7 @@ export default function ActiveRideScreen() {
                 )}
 
                 {/* Target Marker */}
-                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
+                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
                     <View style={styles.nexusMarker}>
                         <View style={[styles.markerRing, { backgroundColor: pathColor }]} />
                     </View>
@@ -197,6 +327,48 @@ export default function ActiveRideScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            <Modal visible={!!arrivalCode} transparent animationType="fade" statusBarTranslucent>
+                <View style={styles.codeBackdrop}>
+                    <View style={styles.codeCard}>
+                        <TouchableOpacity
+                            style={styles.codeCloseButton}
+                            onPress={() => setArrivalCode(null)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Close confirm your driver popup">
+                            <Ionicons name="close" size={20} color="#4D6F6C" />
+                        </TouchableOpacity>
+                        <View style={styles.codeIcon}>
+                            <Ionicons name="shield-checkmark" size={32} color={teal} />
+                        </View>
+                        <Text style={styles.codeTitle}>Confirm Your Driver</Text>
+                        <Text style={styles.codeSubtitle}>Share this code with your driver after confirming the vehicle and driver.</Text>
+                        <Text style={styles.codeValue}>{arrivalCode}</Text>
+                        <Text style={styles.codeHint}>Do not share this code before the driver arrives.</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={paymentVisible} transparent animationType="fade" statusBarTranslucent>
+                <View style={styles.codeBackdrop}>
+                    <View style={styles.paymentCard}>
+                        <View style={styles.completedIcon}>
+                            <Ionicons name="checkmark-done" size={30} color={teal} />
+                        </View>
+                        <Text style={styles.codeTitle}>Trip Completed</Text>
+                        <Text style={styles.codeSubtitle}>Your ride has ended. Please confirm the trip payment.</Text>
+                        <Text style={styles.paymentValue}>{paymentAmount}</Text>
+                        <TouchableOpacity
+                            style={styles.paymentButton}
+                            onPress={() => {
+                                setPaymentVisible(false);
+                                router.replace('/(tabs)');
+                            }}>
+                            <Text style={styles.paymentButtonText}>Confirm Payment</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -250,5 +422,97 @@ const styles = StyleSheet.create({
     },
     callIcon: {
         width: 44, height: 44, borderRadius: 22, backgroundColor: teal, justifyContent: 'center', alignItems: 'center', elevation: 4
-    }
+    },
+    codeBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(6, 22, 21, 0.46)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24
+    },
+    codeCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center'
+    },
+    codeCloseButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F0F7F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2
+    },
+    codeIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E7F5F3',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14
+    },
+    codeTitle: { fontSize: 22, fontWeight: '900', color: '#102A28', marginBottom: 8 },
+    codeSubtitle: { fontSize: 14, fontWeight: '700', color: '#617C79', textAlign: 'center', lineHeight: 20, marginBottom: 18 },
+    codeValue: {
+        width: '100%',
+        borderRadius: 18,
+        backgroundColor: '#F7FBFA',
+        borderWidth: 1,
+        borderColor: '#D9E9E6',
+        color: '#102A28',
+        fontSize: 34,
+        fontWeight: '900',
+        letterSpacing: 8,
+        textAlign: 'center',
+        paddingVertical: 14
+    },
+    codeHint: { fontSize: 12, fontWeight: '800', color: '#D97706', textAlign: 'center', marginTop: 14 },
+    paymentCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center'
+    },
+    completedIcon: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#E7F5F3',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: '#BFE7E2'
+    },
+    paymentValue: {
+        width: '100%',
+        borderRadius: 18,
+        backgroundColor: '#F7FBFA',
+        borderWidth: 1,
+        borderColor: '#D9E9E6',
+        color: '#102A28',
+        fontSize: 30,
+        fontWeight: '900',
+        textAlign: 'center',
+        paddingVertical: 16,
+        marginTop: 6
+    },
+    paymentButton: {
+        marginTop: 18,
+        backgroundColor: teal,
+        borderRadius: 18,
+        paddingVertical: 12,
+        paddingHorizontal: 22
+    },
+    paymentButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 }
 });

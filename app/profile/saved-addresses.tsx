@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 type AddressLabel = 'Home' | 'Work' | 'Other';
@@ -501,9 +502,12 @@ export default function SavedAddressesScreen() {
                     <MapView
                       style={StyleSheet.absoluteFillObject}
                       mapType="none"
-                      loadingEnabled={true}
+                      loadingEnabled={MAP_LOADING_ENABLED}
                       loadingBackgroundColor="#EAE6DF"
                       loadingIndicatorColor="#169F95"
+                      showsUserLocation={false}
+                      showsMyLocationButton={false}
+                      toolbarEnabled={false}
                       initialRegion={DEFAULT_REGION}
                       region={mapRegion}
                       onRegionChangeComplete={(region) => {
@@ -513,7 +517,7 @@ export default function SavedAddressesScreen() {
                         });
                       }}
                     >
-                      <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} flipY={false} />
+                      <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
                     </MapView>
 
                     <View pointerEvents="none" style={styles.fixedMarkerContainer}>
