@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
@@ -81,6 +81,7 @@ export default function ConfirmRouteScreen() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [promoCode, setPromoCode] = useState('');
   const [availableDrivers, setAvailableDrivers] = useState<DriverMarker[]>([]);
   const [rideRequesting, setRideRequesting] = useState(false);
   // Overlay: 'finding' while waiting, 'accepted' when driver confirms, null = hidden
@@ -664,25 +665,51 @@ export default function ConfirmRouteScreen() {
               </ScrollView>
 
               {isExpanded && (
-                <View style={styles.actionList}>
-                  <TouchableOpacity style={styles.listRow}>
-                    <MaterialCommunityIcons name="ticket-outline" size={22} color="#8A9A9A" />
-                    <View style={styles.listRowTextContainer}>
-                      <Text style={styles.listRowTitle}>Add Promo Code</Text>
+                <View style={styles.bookingFormCard}>
+                  <View style={styles.formFieldBlock}>
+                    <View style={styles.formLabelRow}>
+                      <View style={styles.formIconWrap}>
+                        <MaterialCommunityIcons name="ticket-percent-outline" size={18} color="#017270" />
+                      </View>
+                      <Text style={styles.formLabel}>Promotion code</Text>
+                    </View>
+                    <View style={styles.promoInputRow}>
+                      <TextInput
+                        style={styles.promoInput}
+                        value={promoCode}
+                        onChangeText={(value) => setPromoCode(value.toUpperCase())}
+                        placeholder="Enter promo code"
+                        placeholderTextColor="#8A9A9A"
+                        autoCapitalize="characters"
+                      />
+                      <TouchableOpacity style={styles.applyPromoButton} activeOpacity={0.8}>
+                        <Text style={styles.applyPromoButtonText}>Apply</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.formDivider} />
+
+                  <TouchableOpacity style={styles.paymentMethodRow} activeOpacity={0.82}>
+                    <View style={styles.paymentMethodLeft}>
+                      <View style={styles.formIconWrap}>
+                        <MaterialCommunityIcons name="cash" size={18} color="#017270" />
+                      </View>
+                      <View style={styles.paymentTextWrap}>
+                        <Text style={styles.formLabel}>Payment method</Text>
+                        <Text style={styles.paymentMethodValue}>Cash</Text>
+                      </View>
                     </View>
                     <Feather name="chevron-right" size={18} color="#8A9A9A" />
                   </TouchableOpacity>
 
-                  <View style={styles.divider} />
-
-                  <TouchableOpacity style={styles.listRow}>
-                    <MaterialCommunityIcons name="cash" size={22} color="#8A9A9A" />
-                    <View style={styles.listRowTextContainer}>
-                      <Text style={styles.listRowTitle}>Payment Method</Text>
-                      <Text style={styles.listRowSub}>Cash</Text>
+                  <View style={styles.totalPriceRow}>
+                    <View>
+                      <Text style={styles.totalPriceLabel}>Total price</Text>
+                      <Text style={styles.totalPriceHint}>{selectedVehicle} ride fare</Text>
                     </View>
-                    <Feather name="chevron-right" size={18} color="#8A9A9A" />
-                  </TouchableOpacity>
+                    <Text style={styles.totalPriceValue}>{getPriceForSelected()}</Text>
+                  </View>
                 </View>
               )}
 
@@ -1092,34 +1119,125 @@ const styles = StyleSheet.create({
     color: '#017270',
     marginTop: 2,
   },
-  actionList: {
-    backgroundColor: '#F0F5F4',
+  bookingFormCard: {
+    backgroundColor: '#F7FBFA',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    borderRadius: 16,
+    padding: 12,
     marginBottom: 12,
+    gap: 10,
   },
-  listRow: {
+  formFieldBlock: {
+    gap: 8,
+  },
+  formLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    gap: 8,
   },
-  listRowTextContainer: {
-    flex: 1,
-    marginLeft: 12,
+  formIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  listRowTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+  formLabel: {
+    fontSize: 12,
+    fontWeight: '900',
     color: '#102A28',
   },
-  listRowSub: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#8A9A9A',
-    marginTop: 2,
+  promoInputRow: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 6,
+    gap: 8,
   },
-  divider: {
+  promoInput: {
+    flex: 1,
+    minWidth: 0,
+    color: '#102A28',
+    fontSize: 13,
+    fontWeight: '800',
+    paddingVertical: 0,
+  },
+  applyPromoButton: {
+    minHeight: 32,
+    borderRadius: 10,
+    backgroundColor: '#017270',
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyPromoButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  formDivider: {
     height: 1,
     backgroundColor: '#E6EFEF',
-    marginVertical: 0,
+  },
+  paymentMethodRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  paymentMethodLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  paymentTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  paymentMethodValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#617C79',
+    marginTop: 2,
+  },
+  totalPriceRow: {
+    minHeight: 58,
+    borderRadius: 14,
+    backgroundColor: '#E7F5F3',
+    borderWidth: 1,
+    borderColor: '#C9E5E1',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  totalPriceLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#102A28',
+  },
+  totalPriceHint: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#617C79',
+    marginTop: 2,
+  },
+  totalPriceValue: {
+    color: '#017270',
+    fontSize: 18,
+    fontWeight: '900',
   },
   superConfirmButton: {
     backgroundColor: '#017270',
