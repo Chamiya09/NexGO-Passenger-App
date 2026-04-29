@@ -205,31 +205,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroBadge}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={palette.accentDark} />
-              <Text style={styles.heroBadgeText}>Verified rides</Text>
-            </View>
-
-            <View style={styles.pointsPill}>
-              <Ionicons name="star" size={13} color={palette.accent} />
-              <Text style={styles.pointsText}>450 pts</Text>
-            </View>
-          </View>
-
-          <Text style={styles.heroTitle}>Book a ride in seconds</Text>
-          <Text style={styles.heroSubtitle}>
-            Set pickup and drop-off, compare vehicle options, and track your driver live.
-          </Text>
-
-          <Pressable style={styles.bookButton} onPress={() => router.push('/(tabs)/ride')}>
-            <Ionicons name="car-sport" size={20} color="#FFFFFF" />
-            <Text style={styles.bookButtonText}>Start booking</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
         {activeRide ? <ActiveRideCard ride={activeRide} onResume={resumeActiveRide} /> : null}
 
         <View style={styles.quickGrid}>
@@ -339,78 +314,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: palette.card,
     zIndex: 1,
-  },
-  heroCard: {
-    backgroundColor: palette.card,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: palette.border,
-    gap: 14,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: palette.accentMuted,
-  },
-  heroBadgeText: {
-    color: palette.accentDark,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  pointsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.elevated,
-  },
-  pointsText: {
-    color: palette.accentDark,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  heroTitle: {
-    color: palette.primary,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '900',
-    maxWidth: 290,
-  },
-  heroSubtitle: {
-    color: palette.secondary,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600',
-  },
-  bookButton: {
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: palette.accentDark,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-    marginTop: 2,
-  },
-  bookButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
   },
   activeRideCard: {
     backgroundColor: palette.accentMuted,
