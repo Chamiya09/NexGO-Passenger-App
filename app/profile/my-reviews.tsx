@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -14,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
-import { deleteRideReview, replaceRideReviews, RideReview, RideReviewMap } from '@/lib/rideReviews';
+import { deleteRideReview, replaceRideReviews, RideReview, RideReviewMap, saveRideReview } from '@/lib/rideReviews';
 
 const palette = {
   background: '#F4F8F7',
@@ -91,6 +92,7 @@ export default function MyReviewsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [removingRideId, setRemovingRideId] = useState<string | null>(null);
+  const [updatingRideId, setUpdatingRideId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const loadReviews = useCallback(async (isRefresh = false) => {
@@ -196,6 +198,23 @@ export default function MyReviewsScreen() {
     );
   };
 
+  const updateReview = async (ride: ReviewRide, rating: number, comment: string) => {
+    try {
+      setUpdatingRideId(ride.id);
+      setError('');
+      const updatedReview = await saveRideReview(ride.id, rating, comment, token);
+      setReviewRides((current) =>
+        current.map((item) => (item.id === ride.id ? { ...item, review: updatedReview } : item))
+      );
+      return true;
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update review.');
+      return false;
+    } finally {
+      setUpdatingRideId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <RefreshableScrollView
@@ -243,8 +262,9 @@ export default function MyReviewsScreen() {
                 key={ride.id}
                 ride={ride}
                 isRemoving={removingRideId === ride.id}
+                isUpdating={updatingRideId === ride.id}
                 onView={() => openRideDetails(ride)}
-                onUpdate={() => openRideDetails(ride)}
+                onUpdate={(rating, comment) => updateReview(ride, rating, comment)}
                 onRemove={() => confirmRemoveReview(ride)}
               />
             ))}
@@ -260,17 +280,37 @@ export default function MyReviewsScreen() {
 function ReviewCard({
   ride,
   isRemoving,
+  isUpdating,
   onView,
   onUpdate,
   onRemove,
 }: {
   ride: ReviewRide;
   isRemoving: boolean;
+  isUpdating: boolean;
   onView: () => void;
-  onUpdate: () => void;
+  onUpdate: (rating: number, comment: string) => Promise<boolean>;
   onRemove: () => void;
 }) {
   const review = ride.review;
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftRating, setDraftRating] = useState(review?.rating ?? 0);
+  const [draftComment, setDraftComment] = useState(review?.comment ?? '');
+
+  const openUpdateForm = () => {
+    setDraftRating(review?.rating ?? 0);
+    setDraftComment(review?.comment ?? '');
+    setIsEditing(true);
+  };
+
+  const saveUpdate = async () => {
+    if (draftRating < 1 || isUpdating) return;
+
+    const saved = await onUpdate(draftRating, draftComment);
+    if (saved) {
+      setIsEditing(false);
+    }
+  };
 
   return (
     <View style={styles.reviewCard}>
@@ -309,7 +349,7 @@ function ReviewCard({
           <Text style={styles.viewButtonText}>View</Text>
         </Pressable>
 
-        <Pressable style={styles.updateButton} onPress={onUpdate}>
+        <Pressable style={styles.updateButton} onPress={openUpdateForm}>
           <Ionicons name="create-outline" size={15} color="#FFFFFF" />
           <Text style={styles.updateButtonText}>Update</Text>
         </Pressable>
@@ -322,6 +362,64 @@ function ReviewCard({
           <Text style={styles.removeButtonText}>{isRemoving ? 'Removing' : 'Remove'}</Text>
         </Pressable>
       </View>
+
+      {isEditing ? (
+        <View style={styles.updateForm}>
+          <View style={styles.updateFormHeader}>
+            <View>
+              <Text style={styles.updateFormTitle}>Update review</Text>
+              <Text style={styles.updateFormHint}>Edit only this ride review.</Text>
+            </View>
+            <Pressable style={styles.closeFormButton} onPress={() => setIsEditing(false)} disabled={isUpdating}>
+              <Ionicons name="close" size={18} color={palette.secondaryText} />
+            </Pressable>
+          </View>
+
+          <View style={styles.editStarRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Pressable
+                key={star}
+                style={[styles.editStarButton, star <= draftRating && styles.editStarButtonActive]}
+                onPress={() => setDraftRating(star)}
+                disabled={isUpdating}>
+                <Ionicons
+                  name={star <= draftRating ? 'star' : 'star-outline'}
+                  size={21}
+                  color={star <= draftRating ? '#F5A623' : '#8CA1A0'}
+                />
+              </Pressable>
+            ))}
+          </View>
+
+          <TextInput
+            style={styles.updateInput}
+            value={draftComment}
+            onChangeText={setDraftComment}
+            placeholder="Update your ride feedback..."
+            placeholderTextColor="#8CA1A0"
+            multiline
+            maxLength={220}
+            textAlignVertical="top"
+            editable={!isUpdating}
+          />
+
+          <View style={styles.updateFooter}>
+            <Text style={styles.characterCount}>{draftComment.trim().length}/220</Text>
+            <View style={styles.updateFooterButtons}>
+              <Pressable style={styles.cancelUpdateButton} onPress={() => setIsEditing(false)} disabled={isUpdating}>
+                <Text style={styles.cancelUpdateText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.saveUpdateButton, (draftRating < 1 || isUpdating) && styles.disabledButton]}
+                onPress={saveUpdate}
+                disabled={draftRating < 1 || isUpdating}>
+                <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" />
+                <Text style={styles.saveUpdateText}>{isUpdating ? 'Saving' : 'Save'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -625,6 +723,120 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.55,
+  },
+  updateForm: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.elevatedCard,
+    padding: 11,
+    gap: 10,
+  },
+  updateFormHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  updateFormTitle: {
+    color: palette.primaryText,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  updateFormHint: {
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  closeFormButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editStarRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  editStarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editStarButtonActive: {
+    borderColor: '#F8D58C',
+    backgroundColor: palette.warningSoft,
+  },
+  updateInput: {
+    minHeight: 84,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    color: palette.primaryText,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  updateFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  characterCount: {
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  updateFooterButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cancelUpdateButton: {
+    minHeight: 34,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelUpdateText: {
+    color: palette.secondaryText,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  saveUpdateButton: {
+    minHeight: 34,
+    borderRadius: 11,
+    backgroundColor: palette.accent,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  saveUpdateText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
   refreshText: {
     color: palette.secondaryText,
