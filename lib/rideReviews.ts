@@ -7,8 +7,11 @@ export type RideReview = {
   rideId: string;
   rating: number;
   comment: string;
+  status?: 'review' | 'approved' | 'rejected';
   updatedAt?: string | null;
   reviewedAt?: string | null;
+  submittedAt?: string | null;
+  moderatedAt?: string | null;
 };
 
 export type RideReviewMap = Record<string, RideReview>;
@@ -102,6 +105,7 @@ export async function saveRideReview(
     rideId,
     rating: clampRating(rating),
     comment: comment.trim(),
+    status: 'review',
     updatedAt: new Date().toISOString(),
   };
 

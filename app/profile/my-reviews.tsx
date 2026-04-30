@@ -85,6 +85,33 @@ const formatCoords = (coords?: Coords) => {
   return `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
 };
 
+const getReviewStatusConfig = (status?: RideReview['status']) => {
+  if (status === 'approved') {
+    return {
+      label: 'Approved',
+      icon: 'checkmark-circle' as const,
+      bg: '#E9F8EF',
+      text: '#157A62',
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      label: 'Rejected',
+      icon: 'close-circle' as const,
+      bg: palette.dangerSoft,
+      text: palette.danger,
+    };
+  }
+
+  return {
+    label: 'Pending',
+    icon: 'time-outline' as const,
+    bg: palette.warningSoft,
+    text: palette.warning,
+  };
+};
+
 export default function MyReviewsScreen() {
   const { token } = useAuth();
   const router = useRouter();
@@ -293,11 +320,15 @@ function ReviewCard({
   onRemove: () => void;
 }) {
   const review = ride.review;
+  const reviewStatus = getReviewStatusConfig(review?.status);
+  const canEdit = review?.status !== 'rejected';
   const [isEditing, setIsEditing] = useState(false);
   const [draftRating, setDraftRating] = useState(review?.rating ?? 0);
   const [draftComment, setDraftComment] = useState(review?.comment ?? '');
 
   const openUpdateForm = () => {
+    if (!canEdit) return;
+
     setDraftRating(review?.rating ?? 0);
     setDraftComment(review?.comment ?? '');
     setIsEditing(true);
@@ -337,6 +368,20 @@ function ReviewCard({
 
       <Text style={styles.reviewComment}>{review?.comment || 'No written comment.'}</Text>
 
+      <View style={[styles.statusBanner, { backgroundColor: reviewStatus.bg }]}>
+        <Ionicons name={reviewStatus.icon} size={15} color={reviewStatus.text} />
+        <Text style={[styles.statusBannerText, { color: reviewStatus.text }]}>
+          {reviewStatus.label}
+        </Text>
+        <Text style={styles.statusBannerHint}>
+          {review?.status === 'approved'
+            ? 'Visible on public driver profile. Editing sends it back to admin approval.'
+            : review?.status === 'rejected'
+              ? 'This review was rejected and cannot be edited.'
+              : 'Waiting for admin approval before it appears publicly.'}
+        </Text>
+      </View>
+
       <View style={styles.routeBox}>
         <RouteLine label="Pickup" value={ride.pickup?.name || formatCoords(ride.pickup)} icon="radio-button-on" />
         <RouteLine label="Drop-off" value={ride.dropoff?.name || formatCoords(ride.dropoff)} icon="location" />
@@ -349,10 +394,17 @@ function ReviewCard({
           <Text style={styles.viewButtonText}>View</Text>
         </Pressable>
 
-        <Pressable style={styles.updateButton} onPress={openUpdateForm}>
-          <Ionicons name="create-outline" size={15} color="#FFFFFF" />
-          <Text style={styles.updateButtonText}>Update</Text>
-        </Pressable>
+        {canEdit ? (
+          <Pressable style={styles.updateButton} onPress={openUpdateForm}>
+            <Ionicons name="create-outline" size={15} color="#FFFFFF" />
+            <Text style={styles.updateButtonText}>Update</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.lockedButton}>
+            <Ionicons name="lock-closed-outline" size={15} color={palette.secondaryText} />
+            <Text style={styles.lockedButtonText}>Locked</Text>
+          </View>
+        )}
 
         <Pressable
           style={[styles.removeButton, isRemoving && styles.disabledButton]}
@@ -639,6 +691,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 19,
   },
+  statusBanner: {
+    minHeight: 42,
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  statusBannerText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  statusBannerHint: {
+    flexBasis: '100%',
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+    paddingLeft: 21,
+  },
   routeBox: {
     borderRadius: 13,
     borderWidth: 1,
@@ -700,6 +774,24 @@ const styles = StyleSheet.create({
   },
   updateButtonText: {
     color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  lockedButton: {
+    flexGrow: 1,
+    minWidth: 88,
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.elevatedCard,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  lockedButtonText: {
+    color: palette.secondaryText,
     fontSize: 12,
     fontWeight: '900',
   },

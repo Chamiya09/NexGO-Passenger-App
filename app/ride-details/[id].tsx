@@ -94,6 +94,7 @@ export default function RideDetailsScreen() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const isRejectedReview = review?.status === 'rejected';
 
   useEffect(() => {
     let cancelled = false;
@@ -117,7 +118,7 @@ export default function RideDetailsScreen() {
   }, [rideId, token]);
 
   const handleSaveReview = async () => {
-    if (!rideId || rating < 1 || saving || deleting) return;
+    if (!rideId || rating < 1 || saving || deleting || isRejectedReview) return;
 
     try {
       setSaving(true);
@@ -282,12 +283,30 @@ export default function RideDetailsScreen() {
                   </Text>
                 </View>
                 {review ? (
-                  <View style={styles.savedBadge}>
-                    <Ionicons name="checkmark-circle" size={14} color={teal} />
-                    <Text style={styles.savedBadgeText}>Saved</Text>
+                  <View style={[styles.savedBadge, isRejectedReview && styles.rejectedBadge]}>
+                    <Ionicons
+                      name={isRejectedReview ? 'close-circle' : review.status === 'approved' ? 'checkmark-circle' : 'time-outline'}
+                      size={14}
+                      color={isRejectedReview ? '#C13B3B' : teal}
+                    />
+                    <Text style={[styles.savedBadgeText, isRejectedReview && styles.rejectedBadgeText]}>
+                      {isRejectedReview ? 'Rejected' : review.status === 'approved' ? 'Approved' : 'Pending'}
+                    </Text>
                   </View>
                 ) : null}
               </View>
+
+              {isRejectedReview ? (
+                <View style={styles.rejectedNotice}>
+                  <Ionicons name="lock-closed-outline" size={16} color="#C13B3B" />
+                  <Text style={styles.rejectedNoticeText}>This review was rejected and cannot be edited.</Text>
+                </View>
+              ) : review?.status === 'approved' ? (
+                <View style={styles.pendingNotice}>
+                  <Ionicons name="information-circle-outline" size={16} color={teal} />
+                  <Text style={styles.pendingNoticeText}>Updating an approved review sends it back to admin approval.</Text>
+                </View>
+              ) : null}
 
               <View style={styles.starPicker}>
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -298,9 +317,11 @@ export default function RideDetailsScreen() {
                       star <= rating && styles.starButtonActive,
                     ]}
                     onPress={() => {
+                      if (isRejectedReview) return;
                       setRating(star);
                       setSaveMessage('');
                     }}
+                    disabled={isRejectedReview}
                     activeOpacity={0.75}
                   >
                     <Ionicons
@@ -324,6 +345,7 @@ export default function RideDetailsScreen() {
                 multiline
                 maxLength={220}
                 textAlignVertical="top"
+                editable={!isRejectedReview}
               />
 
               <View style={styles.reviewFooter}>
@@ -352,14 +374,14 @@ export default function RideDetailsScreen() {
                   style={[
                     styles.saveReviewButton,
                     review && styles.saveReviewButtonInline,
-                    (rating < 1 || saving || deleting) && styles.saveReviewButtonDisabled,
+                    (rating < 1 || saving || deleting || isRejectedReview) && styles.saveReviewButtonDisabled,
                   ]}
                   onPress={handleSaveReview}
-                  disabled={rating < 1 || saving || deleting}
+                  disabled={rating < 1 || saving || deleting || isRejectedReview}
                 >
                   <Ionicons name="star" size={16} color="#FFFFFF" />
                   <Text style={styles.saveReviewButtonText}>
-                    {saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
+                    {isRejectedReview ? 'Editing locked' : saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -667,6 +689,46 @@ const styles = StyleSheet.create({
     color: teal,
     fontSize: 11,
     fontWeight: '900',
+  },
+  rejectedBadge: {
+    backgroundColor: '#FFF4F4',
+  },
+  rejectedBadgeText: {
+    color: '#C13B3B',
+  },
+  rejectedNotice: {
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#F1D6D6',
+    backgroundColor: '#FFF4F4',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rejectedNoticeText: {
+    flex: 1,
+    color: '#C13B3B',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  pendingNotice: {
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#E7F5F3',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingNoticeText: {
+    flex: 1,
+    color: teal,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   starPicker: {
     flexDirection: 'row',

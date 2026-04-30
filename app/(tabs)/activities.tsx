@@ -216,6 +216,16 @@ function RideCard({
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
   const reviewScore = review?.rating ? `${review.rating}.0` : 'New';
+  const reviewStatusLabel =
+    review?.status === 'approved'
+      ? 'Approved'
+      : review?.status === 'rejected'
+        ? 'Rejected'
+        : review
+          ? 'Pending'
+          : 'Open';
+  const reviewStatusColor = review?.status === 'rejected' ? '#C13B3B' : teal;
+  const reviewStatusBg = review?.status === 'rejected' ? '#FFF4F4' : '#E7F5F3';
 
   return (
     <View style={cardStyles.card}>
@@ -276,13 +286,21 @@ function RideCard({
               </View>
             </View>
 
-            <View style={cardStyles.reviewStatusPill}>
+            <View style={[cardStyles.reviewStatusPill, { backgroundColor: reviewStatusBg }]}>
               <Ionicons
-                name={review ? 'checkmark-circle' : 'create-outline'}
+                name={
+                  review?.status === 'approved'
+                    ? 'checkmark-circle'
+                    : review?.status === 'rejected'
+                      ? 'close-circle'
+                      : review
+                        ? 'time-outline'
+                        : 'create-outline'
+                }
                 size={13}
-                color={teal}
+                color={reviewStatusColor}
               />
-              <Text style={cardStyles.reviewStatusText}>{review ? 'Rated' : 'Open'}</Text>
+              <Text style={[cardStyles.reviewStatusText, { color: reviewStatusColor }]}>{reviewStatusLabel}</Text>
             </View>
           </View>
 
