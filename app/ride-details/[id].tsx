@@ -12,7 +12,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
-import { loadRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
+import { fetchRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
+import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
 
@@ -79,6 +80,7 @@ const vehicleName = (params: RideDetailsParams) => {
 
 export default function RideDetailsScreen() {
   const router = useRouter();
+  const { token } = useAuth();
   const params = useLocalSearchParams<RideDetailsParams>();
   const isCompleted = String(params.status ?? '').toLowerCase() === 'completed';
   const rideId = String(params.id ?? '');
@@ -92,7 +94,7 @@ export default function RideDetailsScreen() {
     let cancelled = false;
 
     const hydrateReview = async () => {
-      const storedReview = await loadRideReview(rideId);
+      const storedReview = await fetchRideReview(rideId, token);
       if (cancelled) return;
 
       setReview(storedReview);
@@ -107,7 +109,7 @@ export default function RideDetailsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [rideId]);
+  }, [rideId, token]);
 
   const handleSaveReview = async () => {
     if (!rideId || rating < 1 || saving) return;
@@ -115,9 +117,11 @@ export default function RideDetailsScreen() {
     try {
       setSaving(true);
       setSaveMessage('');
-      const nextReview = await saveRideReview(rideId, rating, comment);
+      const nextReview = await saveRideReview(rideId, rating, comment, token);
       setReview(nextReview);
       setSaveMessage('Review saved');
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Unable to save review');
     } finally {
       setSaving(false);
     }

@@ -23,7 +23,7 @@ import {
   loadPassengerActiveRide,
   PassengerActiveRideParams,
 } from '@/lib/activeRideStorage';
-import { loadRideReviews, RideReviewMap } from '@/lib/rideReviews';
+import { loadRideReviews, RideReview, RideReviewMap } from '@/lib/rideReviews';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -57,6 +57,7 @@ type Ride = {
       category?: string;
     } | null;
   } | null;
+  review?: RideReview | null;
 };
 
 const isCompletedRide = (ride: Ride) =>
@@ -534,6 +535,16 @@ export default function ActivitiesScreen() {
 
       const data = await res.json() as { rides: Ride[] };
       setRides(data.rides ?? []);
+      setReviews((currentReviews) => {
+        const serverReviews = (data.rides ?? []).reduce<RideReviewMap>((acc, ride) => {
+          if (ride.review) {
+            acc[ride.id] = ride.review;
+          }
+          return acc;
+        }, {});
+
+        return { ...currentReviews, ...serverReviews };
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to load rides');
     } finally {
