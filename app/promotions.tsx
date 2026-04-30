@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
+  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   View,
@@ -87,6 +89,14 @@ export default function PromotionsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
 
+      <View style={styles.topBar}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={20} color={palette.primary} />
+        </Pressable>
+        <Text style={styles.topBarTitle}>Promotions</Text>
+        <View style={styles.topBarSpacer} />
+      </View>
+
       {loading ? (
         <View style={styles.centerState}>
           <ActivityIndicator size="small" color={palette.accent} />
@@ -167,9 +177,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: palette.background,
+    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    color: palette.primary,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 0,
     paddingBottom: 30,
   },
   heroCard: {
