@@ -117,12 +117,21 @@ export async function saveRideReview(
 
 export async function deleteRideReview(rideId: string, token?: string | null): Promise<void> {
   if (token) {
-    const response = await fetch(`${API_BASE_URL}/rides/${rideId}/review`, {
+    const deleteResponse = await fetch(`${API_BASE_URL}/rides/${rideId}/review`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    await parseApiResponse<{ message?: string }>(response);
+    if (deleteResponse.status === 404 || deleteResponse.status === 405) {
+      const fallbackResponse = await fetch(`${API_BASE_URL}/rides/${rideId}/review/delete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await parseApiResponse<{ message?: string }>(fallbackResponse);
+    } else {
+      await parseApiResponse<{ message?: string }>(deleteResponse);
+    }
   }
 
   await removeRideReview(rideId);
