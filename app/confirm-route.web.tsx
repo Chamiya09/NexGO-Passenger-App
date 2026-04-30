@@ -19,6 +19,7 @@ export default function ConfirmRouteWebScreen() {
 
   const pName = (params.pName as string) || 'Pickup';
   const dName = (params.dName as string) || 'Drop-off';
+  const promoCode = typeof params.promoCode === 'string' ? params.promoCode.toUpperCase() : '';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -72,6 +73,13 @@ export default function ConfirmRouteWebScreen() {
           <View style={styles.routeDivider} />
           <RoutePoint icon="location" label="Drop-off" value={dName} />
         </View>
+
+        {promoCode ? (
+          <View style={styles.promoCodeCard}>
+            <Ionicons name="pricetag-outline" size={17} color={teal} />
+            <Text style={styles.promoCodeText}>Promo code ready: {promoCode}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.loaderRow}>
           <ActivityIndicator size="small" color={teal} />
@@ -291,6 +299,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  promoCodeCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  promoCodeText: {
+    flex: 1,
+    color: '#102A28',
+    fontSize: 13,
+    fontWeight: '800',
   },
   loaderText: {
     fontSize: 13,

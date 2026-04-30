@@ -9,16 +9,18 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const teal = '#169F95';
 
 export default function RideWebScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [pickup] = useState('Colombo Fort');
   const [dropoff] = useState('Bambalapitiya');
   const [selectedVehicle, setSelectedVehicle] = useState<'Mini' | 'Sedan' | 'Van'>('Mini');
+  const selectedPromoCode = typeof params.promoCode === 'string' ? params.promoCode : '';
 
   const priceMap = {
     Mini: 'LKR 1301',
@@ -107,6 +109,7 @@ export default function RideWebScreen() {
                 dLat: '6.9066',
                 dLng: '79.8707',
                 dName: dropoff,
+                ...(selectedPromoCode && { promoCode: selectedPromoCode }),
               },
             })
           }>

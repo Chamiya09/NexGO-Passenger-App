@@ -92,7 +92,10 @@ export default function ConfirmRouteScreen() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
-  const [promoCode, setPromoCode] = useState('');
+  const [promoCode, setPromoCode] = useState(() => {
+    const initialPromoCode = params.promoCode;
+    return typeof initialPromoCode === 'string' ? initialPromoCode.toUpperCase() : '';
+  });
   const [promoStatus, setPromoStatus] = useState<'idle' | 'applied' | 'error'>('idle');
   const [promoMessage, setPromoMessage] = useState('');
   const [appliedPromotion, setAppliedPromotion] = useState<PromotionSummary | null>(null);

@@ -141,20 +141,28 @@ export default function PromotionsScreen() {
                   <View style={styles.promotionCopy}>
                     <Text style={styles.promotionTitle} numberOfLines={2}>{promotion.name}</Text>
                     <Text style={styles.promotionText}>{getPromoCaption(promotion)}</Text>
-                    <View style={styles.metaRow}>
-                      <View style={styles.metaPill}>
-                        <Ionicons name="time-outline" size={13} color={palette.secondary} />
-                        <Text style={styles.promotionMeta}>
-                          {promotion.endDate === 'No end date' ? 'No end date' : `Valid until ${promotion.endDate}`}
-                        </Text>
-                      </View>
-                    </View>
                   </View>
 
-                  <Pressable style={styles.useButton} onPress={() => router.push('/(tabs)/ride')}>
-                    <Text style={styles.useButtonText}>Use code</Text>
-                    <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
-                  </Pressable>
+                  <View style={styles.promotionFooter}>
+                    <View style={styles.metaPill}>
+                      <Ionicons name="time-outline" size={13} color={palette.secondary} />
+                      <Text style={styles.promotionMeta}>
+                        {promotion.endDate === 'No end date' ? 'No end date' : `Valid until ${promotion.endDate}`}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      style={styles.useButton}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(tabs)/ride',
+                          params: { promoCode: promotion.code },
+                        })
+                      }>
+                      <Text style={styles.useButtonText}>Use code</Text>
+                      <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             ))
@@ -326,14 +334,13 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: '600',
   },
-  metaRow: {
+  promotionFooter: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
-    marginTop: 2,
   },
   metaPill: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -343,6 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FBFA',
     borderWidth: 1,
     borderColor: palette.divider,
+    flexShrink: 1,
   },
   promotionMeta: {
     color: palette.secondary,
@@ -350,7 +358,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   useButton: {
-    alignSelf: 'flex-start',
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,

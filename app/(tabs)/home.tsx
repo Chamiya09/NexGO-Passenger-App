@@ -452,7 +452,12 @@ export default function HomeScreen() {
                   promotion={promotion}
                   index={index}
                   getPromoCaption={getPromoCaption}
-                  onUse={() => router.push('/(tabs)/ride')}
+                  onUse={() =>
+                    router.push({
+                      pathname: '/(tabs)/ride',
+                      params: { promoCode: promotion.code },
+                    })
+                  }
                 />
               ))}
             </ScrollView>
