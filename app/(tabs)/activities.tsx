@@ -617,6 +617,7 @@ export default function ActivitiesScreen() {
         driverName: ride.driver?.fullName ?? '',
         driverPhone: ride.driver?.phoneNumber ?? '',
         driverImage: ride.driver?.profileImageUrl ?? '',
+        driverVehicleType: ride.vehicleType,
         vehicleMake: ride.driver?.vehicle?.make ?? '',
         vehicleModel: ride.driver?.vehicle?.model ?? '',
         vehiclePlate: ride.driver?.vehicle?.plateNumber ?? '',

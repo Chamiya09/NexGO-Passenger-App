@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -13,14 +13,22 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
-import { useAuth } from '@/context/auth-context';
 import { fetchPublicDriverProfile, PublicDriverProfile } from '@/lib/driverProfiles';
 
 const teal = '#169F95';
 
 type DriverProfileParams = {
   id?: string;
+  rideId?: string;
   name?: string;
+  phone?: string;
+  image?: string;
+  vehicleType?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehiclePlate?: string;
+  vehicleColor?: string;
+  vehicleCategory?: string;
 };
 
 const formatVehicleName = (driver?: PublicDriverProfile | null) => {
@@ -46,20 +54,60 @@ const formatDate = (iso?: string | null) => {
 
 export default function DriverProfileScreen() {
   const router = useRouter();
-  const { token } = useAuth();
   const params = useLocalSearchParams<DriverProfileParams>();
   const driverId = String(params.id ?? '');
+  const rideId = String(params.rideId ?? '');
+  const fallbackName = String(params.name ?? '');
+  const fallbackPhone = String(params.phone ?? '');
+  const fallbackImage = String(params.image ?? '');
+  const fallbackVehicleType = String(params.vehicleType ?? '');
+  const fallbackVehicleMake = String(params.vehicleMake ?? '');
+  const fallbackVehicleModel = String(params.vehicleModel ?? '');
+  const fallbackVehiclePlate = String(params.vehiclePlate ?? '');
+  const fallbackVehicleColor = String(params.vehicleColor ?? '');
+  const fallbackVehicleCategory = String(params.vehicleCategory ?? '');
 
   const [driver, setDriver] = useState<PublicDriverProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fallbackDriver = useMemo<PublicDriverProfile>(() => ({
+    id: driverId,
+    fullName: fallbackName || 'Driver',
+    phoneNumber: fallbackPhone,
+    profileImageUrl: fallbackImage,
+    status: '',
+    isOnline: false,
+    ratingAverage: 0,
+    ratingCount: 0,
+    completedRides: 0,
+    vehicle: {
+      category: fallbackVehicleCategory || fallbackVehicleType,
+      make: fallbackVehicleMake,
+      model: fallbackVehicleModel,
+      plateNumber: fallbackVehiclePlate,
+      color: fallbackVehicleColor,
+    },
+    recentReviews: [],
+  }), [
+    driverId,
+    fallbackImage,
+    fallbackName,
+    fallbackPhone,
+    fallbackVehicleCategory,
+    fallbackVehicleColor,
+    fallbackVehicleMake,
+    fallbackVehicleModel,
+    fallbackVehiclePlate,
+    fallbackVehicleType,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadDriver = async () => {
       if (!driverId) {
-        setError('Driver profile not available');
+        setDriver(fallbackDriver);
         setLoading(false);
         return;
       }
@@ -67,13 +115,14 @@ export default function DriverProfileScreen() {
       try {
         setLoading(true);
         setError(null);
-        const profile = await fetchPublicDriverProfile(driverId, token);
+        const profile = await fetchPublicDriverProfile(driverId, rideId);
         if (!cancelled) {
           setDriver(profile);
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load driver profile');
+          setDriver(fallbackDriver);
+          setError(loadError instanceof Error ? loadError.message : 'Live profile data unavailable');
         }
       } finally {
         if (!cancelled) {
@@ -87,23 +136,31 @@ export default function DriverProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [driverId, token]);
+  }, [driverId, fallbackDriver, rideId]);
 
-  const displayName = driver?.fullName || params.name || 'Driver';
+  const displayName = driver?.fullName || fallbackName || 'Driver';
   const ratingLabel = driver?.ratingCount
     ? `${driver.ratingAverage.toFixed(1)} average`
     : 'No ratings yet';
+  const ratingValue = driver?.ratingCount ? driver.ratingAverage.toFixed(1) : 'New';
 
   return (
     <View style={styles.overlay}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+          presentation: 'transparentModal',
+          animation: 'fade',
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <StatusBar style="light" />
       <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} />
 
       <View style={styles.popup}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={22} color="#102A28" />
+            <Ionicons name="close" size={20} color="#102A28" />
           </TouchableOpacity>
           <View style={styles.headerText}>
             <Text style={styles.eyebrow}>DRIVER PROFILE</Text>
@@ -116,30 +173,57 @@ export default function DriverProfileScreen() {
             <ActivityIndicator size="large" color={teal} />
             <Text style={styles.centerText}>Loading driver profile...</Text>
           </View>
-        ) : error ? (
-          <View style={styles.centerState}>
-            <Ionicons name="alert-circle-outline" size={38} color="#DC2626" />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
         ) : (
           <RefreshableScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.profileHero}>
-              <View style={styles.avatarWrap}>
-                {driver?.profileImageUrl ? (
-                  <Image source={{ uri: driver.profileImageUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarInitial}>{displayName.trim().charAt(0).toUpperCase()}</Text>
-                )}
+            {error ? (
+              <View style={styles.inlineNotice}>
+                <Ionicons name="cloud-offline-outline" size={16} color="#D97706" />
+                <Text style={styles.inlineNoticeText}>{error}</Text>
               </View>
-              <Text style={styles.driverName}>{displayName}</Text>
-              <View style={styles.statusPill}>
-                <View style={[styles.statusDot, { backgroundColor: driver?.isOnline ? teal : '#8CA1A0' }]} />
-                <Text style={styles.statusText}>{driver?.isOnline ? 'Online' : 'Offline'}</Text>
+            ) : null}
+
+            <View style={styles.profileHero}>
+              <View style={styles.heroTop}>
+                <View style={styles.avatarWrap}>
+                  {driver?.profileImageUrl ? (
+                    <Image source={{ uri: driver.profileImageUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatarInitial}>{displayName.trim().charAt(0).toUpperCase()}</Text>
+                  )}
+                </View>
+                <View style={styles.heroCopy}>
+                  <Text style={styles.driverName} numberOfLines={1}>{displayName}</Text>
+                  <Text style={styles.vehicleSummary} numberOfLines={1}>{formatVehicleName(driver)}</Text>
+                  <View style={styles.heroPills}>
+                    <View style={styles.statusPill}>
+                      <View style={[styles.statusDot, { backgroundColor: driver?.isOnline ? teal : '#8CA1A0' }]} />
+                      <Text style={styles.statusText}>{driver?.isOnline ? 'Online' : 'Offline'}</Text>
+                    </View>
+                    <View style={styles.ratingPill}>
+                      <Ionicons name="star" size={13} color="#F5A623" />
+                      <Text style={styles.ratingPillText}>{ratingValue}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.heroRatingPanel}>
+                <View style={styles.ratingPanelCopy}>
+                  <Text style={styles.ratingPanelValue}>{ratingValue}</Text>
+                  <View>
+                    <StarStrip rating={driver?.ratingAverage ?? 0} size={15} />
+                    <Text style={styles.ratingPanelLabel}>{ratingLabel}</Text>
+                  </View>
+                </View>
+                <View style={styles.tripBadge}>
+                  <Ionicons name="checkmark-done" size={15} color={teal} />
+                  <Text style={styles.tripBadgeText}>{driver?.completedRides ?? 0} trips</Text>
+                </View>
               </View>
             </View>
 
             <View style={styles.statsRow}>
-              <StatBox icon="star" label="Rating" value={ratingLabel} />
+              <StatBox icon="star" label="Ratings" value={String(driver?.ratingCount ?? 0)} />
               <StatBox icon="checkmark-done" label="Trips" value={String(driver?.completedRides ?? 0)} />
             </View>
 
@@ -157,19 +241,19 @@ export default function DriverProfileScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Top Rated Reviews</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Top Rated Reviews</Text>
+                <Text style={styles.sectionMeta}>Best 3</Text>
+              </View>
               {driver?.recentReviews?.length ? (
                 driver.recentReviews.map((review, index) => (
                   <View key={`${review.reviewedAt ?? index}`} style={styles.reviewRow}>
-                    <View style={styles.reviewStars}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={star <= review.rating ? 'star' : 'star-outline'}
-                          size={14}
-                          color={star <= review.rating ? '#F5A623' : '#B7C7C5'}
-                        />
-                      ))}
+                    <View style={styles.reviewTopRow}>
+                      <View style={styles.reviewRank}>
+                        <Text style={styles.reviewRankText}>{index + 1}</Text>
+                      </View>
+                      <StarStrip rating={review.rating} size={14} />
+                      <Text style={styles.reviewScore}>{review.rating}.0</Text>
                     </View>
                     {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
                     {formatDate(review.reviewedAt) ? (
@@ -184,6 +268,21 @@ export default function DriverProfileScreen() {
           </RefreshableScrollView>
         )}
       </View>
+    </View>
+  );
+}
+
+function StarStrip({ rating, size }: { rating: number; size: number }) {
+  return (
+    <View style={styles.starStrip}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Ionicons
+          key={star}
+          name={star <= Math.round(rating) ? 'star' : 'star-outline'}
+          size={size}
+          color={star <= Math.round(rating) ? '#F5A623' : '#B7C7C5'}
+        />
+      ))}
     </View>
   );
 }
@@ -235,18 +334,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(5, 20, 19, 0.55)',
     justifyContent: 'center',
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 24,
   },
   popup: {
+    width: '100%',
+    maxWidth: 430,
     maxHeight: '88%',
+    alignSelf: 'center',
     backgroundColor: '#F4F8F7',
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#D9E9E6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
   },
   header: {
-    minHeight: 70,
+    minHeight: 68,
     paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: '#FFFFFF',
@@ -298,19 +406,40 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
   },
+  inlineNotice: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F8D58C',
+    backgroundColor: '#FFF8EC',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inlineNoticeText: {
+    flex: 1,
+    color: '#9A6200',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   profileHero: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#D9E9E6',
     padding: 16,
+    gap: 14,
+  },
+  heroTop: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 13,
   },
   avatarWrap: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
     backgroundColor: '#E7F5F3',
     borderWidth: 1,
     borderColor: '#BFE7E2',
@@ -324,13 +453,27 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     color: teal,
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 5,
   },
   driverName: {
     color: '#102A28',
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '900',
+  },
+  vehicleSummary: {
+    color: '#617C79',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  heroPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
   },
   statusPill: {
     flexDirection: 'row',
@@ -352,6 +495,64 @@ const styles = StyleSheet.create({
     color: '#617C79',
     fontSize: 12,
     fontWeight: '800',
+  },
+  ratingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: '#FFF8EC',
+    borderWidth: 1,
+    borderColor: '#F8D58C',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  ratingPillText: {
+    color: '#9A6200',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  heroRatingPanel: {
+    borderRadius: 14,
+    backgroundColor: '#F7FBFA',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  ratingPanelCopy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  ratingPanelValue: {
+    color: '#102A28',
+    fontSize: 27,
+    fontWeight: '900',
+  },
+  ratingPanelLabel: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  tripBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  tripBadgeText: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
   },
   statsRow: {
     flexDirection: 'row',
@@ -391,6 +592,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  sectionMeta: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -422,12 +634,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FBFA',
     borderWidth: 1,
     borderColor: '#D9E9E6',
-    padding: 10,
-    gap: 5,
+    padding: 11,
+    gap: 7,
   },
-  reviewStars: {
+  reviewTopRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  reviewRank: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewRankText: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  starStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 2,
+  },
+  reviewScore: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '900',
   },
   reviewComment: {
     color: '#102A28',

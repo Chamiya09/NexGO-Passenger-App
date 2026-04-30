@@ -35,6 +35,7 @@ type RideDetailsParams = {
   driverName?: string;
   driverPhone?: string;
   driverImage?: string;
+  driverVehicleType?: string;
   vehicleMake?: string;
   vehicleModel?: string;
   vehiclePlate?: string;
@@ -136,7 +137,16 @@ export default function RideDetailsScreen() {
       pathname: '/driver-profile/[id]',
       params: {
         id: driverId,
+        rideId,
         name: params.driverName ?? '',
+        phone: params.driverPhone ?? '',
+        image: params.driverImage ?? '',
+        vehicleType: params.driverVehicleType ?? params.vehicleType ?? '',
+        vehicleMake: params.vehicleMake ?? '',
+        vehicleModel: params.vehicleModel ?? '',
+        vehiclePlate: params.vehiclePlate ?? '',
+        vehicleColor: params.vehicleColor ?? '',
+        vehicleCategory: params.vehicleCategory ?? '',
       },
     });
   };

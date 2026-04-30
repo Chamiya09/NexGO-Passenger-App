@@ -263,6 +263,7 @@ export default function ActiveRideScreen() {
             params: {
                 id: driverId,
                 name: driverName,
+                rideId,
             },
         });
     };

@@ -28,12 +28,29 @@ export type PublicDriverProfile = {
 
 export async function fetchPublicDriverProfile(
   driverId: string,
-  token?: string | null
+  rideId?: string
 ): Promise<PublicDriverProfile> {
-  const response = await fetch(`${API_BASE_URL}/driver-auth/drivers/${driverId}/public-profile`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  const endpoints = [
+    ...(rideId ? [`${API_BASE_URL}/rides/${rideId}/driver-public-profile`] : []),
+    `${API_BASE_URL}/driver-auth/drivers/${driverId}/public-profile`,
+    `${API_BASE_URL}/rides/drivers/${driverId}/public-profile`,
+  ];
 
-  const data = await parseApiResponse<{ driver: PublicDriverProfile }>(response);
-  return data.driver;
+  let lastError: unknown = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { signal: controller.signal });
+      const data = await parseApiResponse<{ driver: PublicDriverProfile }>(response);
+      clearTimeout(timeout);
+      return data.driver;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  clearTimeout(timeout);
+  throw lastError instanceof Error ? lastError : new Error('Unable to load driver profile');
 }
