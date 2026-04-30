@@ -287,6 +287,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeRide, setActiveRide] = useState<PassengerActiveRideParams | null>(null);
   const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
+  const promoScrollRef = React.useRef<ScrollView>(null);
+  const promoAutoIndexRef = React.useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -328,6 +330,21 @@ export default function HomeScreen() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (promotions.length <= 1) return undefined;
+
+    const cardWidthWithGap = 312;
+    const interval = setInterval(() => {
+      promoAutoIndexRef.current = (promoAutoIndexRef.current + 1) % promotions.length;
+      promoScrollRef.current?.scrollTo({
+        x: promoAutoIndexRef.current * cardWidthWithGap,
+        animated: true,
+      });
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, [promotions.length]);
 
   const getPromoCaption = (promotion: PromotionSummary) => (
     promotion.discountType === 'Percentage'
@@ -407,9 +424,16 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView
+              ref={promoScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.promoScroll}>
+              contentContainerStyle={styles.promoScroll}
+              decelerationRate="fast"
+              snapToInterval={312}
+              snapToAlignment="start"
+              onMomentumScrollEnd={(event) => {
+                promoAutoIndexRef.current = Math.round(event.nativeEvent.contentOffset.x / 312);
+              }}>
               {promotions.map((promotion, index) => (
                 <PromotionCard
                   key={promotion.id}
