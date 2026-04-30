@@ -120,6 +120,9 @@ export default function MyReviewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [removingRideId, setRemovingRideId] = useState<string | null>(null);
   const [updatingRideId, setUpdatingRideId] = useState<string | null>(null);
+  const [editingRide, setEditingRide] = useState<ReviewRide | null>(null);
+  const [draftRating, setDraftRating] = useState(0);
+  const [draftComment, setDraftComment] = useState('');
   const [error, setError] = useState('');
 
   const loadReviews = useCallback(async (isRefresh = false) => {
@@ -242,6 +245,31 @@ export default function MyReviewsScreen() {
     }
   };
 
+  const openUpdatePopup = (ride: ReviewRide) => {
+    if (ride.review?.status === 'rejected') return;
+
+    setEditingRide(ride);
+    setDraftRating(ride.review?.rating ?? 0);
+    setDraftComment(ride.review?.comment ?? '');
+  };
+
+  const closeUpdatePopup = () => {
+    if (updatingRideId) return;
+
+    setEditingRide(null);
+    setDraftRating(0);
+    setDraftComment('');
+  };
+
+  const savePopupUpdate = async () => {
+    if (!editingRide || draftRating < 1 || updatingRideId) return;
+
+    const saved = await updateReview(editingRide, draftRating, draftComment);
+    if (saved) {
+      closeUpdatePopup();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <RefreshableScrollView
@@ -291,7 +319,7 @@ export default function MyReviewsScreen() {
                 isRemoving={removingRideId === ride.id}
                 isUpdating={updatingRideId === ride.id}
                 onView={() => openRideDetails(ride)}
-                onUpdate={(rating, comment) => updateReview(ride, rating, comment)}
+                onUpdate={() => openUpdatePopup(ride)}
                 onRemove={() => confirmRemoveReview(ride)}
               />
             ))}
@@ -300,6 +328,69 @@ export default function MyReviewsScreen() {
 
         {refreshing ? <Text style={styles.refreshText}>Refreshing reviews...</Text> : null}
       </RefreshableScrollView>
+
+      {editingRide ? (
+        <View style={styles.popupOverlay}>
+          <Pressable style={styles.popupBackdrop} onPress={closeUpdatePopup} />
+          <View style={styles.popupCard}>
+            <View style={styles.updateFormHeader}>
+              <View style={styles.popupTitleWrap}>
+                <Text style={styles.updateFormTitle}>Update review</Text>
+                <Text style={styles.updateFormHint} numberOfLines={1}>
+                  {editingRide.driver?.fullName || 'Driver not available'}
+                </Text>
+              </View>
+              <Pressable style={styles.closeFormButton} onPress={closeUpdatePopup} disabled={Boolean(updatingRideId)}>
+                <Ionicons name="close" size={18} color={palette.secondaryText} />
+              </Pressable>
+            </View>
+
+            <View style={styles.editStarRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Pressable
+                  key={star}
+                  style={[styles.editStarButton, star <= draftRating && styles.editStarButtonActive]}
+                  onPress={() => setDraftRating(star)}
+                  disabled={Boolean(updatingRideId)}>
+                  <Ionicons
+                    name={star <= draftRating ? 'star' : 'star-outline'}
+                    size={21}
+                    color={star <= draftRating ? '#F5A623' : '#8CA1A0'}
+                  />
+                </Pressable>
+              ))}
+            </View>
+
+            <TextInput
+              style={styles.updateInput}
+              value={draftComment}
+              onChangeText={setDraftComment}
+              placeholder="Update your ride feedback..."
+              placeholderTextColor="#8CA1A0"
+              multiline
+              maxLength={220}
+              textAlignVertical="top"
+              editable={!updatingRideId}
+            />
+
+            <View style={styles.updateFooter}>
+              <Text style={styles.characterCount}>{draftComment.trim().length}/220</Text>
+              <View style={styles.updateFooterButtons}>
+                <Pressable style={styles.cancelUpdateButton} onPress={closeUpdatePopup} disabled={Boolean(updatingRideId)}>
+                  <Text style={styles.cancelUpdateText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.saveUpdateButton, (draftRating < 1 || Boolean(updatingRideId)) && styles.disabledButton]}
+                  onPress={savePopupUpdate}
+                  disabled={draftRating < 1 || Boolean(updatingRideId)}>
+                  <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" />
+                  <Text style={styles.saveUpdateText}>{updatingRideId ? 'Saving' : 'Save'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -316,32 +407,12 @@ function ReviewCard({
   isRemoving: boolean;
   isUpdating: boolean;
   onView: () => void;
-  onUpdate: (rating: number, comment: string) => Promise<boolean>;
+  onUpdate: () => void;
   onRemove: () => void;
 }) {
   const review = ride.review;
   const reviewStatus = getReviewStatusConfig(review?.status);
   const canEdit = review?.status !== 'rejected';
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftRating, setDraftRating] = useState(review?.rating ?? 0);
-  const [draftComment, setDraftComment] = useState(review?.comment ?? '');
-
-  const openUpdateForm = () => {
-    if (!canEdit) return;
-
-    setDraftRating(review?.rating ?? 0);
-    setDraftComment(review?.comment ?? '');
-    setIsEditing(true);
-  };
-
-  const saveUpdate = async () => {
-    if (draftRating < 1 || isUpdating) return;
-
-    const saved = await onUpdate(draftRating, draftComment);
-    if (saved) {
-      setIsEditing(false);
-    }
-  };
 
   return (
     <View style={styles.reviewCard}>
@@ -395,9 +466,9 @@ function ReviewCard({
         </Pressable>
 
         {canEdit ? (
-          <Pressable style={styles.updateButton} onPress={openUpdateForm}>
+          <Pressable style={[styles.updateButton, isUpdating && styles.disabledButton]} onPress={onUpdate} disabled={isUpdating}>
             <Ionicons name="create-outline" size={15} color="#FFFFFF" />
-            <Text style={styles.updateButtonText}>Update</Text>
+            <Text style={styles.updateButtonText}>{isUpdating ? 'Saving' : 'Update'}</Text>
           </Pressable>
         ) : (
           <View style={styles.lockedButton}>
@@ -415,63 +486,6 @@ function ReviewCard({
         </Pressable>
       </View>
 
-      {isEditing ? (
-        <View style={styles.updateForm}>
-          <View style={styles.updateFormHeader}>
-            <View>
-              <Text style={styles.updateFormTitle}>Update review</Text>
-              <Text style={styles.updateFormHint}>Edit only this ride review.</Text>
-            </View>
-            <Pressable style={styles.closeFormButton} onPress={() => setIsEditing(false)} disabled={isUpdating}>
-              <Ionicons name="close" size={18} color={palette.secondaryText} />
-            </Pressable>
-          </View>
-
-          <View style={styles.editStarRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Pressable
-                key={star}
-                style={[styles.editStarButton, star <= draftRating && styles.editStarButtonActive]}
-                onPress={() => setDraftRating(star)}
-                disabled={isUpdating}>
-                <Ionicons
-                  name={star <= draftRating ? 'star' : 'star-outline'}
-                  size={21}
-                  color={star <= draftRating ? '#F5A623' : '#8CA1A0'}
-                />
-              </Pressable>
-            ))}
-          </View>
-
-          <TextInput
-            style={styles.updateInput}
-            value={draftComment}
-            onChangeText={setDraftComment}
-            placeholder="Update your ride feedback..."
-            placeholderTextColor="#8CA1A0"
-            multiline
-            maxLength={220}
-            textAlignVertical="top"
-            editable={!isUpdating}
-          />
-
-          <View style={styles.updateFooter}>
-            <Text style={styles.characterCount}>{draftComment.trim().length}/220</Text>
-            <View style={styles.updateFooterButtons}>
-              <Pressable style={styles.cancelUpdateButton} onPress={() => setIsEditing(false)} disabled={isUpdating}>
-                <Text style={styles.cancelUpdateText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.saveUpdateButton, (draftRating < 1 || isUpdating) && styles.disabledButton]}
-                onPress={saveUpdate}
-                disabled={draftRating < 1 || isUpdating}>
-                <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" />
-                <Text style={styles.saveUpdateText}>{isUpdating ? 'Saving' : 'Save'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -816,13 +830,29 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.55,
   },
-  updateForm: {
-    borderRadius: 14,
+  popupOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  popupBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(18, 53, 50, 0.48)',
+  },
+  popupCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: palette.elevatedCard,
-    padding: 11,
-    gap: 10,
+    backgroundColor: palette.card,
+    padding: 16,
+    gap: 12,
+  },
+  popupTitleWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   updateFormHeader: {
     flexDirection: 'row',
