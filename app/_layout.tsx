@@ -19,6 +19,18 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="promotions"
+            options={{
+              title: 'Promotions',
+              headerShown: true,
+              headerTitleAlign: 'center',
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: '#F0F1F3' },
+              headerTintColor: '#153F3A',
+              headerBackButtonDisplayMode: 'minimal',
+            }}
+          />
           <Stack.Screen name="active-ride/[id]" options={{ headerShown: false }} />
           <Stack.Screen
             name="ride-details/[id]"

@@ -86,6 +86,22 @@ function getFirstName(fullName?: string) {
   return fullName?.trim().split(/\s+/)[0] || 'Passenger';
 }
 
+function getActivePromotions(promotions: PromotionSummary[]) {
+  const now = Date.now();
+  return promotions.filter((item) => {
+    if (!item.active || item.status !== 'Active') return false;
+    if (!item.endDate || item.endDate === 'No end date') return true;
+    const endDate = new Date(item.endDate).getTime();
+    return Number.isFinite(endDate) && endDate >= now;
+  });
+}
+
+function getRandomPromotions(promotions: PromotionSummary[], limit = 4) {
+  return [...promotions]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, limit);
+}
+
 function ActiveRideCard({
   ride,
   onResume,
@@ -313,14 +329,7 @@ export default function HomeScreen() {
       .then(parseApiResponse<{ promotions: PromotionSummary[] }>)
       .then((data) => {
         if (!mounted) return;
-        const now = Date.now();
-        const activePromotions = (data.promotions ?? []).filter((item) => {
-          if (!item.active || item.status !== 'Active') return false;
-          if (!item.endDate || item.endDate === 'No end date') return true;
-          const endDate = new Date(item.endDate).getTime();
-          return Number.isFinite(endDate) && endDate >= now;
-        });
-        setPromotions(activePromotions);
+        setPromotions(getRandomPromotions(getActivePromotions(data.promotions ?? [])));
       })
       .catch(() => {
         if (mounted) setPromotions([]);
@@ -421,6 +430,9 @@ export default function HomeScreen() {
                 <Text style={styles.sectionTitle}>Ride Promotions</Text>
                 <Text style={styles.sectionCaption}>Limited-time offers from NexGO</Text>
               </View>
+              <Pressable style={styles.sectionAction} onPress={() => router.push('/promotions')}>
+                <Text style={styles.sectionActionText}>See all</Text>
+              </Pressable>
             </View>
 
             <ScrollView
