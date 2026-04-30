@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -11,6 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { loadRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
 
 const teal = '#169F95';
 
@@ -79,6 +81,47 @@ export default function RideDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<RideDetailsParams>();
   const isCompleted = String(params.status ?? '').toLowerCase() === 'completed';
+  const rideId = String(params.id ?? '');
+  const [review, setReview] = useState<RideReview | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateReview = async () => {
+      const storedReview = await loadRideReview(rideId);
+      if (cancelled) return;
+
+      setReview(storedReview);
+      setRating(storedReview?.rating ?? 0);
+      setComment(storedReview?.comment ?? '');
+    };
+
+    if (rideId) {
+      void hydrateReview();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rideId]);
+
+  const handleSaveReview = async () => {
+    if (!rideId || rating < 1 || saving) return;
+
+    try {
+      setSaving(true);
+      setSaveMessage('');
+      const nextReview = await saveRideReview(rideId, rating, comment);
+      setReview(nextReview);
+      setSaveMessage('Review saved');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={styles.overlay}>
@@ -161,6 +204,79 @@ export default function RideDetailsScreen() {
               <InfoRow icon="flag-outline" label="Completed" value={formatDate(params.completedAt)} />
               <InfoRow icon="pricetag-outline" label="Ride ID" value={params.id || 'Not available'} selectable />
               <InfoRow icon="wallet-outline" label="Payment" value="Cash" />
+            </View>
+
+            <View style={styles.reviewSection}>
+              <View style={styles.reviewHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Review & Rating</Text>
+                  <Text style={styles.reviewSubtitle}>
+                    {review ? 'Your feedback for this ride' : 'Rate your completed ride'}
+                  </Text>
+                </View>
+                {review ? (
+                  <View style={styles.savedBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color={teal} />
+                    <Text style={styles.savedBadgeText}>Saved</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.starPicker}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    style={[
+                      styles.starButton,
+                      star <= rating && styles.starButtonActive,
+                    ]}
+                    onPress={() => {
+                      setRating(star);
+                      setSaveMessage('');
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={star <= rating ? 'star' : 'star-outline'}
+                      size={24}
+                      color={star <= rating ? '#F5A623' : '#8CA1A0'}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.reviewInput}
+                value={comment}
+                onChangeText={(value) => {
+                  setComment(value);
+                  setSaveMessage('');
+                }}
+                placeholder="Share what went well..."
+                placeholderTextColor="#8CA1A0"
+                multiline
+                maxLength={220}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.reviewFooter}>
+                <Text style={styles.characterCount}>{comment.trim().length}/220</Text>
+                {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.saveReviewButton,
+                  (rating < 1 || saving) && styles.saveReviewButtonDisabled,
+                ]}
+                onPress={handleSaveReview}
+                disabled={rating < 1 || saving}
+              >
+                <Ionicons name="star" size={16} color="#FFFFFF" />
+                <Text style={styles.saveReviewButtonText}>
+                  {saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </RefreshableScrollView>
         )}
@@ -431,6 +547,105 @@ const styles = StyleSheet.create({
     color: '#102A28',
     fontSize: 14,
     fontWeight: '800',
+  },
+  reviewSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    padding: 12,
+    gap: 12,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reviewSubtitle: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  savedBadgeText: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  starPicker: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  starButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starButtonActive: {
+    borderColor: '#F8D58C',
+    backgroundColor: '#FFF8EC',
+  },
+  reviewInput: {
+    minHeight: 92,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#102A28',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  reviewFooter: {
+    minHeight: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  characterCount: {
+    color: '#8CA1A0',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  saveMessage: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  saveReviewButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  saveReviewButtonDisabled: {
+    backgroundColor: '#A7C8C4',
+  },
+  saveReviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
   },
   unavailableBox: {
     padding: 28,

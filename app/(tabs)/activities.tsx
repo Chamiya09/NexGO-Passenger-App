@@ -23,6 +23,7 @@ import {
   loadPassengerActiveRide,
   PassengerActiveRideParams,
 } from '@/lib/activeRideStorage';
+import { loadRideReviews, RideReviewMap } from '@/lib/rideReviews';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -198,12 +199,14 @@ const tagStyles = StyleSheet.create({
 // ── Ride Card sub-component ───────────────────────────────────────────────────
 function RideCard({
   ride,
+  review,
   onCancel,
   onViewDetails,
   onResumeNavigation,
   isResumeTarget,
 }: {
   ride: Ride;
+  review?: RideReviewMap[string];
   onCancel?: (id: string) => void;
   onViewDetails: (ride: Ride) => void;
   onResumeNavigation?: () => void;
@@ -257,10 +260,34 @@ function RideCard({
       </View>
 
       {isCompletedRide(ride) && (
-        <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
-          <Ionicons name="receipt-outline" size={15} color={teal} />
-          <Text style={cardStyles.detailsBtnText}>View details</Text>
-        </TouchableOpacity>
+        <View style={cardStyles.reviewBlock}>
+          <View style={cardStyles.ratingRow}>
+            <View style={cardStyles.starRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name={review && star <= review.rating ? 'star' : 'star-outline'}
+                  size={16}
+                  color={review && star <= review.rating ? '#F5A623' : '#B7C7C5'}
+                />
+              ))}
+            </View>
+            <Text style={cardStyles.reviewStatus}>
+              {review ? `${review.rating}.0 rated` : 'Not rated yet'}
+            </Text>
+          </View>
+
+          {review?.comment ? (
+            <Text style={cardStyles.reviewComment} numberOfLines={2}>
+              {review.comment}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
+            <Ionicons name="receipt-outline" size={15} color={teal} />
+            <Text style={cardStyles.detailsBtnText}>View details</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {isResumeTarget && onResumeNavigation && (
@@ -353,6 +380,37 @@ const cardStyles = StyleSheet.create({
   },
   vehicleText: { fontSize: 12, fontWeight: '800', color: teal },
   fare: { fontSize: 15, fontWeight: '900', color: '#102A28' },
+  reviewBlock: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    padding: 12,
+    gap: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  starRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  reviewStatus: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  reviewComment: {
+    color: '#102A28',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
   cancelBtn: {
     marginTop: 12,
     borderWidth: 1,
@@ -368,7 +426,6 @@ const cardStyles = StyleSheet.create({
     fontSize: 14,
   },
   detailsBtn: {
-    marginTop: 12,
     minHeight: 38,
     borderRadius: 12,
     borderWidth: 1,
@@ -442,10 +499,16 @@ export default function ActivitiesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestNavigation, setLatestNavigation] = useState<PassengerActiveRideParams | null>(null);
+  const [reviews, setReviews] = useState<RideReviewMap>({});
 
   const loadLatestNavigation = useCallback(async () => {
     const stored = await loadPassengerActiveRide();
     setLatestNavigation(stored);
+  }, []);
+
+  const loadReviews = useCallback(async () => {
+    const storedReviews = await loadRideReviews();
+    setReviews(storedReviews);
   }, []);
 
   // ── Fetch rides from API ───────────────────────────────────────────────────
@@ -483,13 +546,15 @@ export default function ActivitiesScreen() {
   useEffect(() => {
     fetchRides();
     loadLatestNavigation();
-  }, [fetchRides, loadLatestNavigation]);
+    loadReviews();
+  }, [fetchRides, loadLatestNavigation, loadReviews]);
 
   useFocusEffect(
     useCallback(() => {
       void loadLatestNavigation();
       void fetchRides(true);
-    }, [fetchRides, loadLatestNavigation])
+      void loadReviews();
+    }, [fetchRides, loadLatestNavigation, loadReviews])
   );
 
   // ── Cancel ride via API ───────────────────────────────────────────────────
@@ -683,6 +748,7 @@ export default function ActivitiesScreen() {
           renderItem={({ item }) => (
             <RideCard
               ride={item}
+              review={reviews[item.id]}
               onCancel={handleCancelRide}
               onViewDetails={handleViewRideDetails}
               isResumeTarget={Boolean(latestNavigation?.id && item.id === latestNavigation.id)}
