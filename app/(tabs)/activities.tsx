@@ -23,7 +23,7 @@ import {
   loadPassengerActiveRide,
   PassengerActiveRideParams,
 } from '@/lib/activeRideStorage';
-import { loadRideReviews, RideReview, RideReviewMap } from '@/lib/rideReviews';
+import { replaceRideReviews, RideReview, RideReviewMap } from '@/lib/rideReviews';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -507,11 +507,6 @@ export default function ActivitiesScreen() {
     setLatestNavigation(stored);
   }, []);
 
-  const loadReviews = useCallback(async () => {
-    const storedReviews = await loadRideReviews();
-    setReviews(storedReviews);
-  }, []);
-
   // ── Fetch rides from API ───────────────────────────────────────────────────
   const fetchRides = useCallback(async (isRefresh = false) => {
     if (!token) return;
@@ -534,17 +529,17 @@ export default function ActivitiesScreen() {
       }
 
       const data = await res.json() as { rides: Ride[] };
-      setRides(data.rides ?? []);
-      setReviews((currentReviews) => {
-        const serverReviews = (data.rides ?? []).reduce<RideReviewMap>((acc, ride) => {
-          if (ride.review) {
-            acc[ride.id] = ride.review;
-          }
-          return acc;
-        }, {});
+      const savedRides = data.rides ?? [];
+      const serverReviews = savedRides.reduce<RideReviewMap>((acc, ride) => {
+        if (ride.review) {
+          acc[ride.id] = ride.review;
+        }
+        return acc;
+      }, {});
 
-        return { ...currentReviews, ...serverReviews };
-      });
+      setRides(savedRides);
+      setReviews(serverReviews);
+      await replaceRideReviews(serverReviews);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to load rides');
     } finally {
@@ -557,15 +552,13 @@ export default function ActivitiesScreen() {
   useEffect(() => {
     fetchRides();
     loadLatestNavigation();
-    loadReviews();
-  }, [fetchRides, loadLatestNavigation, loadReviews]);
+  }, [fetchRides, loadLatestNavigation]);
 
   useFocusEffect(
     useCallback(() => {
       void loadLatestNavigation();
       void fetchRides(true);
-      void loadReviews();
-    }, [fetchRides, loadLatestNavigation, loadReviews])
+    }, [fetchRides, loadLatestNavigation])
   );
 
   // ── Cancel ride via API ───────────────────────────────────────────────────

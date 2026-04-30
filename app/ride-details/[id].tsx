@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -12,7 +13,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
-import { fetchRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
+import { deleteRideReview, fetchRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
 import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
@@ -91,6 +92,7 @@ export default function RideDetailsScreen() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function RideDetailsScreen() {
   }, [rideId, token]);
 
   const handleSaveReview = async () => {
-    if (!rideId || rating < 1 || saving) return;
+    if (!rideId || rating < 1 || saving || deleting) return;
 
     try {
       setSaving(true);
@@ -128,6 +130,37 @@ export default function RideDetailsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteReview = () => {
+    if (!rideId || !review || deleting) return;
+
+    Alert.alert(
+      'Delete review?',
+      'This removes your rating and comment from this ride.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              setSaveMessage('');
+              await deleteRideReview(rideId, token);
+              setReview(null);
+              setRating(0);
+              setComment('');
+              setSaveMessage('Review deleted');
+            } catch (error) {
+              setSaveMessage(error instanceof Error ? error.message : 'Unable to delete review');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const openDriverProfile = () => {
@@ -298,19 +331,38 @@ export default function RideDetailsScreen() {
                 {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.saveReviewButton,
-                  (rating < 1 || saving) && styles.saveReviewButtonDisabled,
-                ]}
-                onPress={handleSaveReview}
-                disabled={rating < 1 || saving}
-              >
-                <Ionicons name="star" size={16} color="#FFFFFF" />
-                <Text style={styles.saveReviewButtonText}>
-                  {saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.reviewActionRow}>
+                {review ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.deleteReviewButton,
+                      (saving || deleting) && styles.deleteReviewButtonDisabled,
+                    ]}
+                    onPress={handleDeleteReview}
+                    disabled={saving || deleting}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#C13B3B" />
+                    <Text style={styles.deleteReviewButtonText}>
+                      {deleting ? 'Deleting...' : 'Delete'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveReviewButton,
+                    review && styles.saveReviewButtonInline,
+                    (rating < 1 || saving || deleting) && styles.saveReviewButtonDisabled,
+                  ]}
+                  onPress={handleSaveReview}
+                  disabled={rating < 1 || saving || deleting}
+                >
+                  <Ionicons name="star" size={16} color="#FFFFFF" />
+                  <Text style={styles.saveReviewButtonText}>
+                    {saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </RefreshableScrollView>
         )}
@@ -664,7 +716,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
+  reviewActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   saveReviewButton: {
+    flex: 1,
     minHeight: 44,
     borderRadius: 14,
     backgroundColor: teal,
@@ -673,11 +731,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
+  saveReviewButtonInline: {
+    flex: 1.2,
+  },
   saveReviewButtonDisabled: {
     backgroundColor: '#A7C8C4',
   },
   saveReviewButtonText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  deleteReviewButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1D6D6',
+    backgroundColor: '#FFF4F4',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  deleteReviewButtonDisabled: {
+    opacity: 0.55,
+  },
+  deleteReviewButtonText: {
+    color: '#C13B3B',
     fontSize: 14,
     fontWeight: '900',
   },

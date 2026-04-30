@@ -38,6 +38,21 @@ export async function loadRideReview(rideId: string): Promise<RideReview | null>
   return reviews[rideId] ?? null;
 }
 
+export async function replaceRideReviews(reviews: RideReviewMap) {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
+}
+
+export async function removeRideReview(rideId: string) {
+  if (!rideId) return;
+
+  const reviews = await loadRideReviews();
+  if (!reviews[rideId]) return;
+
+  const nextReviews = { ...reviews };
+  delete nextReviews[rideId];
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextReviews));
+}
+
 export async function fetchRideReview(rideId: string, token?: string | null): Promise<RideReview | null> {
   if (!rideId || !token) return loadRideReview(rideId);
 
@@ -50,6 +65,8 @@ export async function fetchRideReview(rideId: string, token?: string | null): Pr
   if (review) {
     const reviews = await loadRideReviews();
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...reviews, [rideId]: review }));
+  } else {
+    await removeRideReview(rideId);
   }
 
   return review;
@@ -96,4 +113,17 @@ export async function saveRideReview(
 
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextReviews));
   return review;
+}
+
+export async function deleteRideReview(rideId: string, token?: string | null): Promise<void> {
+  if (token) {
+    const response = await fetch(`${API_BASE_URL}/rides/${rideId}/review`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    await parseApiResponse<{ message?: string }>(response);
+  }
+
+  await removeRideReview(rideId);
 }
