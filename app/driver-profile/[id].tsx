@@ -106,7 +106,7 @@ export default function DriverProfileScreen() {
     let cancelled = false;
 
     const loadDriver = async () => {
-      if (!driverId) {
+      if (!driverId && !rideId) {
         setDriver(fallbackDriver);
         setLoading(false);
         return;

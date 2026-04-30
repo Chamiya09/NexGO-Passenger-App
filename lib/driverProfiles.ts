@@ -27,30 +27,41 @@ export type PublicDriverProfile = {
 };
 
 export async function fetchPublicDriverProfile(
-  driverId: string,
+  driverId?: string,
   rideId?: string
 ): Promise<PublicDriverProfile> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const cleanDriverId = String(driverId ?? '').trim();
+  const cleanRideId = String(rideId ?? '').trim();
   const endpoints = [
-    ...(rideId ? [`${API_BASE_URL}/rides/${rideId}/driver-public-profile`] : []),
-    `${API_BASE_URL}/driver-auth/drivers/${driverId}/public-profile`,
-    `${API_BASE_URL}/rides/drivers/${driverId}/public-profile`,
+    ...(cleanRideId ? [`${API_BASE_URL}/rides/${cleanRideId}/driver-public-profile`] : []),
+    ...(cleanDriverId
+      ? [
+          `${API_BASE_URL}/driver-auth/drivers/${cleanDriverId}/public-profile`,
+          `${API_BASE_URL}/rides/drivers/${cleanDriverId}/public-profile`,
+        ]
+      : []),
   ];
+
+  if (endpoints.length === 0) {
+    throw new Error('Driver profile route is missing ride or driver id');
+  }
 
   let lastError: unknown = null;
 
   for (const endpoint of endpoints) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
       const data = await parseApiResponse<{ driver: PublicDriverProfile }>(response);
       clearTimeout(timeout);
       return data.driver;
     } catch (error) {
+      clearTimeout(timeout);
       lastError = error;
     }
   }
 
-  clearTimeout(timeout);
   throw lastError instanceof Error ? lastError : new Error('Unable to load driver profile');
 }
