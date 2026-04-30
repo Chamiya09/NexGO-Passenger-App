@@ -24,6 +24,7 @@ type ProfileSection = {
     | '/profile/personal-details'
     | '/profile/membership'
     | '/profile/support-help'
+    | '/profile/my-reviews'
     | '/profile/saved-addresses'
     | '/profile/payment-details'
     | '/profile/privacy-security'
@@ -50,6 +51,13 @@ const PROFILE_SECTIONS: ProfileSection[] = [
     subtitle: 'Cards, wallet setup, and transaction methods',
     icon: 'card-outline',
     route: '/profile/payment-details',
+  },
+  {
+    title: 'My Reviews',
+    subtitle: 'View, update, or remove your ride ratings',
+    icon: 'star-half-outline',
+    route: '/profile/my-reviews',
+    badge: 'NEW',
   },
   {
     title: 'Saved Addresses',
