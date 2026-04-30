@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -146,7 +147,7 @@ export default function PrivacySecurityScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
@@ -199,7 +200,7 @@ export default function PrivacySecurityScreen() {
         {successMessage ? <Text style={[styles.pageFeedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
         <ProfileDetailsGroup title="ACCOUNT SAFETY" actionRows={privacyActions} />
-      </ScrollView>
+      </RefreshableScrollView>
 
       <Modal visible={isPasswordModalVisible} transparent animationType="fade" onRequestClose={closePasswordModal}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>

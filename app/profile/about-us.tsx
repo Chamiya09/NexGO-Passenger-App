@@ -1,7 +1,8 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
@@ -66,7 +67,7 @@ export default function AboutUsScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
@@ -156,7 +157,7 @@ export default function AboutUsScreen() {
             { label: 'Experience', value: 'Mobile first' },
           ]}
         />
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

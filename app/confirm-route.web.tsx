@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +9,8 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const teal = '#169F95';
 
@@ -33,7 +34,7 @@ export default function ConfirmRouteWebScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>TRIP DETAILS</Text>
           <Text style={styles.title}>Review your ride</Text>
@@ -96,7 +97,7 @@ export default function ConfirmRouteWebScreen() {
           <Text style={styles.confirmText}>Confirm Mini - LKR 1301</Text>
           <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

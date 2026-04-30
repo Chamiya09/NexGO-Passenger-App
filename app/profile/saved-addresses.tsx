@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,6 +17,7 @@ import {
 import MapView, { UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
@@ -90,31 +91,31 @@ export default function SavedAddressesScreen() {
     danger: '#C13B3B',
   };
 
-  useEffect(() => {
-    const loadSavedAddresses = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+  const loadSavedAddresses = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/auth/saved-addresses`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/saved-addresses`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        const data = await parseApiResponse<{ savedAddresses: SavedAddress[] }>(response);
-        setAddresses(data.savedAddresses);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load saved addresses');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSavedAddresses();
+      const data = await parseApiResponse<{ savedAddresses: SavedAddress[] }>(response);
+      setAddresses(data.savedAddresses);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load saved addresses');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    void loadSavedAddresses();
+  }, [loadSavedAddresses]);
 
   useEffect(() => {
     if (!isModalVisible) {
@@ -321,7 +322,10 @@ export default function SavedAddressesScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={loadSavedAddresses}>
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="navigate-outline" size={15} color={colors.accent} />
@@ -438,7 +442,7 @@ export default function SavedAddressesScreen() {
             })
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={closeAddModal}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>

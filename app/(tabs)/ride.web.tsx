@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,6 +10,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const teal = '#169F95';
 
@@ -31,7 +32,7 @@ export default function RideWebScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>BOOK RIDE</Text>
           <Text style={styles.title}>Plan your trip</Text>
@@ -116,7 +117,7 @@ export default function RideWebScreen() {
           <Text style={styles.confirmText}>Confirm {selectedVehicle} - {priceMap[selectedVehicle]}</Text>
           <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StatusBar as RNStatusBar,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const palette = {
   background: '#F4F7F6',
@@ -64,26 +64,21 @@ export default function PromotionsScreen() {
   const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-
-    fetch(`${API_BASE_URL}/promotions`)
-      .then(parseApiResponse<{ promotions: PromotionSummary[] }>)
-      .then((data) => {
-        if (!mounted) return;
-        setPromotions((data.promotions ?? []).filter(isActivePromotion));
-      })
-      .catch(() => {
-        if (mounted) setPromotions([]);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
+  const loadPromotions = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/promotions`);
+      const data = await parseApiResponse<{ promotions: PromotionSummary[] }>(response);
+      setPromotions((data.promotions ?? []).filter(isActivePromotion));
+    } catch {
+      setPromotions([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadPromotions();
+  }, [loadPromotions]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -103,7 +98,10 @@ export default function PromotionsScreen() {
           <Text style={styles.centerText}>Loading promotions...</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <RefreshableScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          onRefreshPage={loadPromotions}>
           <View style={styles.heroCard}>
             <View style={styles.heroBadge}>
               <Ionicons name="sparkles" size={15} color={palette.accent} />
@@ -175,7 +173,7 @@ export default function PromotionsScreen() {
               <Text style={styles.emptyText}>Check back later for new NexGO ride offers.</Text>
             </View>
           )}
-        </ScrollView>
+        </RefreshableScrollView>
       )}
     </SafeAreaView>
   );

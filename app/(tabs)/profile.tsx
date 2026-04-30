@@ -1,7 +1,6 @@
 ﻿import React from 'react';
 import {
   Image,
-  ScrollView,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -15,6 +14,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 type ProfileSection = {
   title: string;
@@ -117,7 +117,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <View style={styles.profileHead}>
             <View style={[styles.avatarCircle, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}>
@@ -212,7 +212,7 @@ export default function ProfileScreen() {
           <Text style={[styles.footerTop, { color: palette.primaryText }]}>NexGO Passenger</Text>
           <Text style={[styles.footerBottom, { color: palette.secondaryText }]}>Version 1.0.0 (264)</Text>
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
 import { loadPassengerActiveRide, PassengerActiveRideParams } from '@/lib/activeRideStorage';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const palette = {
   background: '#F4F8F7',
@@ -306,6 +307,21 @@ export default function HomeScreen() {
   const promoScrollRef = React.useRef<ScrollView>(null);
   const promoAutoIndexRef = React.useRef(0);
 
+  const loadActiveRide = useCallback(async () => {
+    const ride = await loadPassengerActiveRide();
+    setActiveRide(ride);
+  }, []);
+
+  const loadPromotions = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/promotions`);
+      const data = await parseApiResponse<{ promotions: PromotionSummary[] }>(response);
+      setPromotions(getRandomPromotions(getActivePromotions(data.promotions ?? [])));
+    } catch {
+      setPromotions([]);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
@@ -323,22 +339,8 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    let mounted = true;
-
-    fetch(`${API_BASE_URL}/promotions`)
-      .then(parseApiResponse<{ promotions: PromotionSummary[] }>)
-      .then((data) => {
-        if (!mounted) return;
-        setPromotions(getRandomPromotions(getActivePromotions(data.promotions ?? [])));
-      })
-      .catch(() => {
-        if (mounted) setPromotions([]);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    void loadPromotions();
+  }, [loadPromotions]);
 
   useEffect(() => {
     if (promotions.length <= 1) return undefined;
@@ -399,10 +401,17 @@ export default function HomeScreen() {
     });
   };
 
+  const handleRefreshPage = useCallback(async () => {
+    await Promise.all([loadActiveRide(), loadPromotions()]);
+  }, [loadActiveRide, loadPromotions]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={handleRefreshPage}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.greeting}>Hi, {getFirstName(user?.fullName)}</Text>
@@ -493,7 +502,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

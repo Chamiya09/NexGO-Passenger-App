@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -64,31 +65,31 @@ export default function PaymentDetailsScreen() {
     success: '#157A62',
   };
 
-  useEffect(() => {
-    const loadPaymentMethods = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+  const loadPaymentMethods = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/auth/payment-methods`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/payment-methods`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
-        setPaymentMethods(data.paymentMethods);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load payment methods');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadPaymentMethods();
+      const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
+      setPaymentMethods(data.paymentMethods);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load payment methods');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    void loadPaymentMethods();
+  }, [loadPaymentMethods]);
 
   const handleChange = (field: keyof typeof initialForm, value: string | boolean) => {
     setForm((current) => ({
@@ -218,7 +219,10 @@ export default function PaymentDetailsScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={loadPaymentMethods}>
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="lock-closed-outline" size={15} color={colors.accent} />
@@ -314,7 +318,7 @@ export default function PaymentDetailsScreen() {
             })
           )}
         </View>
-      </ScrollView>
+      </RefreshableScrollView>
 
       <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={closeAddModal}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>

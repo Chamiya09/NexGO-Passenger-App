@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { clearPassengerActiveRide } from '@/lib/activeRideStorage';
 
 const teal = '#169F95';
@@ -21,7 +22,7 @@ export default function ActiveRideWebScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.backButton} onPress={() => router.replace('/(tabs)/home')}>
           <Ionicons name="arrow-back" size={20} color="#123532" />
         </Pressable>
@@ -53,7 +54,7 @@ export default function ActiveRideWebScreen() {
           }}>
           <Text style={styles.homeButtonText}>Return Home</Text>
         </Pressable>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

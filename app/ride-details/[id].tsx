@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +9,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const teal = '#169F95';
 
@@ -108,7 +109,7 @@ export default function RideDetailsScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <RefreshableScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.totalBox}>
               <Text style={styles.totalLabel}>Total fare</Text>
               <Text style={styles.totalValue}>{formatMoney(params.price)}</Text>
@@ -161,7 +162,7 @@ export default function RideDetailsScreen() {
               <InfoRow icon="pricetag-outline" label="Ride ID" value={params.id || 'Not available'} selectable />
               <InfoRow icon="wallet-outline" label="Payment" value="Cash" />
             </View>
-          </ScrollView>
+          </RefreshableScrollView>
         )}
       </View>
     </View>
