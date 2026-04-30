@@ -368,28 +368,15 @@ export default function ConfirmRouteScreen() {
     setPromoMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/promotions`);
-      const data = await parseApiResponse<{ promotions: PromotionSummary[] }>(response);
-      const promotion = (data.promotions ?? []).find((item) => item.code === trimmedCode);
-
-      if (!promotion) {
-        setPromoStatus('error');
-        setPromoMessage('Promo code not found.');
-        setAppliedPromotion(null);
-        return;
+      if (!token) {
+        throw new Error('Please sign in before applying a promo code.');
       }
 
-      const isActive = Boolean(promotion.active) && promotion.status === 'Active';
-      const hasEndDate = promotion.endDate && promotion.endDate !== 'No end date';
-      const endDate = hasEndDate ? new Date(promotion.endDate) : null;
-      const isExpired = endDate ? endDate.getTime() < Date.now() : false;
-
-      if (!isActive || isExpired) {
-        setPromoStatus('error');
-        setPromoMessage(isExpired ? 'Promo code has expired.' : 'Promo code is not active.');
-        setAppliedPromotion(null);
-        return;
-      }
+      const response = await fetch(`${API_BASE_URL}/promotions/validate/${encodeURIComponent(trimmedCode)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await parseApiResponse<{ promotion: PromotionSummary }>(response);
+      const promotion = data.promotion;
 
       setAppliedPromotion(promotion);
       const discountValue = Number(promotion.discountValue);
@@ -470,6 +457,12 @@ export default function ConfirmRouteScreen() {
       passengerName: user.fullName ?? 'Passenger',
       vehicleType: socketVehicleType,
       price: ridePrice,
+      promotion: appliedPromotion
+        ? {
+            id: appliedPromotion.id,
+            code: appliedPromotion.code,
+          }
+        : null,
       pickup: {
         latitude: pLat,
         longitude: pLng,
