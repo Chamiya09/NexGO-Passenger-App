@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Image,
   Pressable,
   SafeAreaView,
@@ -144,6 +146,142 @@ function ServiceTile({ service, onPress }: { service: ServiceCard; onPress: () =
   );
 }
 
+function PromotionCard({
+  promotion,
+  index,
+  getPromoCaption,
+  onUse,
+}: {
+  promotion: PromotionSummary;
+  index: number;
+  getPromoCaption: (promotion: PromotionSummary) => string;
+  onUse: () => void;
+}) {
+  const cardAnim = React.useRef(new Animated.Value(0)).current;
+  const shimmerAnim = React.useRef(new Animated.Value(0)).current;
+  const ctaPulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    cardAnim.setValue(0);
+    const intro = Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 520,
+      delay: index * 90,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    const shimmer = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1100),
+      ])
+    );
+
+    const ctaPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ctaPulseAnim, {
+          toValue: 1.04,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ctaPulseAnim, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    intro.start();
+    shimmer.start();
+    ctaPulse.start();
+
+    return () => {
+      intro.stop();
+      shimmer.stop();
+      ctaPulse.stop();
+    };
+  }, [cardAnim, ctaPulseAnim, index, shimmerAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [
+      {
+        translateY: cardAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+      {
+        scale: cardAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.96, 1],
+        }),
+      },
+    ],
+  };
+
+  const shimmerStyle = {
+    opacity: shimmerAnim.interpolate({
+      inputRange: [0, 0.18, 0.48, 1],
+      outputRange: [0, 0.22, 0, 0],
+    }),
+    transform: [
+      { rotate: '18deg' },
+      {
+        translateX: shimmerAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-80, 340],
+        }),
+      },
+    ],
+  };
+
+  return (
+    <Animated.View style={[styles.promoCard, cardStyle]}>
+      <View style={styles.promoMedia}>
+        {promotion.imageUrl ? (
+          <Image
+            source={{ uri: promotion.imageUrl }}
+            style={styles.promoImage}
+          />
+        ) : (
+          <View style={styles.promoMediaFallback}>
+            <Ionicons name="pricetag" size={34} color="#FFFFFF" />
+          </View>
+        )}
+        <Animated.View pointerEvents="none" style={[styles.promoShimmer, shimmerStyle]} />
+        <View style={styles.promoBadge}>
+          <Text style={styles.promoBadgeText}>{promotion.code}</Text>
+        </View>
+      </View>
+      <View style={styles.promoBody}>
+        <Text style={styles.promoTitle} numberOfLines={2}>{promotion.name}</Text>
+        <Text style={styles.promoText} numberOfLines={2}>{getPromoCaption(promotion)}</Text>
+        <View style={styles.promoFooter}>
+          <View style={styles.promoMetaPill}>
+            <Ionicons name="sparkles" size={12} color="#017270" />
+            <Text style={styles.promoMetaText}>Limited offer</Text>
+          </View>
+          <Animated.View style={{ transform: [{ scale: ctaPulseAnim }] }}>
+            <Pressable style={styles.promoCta} onPress={onUse}>
+              <Text style={styles.promoCtaText}>Use code</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -272,37 +410,14 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.promoScroll}>
-              {promotions.map((promotion) => (
-                <View key={promotion.id} style={styles.promoCard}>
-                  <View style={styles.promoMedia}>
-                    {promotion.imageUrl ? (
-                      <Image
-                        source={{ uri: promotion.imageUrl }}
-                        style={styles.promoImage}
-                      />
-                    ) : (
-                      <View style={styles.promoMediaFallback}>
-                        <Ionicons name="pricetag" size={34} color="#FFFFFF" />
-                      </View>
-                    )}
-                    <View style={styles.promoBadge}>
-                      <Text style={styles.promoBadgeText}>{promotion.code}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.promoBody}>
-                    <Text style={styles.promoTitle} numberOfLines={2}>{promotion.name}</Text>
-                    <Text style={styles.promoText} numberOfLines={2}>{getPromoCaption(promotion)}</Text>
-                    <View style={styles.promoFooter}>
-                      <View style={styles.promoMetaPill}>
-                        <Ionicons name="sparkles" size={12} color="#017270" />
-                        <Text style={styles.promoMetaText}>Limited offer</Text>
-                      </View>
-                      <Pressable style={styles.promoCta} onPress={() => router.push('/(tabs)/ride')}>
-                        <Text style={styles.promoCtaText}>Use code</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
+              {promotions.map((promotion, index) => (
+                <PromotionCard
+                  key={promotion.id}
+                  promotion={promotion}
+                  index={index}
+                  getPromoCaption={getPromoCaption}
+                  onUse={() => router.push('/(tabs)/ride')}
+                />
               ))}
             </ScrollView>
           </>
@@ -569,6 +684,7 @@ const styles = StyleSheet.create({
   promoMedia: {
     height: 128,
     backgroundColor: '#1C5B56',
+    overflow: 'hidden',
   },
   promoImage: {
     width: '100%',
@@ -578,6 +694,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  promoShimmer: {
+    position: 'absolute',
+    top: -38,
+    bottom: -38,
+    width: 58,
+    backgroundColor: '#FFFFFF',
   },
   promoBadge: {
     position: 'absolute',
