@@ -613,6 +613,7 @@ export default function ActivitiesScreen() {
         dName: ride.dropoff?.name ?? '',
         dLat: String(ride.dropoff?.latitude ?? ''),
         dLng: String(ride.dropoff?.longitude ?? ''),
+        driverId: ride.driver?.id ?? '',
         driverName: ride.driver?.fullName ?? '',
         driverPhone: ride.driver?.phoneNumber ?? '',
         driverImage: ride.driver?.profileImageUrl ?? '',

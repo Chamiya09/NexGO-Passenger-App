@@ -31,6 +31,7 @@ type RideDetailsParams = {
   dName?: string;
   dLat?: string;
   dLng?: string;
+  driverId?: string;
   driverName?: string;
   driverPhone?: string;
   driverImage?: string;
@@ -84,6 +85,7 @@ export default function RideDetailsScreen() {
   const params = useLocalSearchParams<RideDetailsParams>();
   const isCompleted = String(params.status ?? '').toLowerCase() === 'completed';
   const rideId = String(params.id ?? '');
+  const driverId = String(params.driverId ?? '');
   const [review, setReview] = useState<RideReview | null>(null);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -127,6 +129,18 @@ export default function RideDetailsScreen() {
     }
   };
 
+  const openDriverProfile = () => {
+    if (!driverId) return;
+
+    router.push({
+      pathname: '/driver-profile/[id]',
+      params: {
+        id: driverId,
+        name: params.driverName ?? '',
+      },
+    });
+  };
+
   return (
     <View style={styles.overlay}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -168,7 +182,12 @@ export default function RideDetailsScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Rider Details</Text>
-              <View style={styles.driverRow}>
+              <TouchableOpacity
+                style={styles.driverRow}
+                onPress={openDriverProfile}
+                disabled={!driverId}
+                activeOpacity={0.75}
+              >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
                     {(params.driverName || 'D').trim().charAt(0).toUpperCase()}
@@ -178,7 +197,8 @@ export default function RideDetailsScreen() {
                   <Text style={styles.driverName}>{params.driverName || 'Driver not available'}</Text>
                   <Text style={styles.driverMeta}>{params.driverPhone || 'Phone not available'}</Text>
                 </View>
-              </View>
+                {driverId ? <Ionicons name="chevron-forward" size={18} color="#8CA1A0" /> : null}
+              </TouchableOpacity>
               <InfoRow icon="car-outline" label="Vehicle" value={vehicleName(params)} />
               <InfoRow icon="card-outline" label="Plate number" value={params.vehiclePlate || 'Not available'} selectable />
               <InfoRow icon="apps-outline" label="Category" value={params.vehicleCategory || params.vehicleType || 'Not available'} />
