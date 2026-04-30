@@ -2,23 +2,26 @@ import React, { useState } from 'react';
 import {
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const teal = '#169F95';
 
 export default function RideWebScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [pickup] = useState('Colombo Fort');
   const [dropoff] = useState('Bambalapitiya');
   const [selectedVehicle, setSelectedVehicle] = useState<'Mini' | 'Sedan' | 'Van'>('Mini');
+  const selectedPromoCode = typeof params.promoCode === 'string' ? params.promoCode : '';
 
   const priceMap = {
     Mini: 'LKR 1301',
@@ -29,7 +32,7 @@ export default function RideWebScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>BOOK RIDE</Text>
           <Text style={styles.title}>Plan your trip</Text>
@@ -107,13 +110,14 @@ export default function RideWebScreen() {
                 dLat: '6.9066',
                 dLng: '79.8707',
                 dName: dropoff,
+                ...(selectedPromoCode && { promoCode: selectedPromoCode }),
               },
             })
           }>
           <Text style={styles.confirmText}>Confirm {selectedVehicle} - {priceMap[selectedVehicle]}</Text>
           <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

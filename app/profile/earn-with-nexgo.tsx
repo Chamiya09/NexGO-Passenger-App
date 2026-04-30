@@ -1,12 +1,13 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text } from 'react-native';
+import { SafeAreaView, StyleSheet, Text } from 'react-native';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 
 export default function EarnWithNexgoScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.pageHint}>Join NexGO partner programs and earn from your trips.</Text>
 
         <ProfileDetailsGroup
@@ -16,7 +17,7 @@ export default function EarnWithNexgoScreen() {
             { label: 'Driver partner program', value: 'Apply' },
           ]}
         />
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

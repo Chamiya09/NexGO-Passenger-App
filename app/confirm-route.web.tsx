@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +9,8 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const teal = '#169F95';
 
@@ -19,6 +20,7 @@ export default function ConfirmRouteWebScreen() {
 
   const pName = (params.pName as string) || 'Pickup';
   const dName = (params.dName as string) || 'Drop-off';
+  const promoCode = typeof params.promoCode === 'string' ? params.promoCode.toUpperCase() : '';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -32,7 +34,7 @@ export default function ConfirmRouteWebScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>TRIP DETAILS</Text>
           <Text style={styles.title}>Review your ride</Text>
@@ -73,6 +75,13 @@ export default function ConfirmRouteWebScreen() {
           <RoutePoint icon="location" label="Drop-off" value={dName} />
         </View>
 
+        {promoCode ? (
+          <View style={styles.promoCodeCard}>
+            <Ionicons name="pricetag-outline" size={17} color={teal} />
+            <Text style={styles.promoCodeText}>Promo code ready: {promoCode}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.loaderRow}>
           <ActivityIndicator size="small" color={teal} />
           <Text style={styles.loaderText}>Preparing route details...</Text>
@@ -88,7 +97,7 @@ export default function ConfirmRouteWebScreen() {
           <Text style={styles.confirmText}>Confirm Mini - LKR 1301</Text>
           <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }
@@ -291,6 +300,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  promoCodeCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  promoCodeText: {
+    flex: 1,
+    color: '#102A28',
+    fontSize: 13,
+    fontWeight: '800',
   },
   loaderText: {
     fontSize: 13,

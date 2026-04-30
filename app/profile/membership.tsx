@@ -1,12 +1,13 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text } from 'react-native';
+import { SafeAreaView, StyleSheet, Text } from 'react-native';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 
 export default function MembershipScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.pageHint}>Benefits and offers available with your current tier.</Text>
 
         <ProfileDetailsGroup
@@ -24,7 +25,7 @@ export default function MembershipScreen() {
             { label: 'Priority support', value: 'Included' },
           ]}
         />
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }

@@ -16,6 +16,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
@@ -166,7 +167,7 @@ export default function PersonalDetailsScreen() {
       <KeyboardAvoidingView
         style={styles.keyboardWrap}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
+        <RefreshableScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
@@ -275,7 +276,7 @@ export default function PersonalDetailsScreen() {
               </Pressable>
             </View>
           </View>
-        </ScrollView>
+        </RefreshableScrollView>
       </KeyboardAvoidingView>
 
       <Modal visible={isEditModalVisible} transparent animationType="fade" onRequestClose={closeEditModal}>

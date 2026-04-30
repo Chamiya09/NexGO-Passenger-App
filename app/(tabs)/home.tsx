@@ -1,5 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -15,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import { loadPassengerActiveRide, PassengerActiveRideParams } from '@/lib/activeRideStorage';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import RefreshableScrollView from '@/components/RefreshableScrollView';
 
 const palette = {
   background: '#F4F8F7',
@@ -45,6 +50,18 @@ type ServiceCard = {
   tone: 'primary' | 'light';
 };
 
+type PromotionSummary = {
+  id: string;
+  name: string;
+  code: string;
+  discountType: 'Percentage' | 'Fixed';
+  discountValue: string;
+  imageUrl: string;
+  endDate: string;
+  status: string;
+  active: boolean;
+};
+
 const serviceCards: ServiceCard[] = [
   {
     title: 'City Ride',
@@ -68,6 +85,22 @@ const serviceCards: ServiceCard[] = [
 
 function getFirstName(fullName?: string) {
   return fullName?.trim().split(/\s+/)[0] || 'Passenger';
+}
+
+function getActivePromotions(promotions: PromotionSummary[]) {
+  const now = Date.now();
+  return promotions.filter((item) => {
+    if (!item.active || item.status !== 'Active') return false;
+    if (!item.endDate || item.endDate === 'No end date') return true;
+    const endDate = new Date(item.endDate).getTime();
+    return Number.isFinite(endDate) && endDate >= now;
+  });
+}
+
+function getRandomPromotions(promotions: PromotionSummary[], limit = 4) {
+  return [...promotions]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, limit);
 }
 
 function ActiveRideCard({
@@ -130,10 +163,164 @@ function ServiceTile({ service, onPress }: { service: ServiceCard; onPress: () =
   );
 }
 
+function PromotionCard({
+  promotion,
+  index,
+  getPromoCaption,
+  onUse,
+}: {
+  promotion: PromotionSummary;
+  index: number;
+  getPromoCaption: (promotion: PromotionSummary) => string;
+  onUse: () => void;
+}) {
+  const cardAnim = React.useRef(new Animated.Value(0)).current;
+  const shimmerAnim = React.useRef(new Animated.Value(0)).current;
+  const ctaPulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    cardAnim.setValue(0);
+    const intro = Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 520,
+      delay: index * 90,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    const shimmer = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1100),
+      ])
+    );
+
+    const ctaPulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ctaPulseAnim, {
+          toValue: 1.04,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ctaPulseAnim, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    intro.start();
+    shimmer.start();
+    ctaPulse.start();
+
+    return () => {
+      intro.stop();
+      shimmer.stop();
+      ctaPulse.stop();
+    };
+  }, [cardAnim, ctaPulseAnim, index, shimmerAnim]);
+
+  const cardStyle = {
+    opacity: cardAnim,
+    transform: [
+      {
+        translateY: cardAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+      {
+        scale: cardAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.96, 1],
+        }),
+      },
+    ],
+  };
+
+  const shimmerStyle = {
+    opacity: shimmerAnim.interpolate({
+      inputRange: [0, 0.18, 0.48, 1],
+      outputRange: [0, 0.22, 0, 0],
+    }),
+    transform: [
+      { rotate: '18deg' },
+      {
+        translateX: shimmerAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-80, 340],
+        }),
+      },
+    ],
+  };
+
+  return (
+    <Animated.View style={[styles.promoCard, cardStyle]}>
+      <View style={styles.promoMedia}>
+        {promotion.imageUrl ? (
+          <Image
+            source={{ uri: promotion.imageUrl }}
+            style={styles.promoImage}
+          />
+        ) : (
+          <View style={styles.promoMediaFallback}>
+            <Ionicons name="pricetag" size={34} color="#FFFFFF" />
+          </View>
+        )}
+        <Animated.View pointerEvents="none" style={[styles.promoShimmer, shimmerStyle]} />
+        <View style={styles.promoBadge}>
+          <Text style={styles.promoBadgeText}>{promotion.code}</Text>
+        </View>
+      </View>
+      <View style={styles.promoBody}>
+        <Text style={styles.promoTitle} numberOfLines={2}>{promotion.name}</Text>
+        <Text style={styles.promoText} numberOfLines={2}>{getPromoCaption(promotion)}</Text>
+        <View style={styles.promoFooter}>
+          <View style={styles.promoMetaPill}>
+            <Ionicons name="sparkles" size={12} color="#017270" />
+            <Text style={styles.promoMetaText}>Limited offer</Text>
+          </View>
+          <Animated.View style={{ transform: [{ scale: ctaPulseAnim }] }}>
+            <Pressable style={styles.promoCta} onPress={onUse}>
+              <Text style={styles.promoCtaText}>Use code</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [activeRide, setActiveRide] = useState<PassengerActiveRideParams | null>(null);
+  const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
+  const promoScrollRef = React.useRef<ScrollView>(null);
+  const promoAutoIndexRef = React.useRef(0);
+
+  const loadActiveRide = useCallback(async () => {
+    const ride = await loadPassengerActiveRide();
+    setActiveRide(ride);
+  }, []);
+
+  const loadPromotions = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/promotions`);
+      const data = await parseApiResponse<{ promotions: PromotionSummary[] }>(response);
+      setPromotions(getRandomPromotions(getActivePromotions(data.promotions ?? [])));
+    } catch {
+      setPromotions([]);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -149,6 +336,31 @@ export default function HomeScreen() {
         mounted = false;
       };
     }, [])
+  );
+
+  useEffect(() => {
+    void loadPromotions();
+  }, [loadPromotions]);
+
+  useEffect(() => {
+    if (promotions.length <= 1) return undefined;
+
+    const cardWidthWithGap = 312;
+    const interval = setInterval(() => {
+      promoAutoIndexRef.current = (promoAutoIndexRef.current + 1) % promotions.length;
+      promoScrollRef.current?.scrollTo({
+        x: promoAutoIndexRef.current * cardWidthWithGap,
+        animated: true,
+      });
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, [promotions.length]);
+
+  const getPromoCaption = (promotion: PromotionSummary) => (
+    promotion.discountType === 'Percentage'
+      ? `Use code ${promotion.code} to get ${Math.min(100, Math.max(0, Number(promotion.discountValue)))}% off your next ride.`
+      : `Use code ${promotion.code} to save LKR ${Math.max(0, Math.round(Number(promotion.discountValue)))} on your next ride.`
   );
 
   const quickActions: QuickAction[] = [
@@ -189,10 +401,17 @@ export default function HomeScreen() {
     });
   };
 
+  const handleRefreshPage = useCallback(async () => {
+    await Promise.all([loadActiveRide(), loadPromotions()]);
+  }, [loadActiveRide, loadPromotions]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={handleRefreshPage}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.greeting}>Hi, {getFirstName(user?.fullName)}</Text>
@@ -205,31 +424,6 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.heroCard}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroBadge}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={palette.accentDark} />
-              <Text style={styles.heroBadgeText}>Verified rides</Text>
-            </View>
-
-            <View style={styles.pointsPill}>
-              <Ionicons name="star" size={13} color={palette.accent} />
-              <Text style={styles.pointsText}>450 pts</Text>
-            </View>
-          </View>
-
-          <Text style={styles.heroTitle}>Book a ride in seconds</Text>
-          <Text style={styles.heroSubtitle}>
-            Set pickup and drop-off, compare vehicle options, and track your driver live.
-          </Text>
-
-          <Pressable style={styles.bookButton} onPress={() => router.push('/(tabs)/ride')}>
-            <Ionicons name="car-sport" size={20} color="#FFFFFF" />
-            <Text style={styles.bookButtonText}>Start booking</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
         {activeRide ? <ActiveRideCard ride={activeRide} onResume={resumeActiveRide} /> : null}
 
         <View style={styles.quickGrid}>
@@ -237,6 +431,47 @@ export default function HomeScreen() {
             <QuickActionButton key={action.label} action={action} />
           ))}
         </View>
+
+        {promotions.length > 0 ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Ride Promotions</Text>
+                <Text style={styles.sectionCaption}>Limited-time offers from NexGO</Text>
+              </View>
+              <Pressable style={styles.sectionAction} onPress={() => router.push('/promotions')}>
+                <Text style={styles.sectionActionText}>See all</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              ref={promoScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.promoScroll}
+              decelerationRate="fast"
+              snapToInterval={312}
+              snapToAlignment="start"
+              onMomentumScrollEnd={(event) => {
+                promoAutoIndexRef.current = Math.round(event.nativeEvent.contentOffset.x / 312);
+              }}>
+              {promotions.map((promotion, index) => (
+                <PromotionCard
+                  key={promotion.id}
+                  promotion={promotion}
+                  index={index}
+                  getPromoCaption={getPromoCaption}
+                  onUse={() =>
+                    router.push({
+                      pathname: '/(tabs)/ride',
+                      params: { promoCode: promotion.code },
+                    })
+                  }
+                />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
 
         <View style={styles.sectionHeader}>
           <View>
@@ -254,19 +489,6 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.promoCard}>
-          <View style={styles.promoContent}>
-            <View style={styles.promoBadge}>
-              <Text style={styles.promoBadgeText}>WEEKEND</Text>
-            </View>
-            <Text style={styles.promoTitle}>Save on Colombo city rides</Text>
-            <Text style={styles.promoText}>Use NexGO points on eligible rides and keep your trip budget light.</Text>
-          </View>
-          <View style={styles.promoIconWrap}>
-            <Ionicons name="pricetag-outline" size={30} color="#FFFFFF" />
-          </View>
-        </View>
-
         <View style={styles.safetyCard}>
           <View style={styles.safetyIcon}>
             <Ionicons name="shield-outline" size={22} color={palette.warning} />
@@ -280,7 +502,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+      </RefreshableScrollView>
     </SafeAreaView>
   );
 }
@@ -339,78 +561,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: palette.card,
     zIndex: 1,
-  },
-  heroCard: {
-    backgroundColor: palette.card,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: palette.border,
-    gap: 14,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: palette.accentMuted,
-  },
-  heroBadgeText: {
-    color: palette.accentDark,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  pointsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.elevated,
-  },
-  pointsText: {
-    color: palette.accentDark,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  heroTitle: {
-    color: palette.primary,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '900',
-    maxWidth: 290,
-  },
-  heroSubtitle: {
-    color: palette.secondary,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600',
-  },
-  bookButton: {
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: palette.accentDark,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-    marginTop: 2,
-  },
-  bookButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
   },
   activeRideCard: {
     backgroundColor: palette.accentMuted,
@@ -569,49 +719,104 @@ const styles = StyleSheet.create({
   serviceSubtitleLight: {
     color: palette.secondary,
   },
-  promoCard: {
-    backgroundColor: palette.accentDark,
-    borderRadius: 22,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  promoScroll: {
+    gap: 12,
+    paddingRight: 20,
   },
-  promoContent: {
+  promoCard: {
+    width: 300,
+    borderRadius: 22,
+    backgroundColor: '#0F3431',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  promoMedia: {
+    height: 128,
+    backgroundColor: '#1C5B56',
+    overflow: 'hidden',
+  },
+  promoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  promoMediaFallback: {
     flex: 1,
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoShimmer: {
+    position: 'absolute',
+    top: -38,
+    bottom: -38,
+    width: 58,
+    backgroundColor: '#FFFFFF',
   },
   promoBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 14,
+    position: 'absolute',
+    left: 14,
+    bottom: 12,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(15,52,49,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   promoBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  promoBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
   },
   promoTitle: {
     color: '#FFFFFF',
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '900',
   },
   promoText: {
-    color: 'rgba(255,255,255,0.86)',
-    fontSize: 13,
-    lineHeight: 19,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '600',
   },
-  promoIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+  promoFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 6,
+  },
+  promoMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#E7F5F3',
+  },
+  promoMetaText: {
+    color: '#017270',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  promoCta: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#F59E0B',
+  },
+  promoCtaText: {
+    color: '#1F1300',
+    fontSize: 11,
+    fontWeight: '900',
   },
   safetyCard: {
     backgroundColor: palette.warningBg,

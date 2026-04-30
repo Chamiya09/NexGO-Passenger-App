@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -46,6 +46,7 @@ type PhotonReverseGeocodeResponse = {
 
 export default function RideScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
   const geocodeRequestRef = useRef(0);
   const locatingRef = useRef(false);
@@ -58,6 +59,7 @@ export default function RideScreen() {
   const locationSourceRef = useRef<'map' | 'device'>('map');
   const { width, height } = useWindowDimensions();
   const markerTipTop = height * MARKER_TIP_TOP_RATIO;
+  const selectedPromoCode = typeof params.promoCode === 'string' ? params.promoCode : '';
 
   const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
   const [locationSource, setLocationSource] = useState<'map' | 'device'>('map');
@@ -534,6 +536,7 @@ export default function RideScreen() {
                     dLat: dropData.coords.latitude,
                     dLng: dropData.coords.longitude,
                     dName: dropData.name,
+                    ...(selectedPromoCode && { promoCode: selectedPromoCode }),
                   }
                 });
               }
