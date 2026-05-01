@@ -24,6 +24,7 @@ type ProfileSection = {
     | '/profile/personal-details'
     | '/profile/membership'
     | '/profile/support-help'
+    | '/profile/my-support-tickets'
     | '/profile/my-reviews'
     | '/profile/saved-addresses'
     | '/profile/payment-details'
@@ -77,6 +78,13 @@ const PROFILE_SECTIONS: ProfileSection[] = [
     subtitle: 'Resolve issues and contact support quickly',
     icon: 'help-circle-outline',
     route: '/profile/support-help',
+  },
+  {
+    title: 'My Support Tickets',
+    subtitle: 'Track passenger complaints and support requests',
+    icon: 'file-tray-full-outline',
+    route: '/profile/my-support-tickets',
+    badge: 'NEW',
   },
   {
     title: 'Earn with NexGO',
