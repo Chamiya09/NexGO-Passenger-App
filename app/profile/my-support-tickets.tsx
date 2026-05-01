@@ -25,7 +25,7 @@ type SupportTicket = {
   description: string;
   rideReference: string;
   priority: 'Normal' | 'Urgent';
-  status: 'Open' | 'In Review' | 'Resolved' | 'Closed';
+  status: 'Pending' | 'Open' | 'In Review' | 'Resolved' | 'Closed';
   adminNote: string;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +33,7 @@ type SupportTicket = {
 };
 
 const STATUS_COLORS = {
+  Pending: { text: '#A16207', bg: '#FFF6E3', icon: 'time-outline' },
   Open: { text: '#14988F', bg: '#E7F5F3', icon: 'radio-button-on-outline' },
   'In Review': { text: '#A16207', bg: '#FFF6E3', icon: 'hourglass-outline' },
   Resolved: { text: '#157A62', bg: '#E9F8EF', icon: 'checkmark-done-outline' },
