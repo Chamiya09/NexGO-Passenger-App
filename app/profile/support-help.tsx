@@ -119,24 +119,6 @@ const SUPPORT_TILES: SupportTile[] = [
 
 const PRIORITY_OPTIONS: TicketPriority[] = ['Normal', 'Urgent'];
 
-const FAQ_ROWS = [
-  {
-    title: 'Where can I see my ride history?',
-    subtitle: 'Open Activities to review completed, cancelled, and upcoming ride details.',
-    icon: 'time-outline' as const,
-  },
-  {
-    title: 'How do I update my saved places?',
-    subtitle: 'Use Saved Addresses to manage home, work, and frequent destinations.',
-    icon: 'location-outline' as const,
-  },
-  {
-    title: 'How do I keep my account secure?',
-    subtitle: 'Use Account Security to change your password and review privacy controls.',
-    icon: 'lock-closed-outline' as const,
-  },
-];
-
 export default function SupportHelpScreen() {
   const { user } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState(SUPPORT_TILES[0].title);
@@ -247,16 +229,6 @@ export default function SupportHelpScreen() {
     } finally {
       setSavingTicket(false);
     }
-  };
-
-  const formatTicketDate = (value: string) => {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return 'Recently';
-    }
-
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
   const openEmailSupport = async () => {
@@ -504,54 +476,6 @@ export default function SupportHelpScreen() {
           </Pressable>
         </View>
 
-        <View style={[styles.openTicketsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.openTicketsHeader}>
-            <Text style={[styles.openTicketsTitle, { color: colors.textPrimary }]}>Open Complaints</Text>
-            <Text style={[styles.openTicketsCount, { color: colors.textSecondary }]}>{tickets.length}</Text>
-          </View>
-
-          {tickets.length === 0 ? (
-            <View style={[styles.emptyTicketState, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
-              <Ionicons name="file-tray-outline" size={22} color={colors.textSecondary} />
-              <Text style={[styles.emptyTicketText, { color: colors.textSecondary }]}>
-                New support tickets you open will appear here.
-              </Text>
-            </View>
-          ) : (
-            tickets.map((ticket) => (
-              <View key={ticket.id} style={[styles.ticketRow, { borderColor: colors.divider }]}>
-                <View style={styles.ticketRowTop}>
-                  <Text style={[styles.ticketId, { color: colors.accent }]} selectable>
-                    {ticket.id}
-                  </Text>
-                  <View
-                    style={[
-                      styles.ticketPriorityBadge,
-                      { backgroundColor: ticket.priority === 'Urgent' ? colors.dangerSoft : colors.accentSoft },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.ticketPriorityText,
-                        { color: ticket.priority === 'Urgent' ? colors.danger : colors.accent },
-                      ]}>
-                      {ticket.priority}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.ticketSubject, { color: colors.textPrimary }]}>{ticket.subject}</Text>
-                <Text style={[styles.ticketMeta, { color: colors.textSecondary }]}>
-                  {ticket.topic} | {ticket.status} | {formatTicketDate(ticket.createdAt)}
-                </Text>
-                {!!ticket.rideReference && (
-                  <Text style={[styles.ticketReference, { color: colors.textSecondary }]} selectable>
-                    Ride: {ticket.rideReference}
-                  </Text>
-                )}
-              </View>
-            ))
-          )}
-        </View>
-
         <ProfileDetailsGroup title="CONTACT SUPPORT" actionRows={contactRows} />
 
         <View style={[styles.priorityCard, { backgroundColor: colors.warningSoft, borderColor: '#F3D99B' }]}>
@@ -586,8 +510,6 @@ export default function SupportHelpScreen() {
             </Text>
           </View>
         </View>
-
-        <ProfileDetailsGroup title="QUICK ANSWERS" actionRows={FAQ_ROWS} />
       </RefreshableScrollView>
     </SafeAreaView>
   );
@@ -803,79 +725,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
-  },
-  openTicketsCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 14,
-  },
-  openTicketsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  openTicketsTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  openTicketsCount: {
-    fontSize: 13,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
-  emptyTicketState: {
-    minHeight: 94,
-    borderRadius: 13,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    gap: 7,
-  },
-  emptyTicketText: {
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  ticketRow: {
-    borderTopWidth: 1,
-    paddingTop: 12,
-    paddingBottom: 11,
-    gap: 4,
-  },
-  ticketRowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  ticketId: {
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  ticketPriorityBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  ticketPriorityText: {
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  ticketSubject: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  ticketMeta: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  ticketReference: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   priorityCard: {
     borderRadius: 16,
