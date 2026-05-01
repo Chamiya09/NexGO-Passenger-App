@@ -1,5 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -16,6 +15,7 @@ import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
 type SupportTile = {
   title: string;
@@ -25,23 +25,6 @@ type SupportTile = {
 };
 
 type TicketPriority = 'Normal' | 'Urgent';
-type TicketStatus = 'Open';
-
-type SupportTicket = {
-  id: string;
-  topic: string;
-  subject: string;
-  description: string;
-  rideReference?: string;
-  priority: TicketPriority;
-  status: TicketStatus;
-  createdAt: string;
-  passengerName?: string;
-  passengerEmail?: string;
-};
-
-const SUPPORT_TICKETS_STORAGE_KEY = 'nexgo-passenger-support-tickets';
-
 const SUPPORT_TILES: SupportTile[] = [
   {
     title: 'Ride issue',
@@ -120,13 +103,12 @@ const SUPPORT_TILES: SupportTile[] = [
 const PRIORITY_OPTIONS: TicketPriority[] = ['Normal', 'Urgent'];
 
 export default function SupportHelpScreen() {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const [selectedTopic, setSelectedTopic] = useState(SUPPORT_TILES[0].title);
   const [priority, setPriority] = useState<TicketPriority>('Normal');
   const [subject, setSubject] = useState('');
   const [rideReference, setRideReference] = useState('');
   const [description, setDescription] = useState('');
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [savingTicket, setSavingTicket] = useState(false);
   const [topicMenuOpen, setTopicMenuOpen] = useState(false);
 
@@ -148,34 +130,10 @@ export default function SupportHelpScreen() {
     successSoft: '#EAF7EF',
   };
 
-  useEffect(() => {
-    const loadTickets = async () => {
-      try {
-        const rawTickets = await AsyncStorage.getItem(SUPPORT_TICKETS_STORAGE_KEY);
-
-        if (!rawTickets) {
-          return;
-        }
-
-        const parsedTickets = JSON.parse(rawTickets) as SupportTicket[];
-        setTickets(Array.isArray(parsedTickets) ? parsedTickets : []);
-      } catch {
-        setTickets([]);
-      }
-    };
-
-    void loadTickets();
-  }, []);
-
   const selectedTopicInfo = useMemo(
     () => SUPPORT_TILES.find((tile) => tile.title === selectedTopic) ?? SUPPORT_TILES[0],
     [selectedTopic]
   );
-
-  const saveTickets = async (nextTickets: SupportTicket[]) => {
-    setTickets(nextTickets);
-    await AsyncStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(nextTickets));
-  };
 
   const resetTicketForm = () => {
     setSubject('');
@@ -185,15 +143,15 @@ export default function SupportHelpScreen() {
     setTopicMenuOpen(false);
   };
 
-  const createTicketId = () => {
-    const suffix = Math.floor(1000 + Math.random() * 9000);
-    return `NGP-${Date.now().toString().slice(-5)}-${suffix}`;
-  };
-
   const submitTicket = async () => {
     const trimmedSubject = subject.trim();
     const trimmedDescription = description.trim();
     const trimmedRideReference = rideReference.trim();
+
+    if (!token) {
+      Alert.alert('Login required', 'Please log in before opening a support ticket.');
+      return;
+    }
 
     if (!trimmedSubject) {
       Alert.alert('Add a subject', 'Please add a short subject for your support ticket.');
@@ -207,23 +165,24 @@ export default function SupportHelpScreen() {
 
     setSavingTicket(true);
     try {
-      const nextTicket: SupportTicket = {
-        id: createTicketId(),
-        topic: selectedTopic,
-        subject: trimmedSubject,
-        description: trimmedDescription,
-        rideReference: trimmedRideReference || undefined,
-        priority,
-        status: 'Open',
-        createdAt: new Date().toISOString(),
-        passengerName: user?.fullName,
-        passengerEmail: user?.email,
-      };
-      const nextTickets = [nextTicket, ...tickets];
+      const response = await fetch(`${API_BASE_URL}/support-tickets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          topic: selectedTopic,
+          subject: trimmedSubject,
+          description: trimmedDescription,
+          rideReference: trimmedRideReference,
+          priority,
+        }),
+      });
+      const data = await parseApiResponse<{ ticket: { id: string } }>(response);
 
-      await saveTickets(nextTickets);
       resetTicketForm();
-      Alert.alert('Ticket opened', `Your complaint ticket ${nextTicket.id} is now open.`);
+      Alert.alert('Ticket opened', `Your complaint ticket ${data.ticket.id} is now open.`);
     } catch (error) {
       Alert.alert('Could not open ticket', error instanceof Error ? error.message : 'Please try again.');
     } finally {
