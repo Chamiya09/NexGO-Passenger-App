@@ -26,6 +26,7 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="about-us" options={{ title: 'About Us' }} />
       <Stack.Screen name="privacy-security" options={{ title: 'Privacy & Security' }} />
       <Stack.Screen name="support-help" options={{ title: 'Support & Help' }} />
+      <Stack.Screen name="my-support-tickets" options={{ title: 'My Support Tickets' }} />
     </Stack>
   );
 }
