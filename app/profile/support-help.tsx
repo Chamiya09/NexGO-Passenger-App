@@ -356,7 +356,7 @@ export default function SupportHelpScreen() {
           <TextInput
             value={rideReference}
             onChangeText={setRideReference}
-            placeholder="Ride ID or booking reference (optional)"
+            placeholder="Reference (Optional)"
             placeholderTextColor={colors.textSecondary}
             autoCapitalize="characters"
             style={[
