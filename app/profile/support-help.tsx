@@ -297,14 +297,8 @@ export default function SupportHelpScreen() {
           {SUPPORT_TILES.map((tile) => (
             <Pressable
               key={tile.title}
-              style={[
-                styles.topicTile,
-                {
-                  backgroundColor: selectedTopic === tile.title ? colors.accentSoft : colors.card,
-                  borderColor: selectedTopic === tile.title ? colors.accent : colors.border,
-                },
-              ]}
-              onPress={() => setSelectedTopic(tile.title)}>
+              style={[styles.topicTile, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={showChatMessage}>
               <View style={styles.topicTileHeader}>
                 <View style={[styles.topicIconWrap, { backgroundColor: colors.accentSoft }]}>
                   <Ionicons name={tile.icon} size={19} color={colors.accent} />
@@ -329,6 +323,37 @@ export default function SupportHelpScreen() {
             <View style={[styles.openBadge, { backgroundColor: colors.successSoft }]}>
               <Ionicons name="radio-button-on-outline" size={14} color={colors.success} />
               <Text style={[styles.openBadgeText, { color: colors.success }]}>Open</Text>
+            </View>
+          </View>
+
+          <View>
+            <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Support Topic</Text>
+            <View style={styles.formTopicGrid}>
+              {SUPPORT_TILES.map((tile) => {
+                const isSelected = selectedTopic === tile.title;
+
+                return (
+                  <Pressable
+                    key={tile.title}
+                    onPress={() => setSelectedTopic(tile.title)}
+                    style={[
+                      styles.formTopicOption,
+                      {
+                        backgroundColor: isSelected ? colors.accentSoft : colors.elevatedCard,
+                        borderColor: isSelected ? colors.accent : colors.border,
+                      },
+                    ]}>
+                    <Ionicons name={tile.icon} size={16} color={isSelected ? colors.accent : colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.formTopicOptionText,
+                        { color: isSelected ? colors.accent : colors.textSecondary },
+                      ]}>
+                      {tile.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
 
@@ -677,6 +702,32 @@ const styles = StyleSheet.create({
   },
   openBadgeText: {
     fontSize: 11,
+    fontWeight: '900',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  formTopicGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  formTopicOption: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  formTopicOptionText: {
+    flex: 1,
+    fontSize: 12,
     fontWeight: '900',
   },
   input: {
