@@ -288,32 +288,6 @@ export default function SupportHelpScreen() {
           </View>
         </View>
 
-        <View style={styles.sectionHeadingWrap}>
-          <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>Support Topics</Text>
-          <Text style={[styles.sectionSubheading, { color: colors.textSecondary }]}>Choose the area that best matches your issue</Text>
-        </View>
-
-        <View style={styles.topicGrid}>
-          {SUPPORT_TILES.map((tile) => (
-            <Pressable
-              key={tile.title}
-              style={[styles.topicTile, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={showChatMessage}>
-              <View style={styles.topicTileHeader}>
-                <View style={[styles.topicIconWrap, { backgroundColor: colors.accentSoft }]}>
-                  <Ionicons name={tile.icon} size={19} color={colors.accent} />
-                </View>
-                <View style={[styles.topicMetaPill, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
-                  <Text style={[styles.topicMetaText, { color: colors.textSecondary }]}>{tile.meta}</Text>
-                </View>
-              </View>
-
-              <Text style={[styles.topicTitle, { color: colors.textPrimary }]}>{tile.title}</Text>
-              <Text style={[styles.topicSubtitle, { color: colors.textSecondary }]}>{tile.subtitle}</Text>
-            </Pressable>
-          ))}
-        </View>
-
         <View style={[styles.ticketComposerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.ticketComposerHeader}>
             <View>
@@ -606,68 +580,6 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  sectionHeadingWrap: {
-    marginBottom: 10,
-  },
-  sectionHeading: {
-    fontSize: 19,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  sectionSubheading: {
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 17,
-  },
-  topicGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 14,
-  },
-  topicTile: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    maxWidth: '48.5%',
-    minHeight: 164,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 13,
-  },
-  topicTileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 12,
-  },
-  topicIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topicMetaPill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  topicMetaText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  topicTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 5,
-  },
-  topicSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '500',
   },
   ticketComposerCard: {
     borderRadius: 16,
