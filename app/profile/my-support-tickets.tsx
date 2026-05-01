@@ -1,5 +1,15 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -33,6 +43,13 @@ export default function MySupportTicketsScreen() {
   const { token } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [editingTicket, setEditingTicket] = useState(false);
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [editSubject, setEditSubject] = useState('');
+  const [editRideReference, setEditRideReference] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState<SupportTicket['priority']>('Normal');
 
   const colors = {
     background: useThemeColor({ light: '#F4F8F7', dark: '#151718' }, 'background'),
@@ -102,6 +119,88 @@ export default function MySupportTicketsScreen() {
 
   const openSupportForm = () => {
     router.push('/profile/support-help');
+  };
+
+  const openTicketDetails = (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    setEditingTicket(false);
+    setEditSubject(ticket.subject);
+    setEditRideReference(ticket.rideReference || '');
+    setEditDescription(ticket.description);
+    setEditPriority(ticket.priority);
+  };
+
+  const canModifyTicket = (ticket: SupportTicket) => !['Resolved', 'Closed'].includes(ticket.status);
+
+  const saveTicketUpdate = async () => {
+    if (!selectedTicket || !token || savingTicket) return;
+
+    const trimmedSubject = editSubject.trim();
+    const trimmedDescription = editDescription.trim();
+
+    if (trimmedSubject.length < 3) {
+      Alert.alert('Add a subject', 'Subject must be at least 3 characters.');
+      return;
+    }
+
+    if (trimmedDescription.length < 12) {
+      Alert.alert('Add more detail', 'Description must be at least 12 characters.');
+      return;
+    }
+
+    setSavingTicket(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${selectedTicket.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subject: trimmedSubject,
+          rideReference: editRideReference.trim(),
+          description: trimmedDescription,
+          priority: editPriority,
+        }),
+      });
+      const data = await parseApiResponse<{ ticket: SupportTicket }>(response);
+
+      setTickets((current) => current.map((ticket) => (ticket.id === data.ticket.id ? data.ticket : ticket)));
+      setSelectedTicket(data.ticket);
+      setEditingTicket(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      Alert.alert('Ticket update failed', message);
+    } finally {
+      setSavingTicket(false);
+    }
+  };
+
+  const deleteTicket = async (ticket: SupportTicket) => {
+    if (!token) return;
+
+    Alert.alert('Delete support ticket', 'This will permanently remove this support ticket.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${ticket.id}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            await parseApiResponse<{ id: string; message?: string }>(response);
+            setTickets((current) => current.filter((item) => item.id !== ticket.id));
+            setSelectedTicket(null);
+          } catch (error) {
+            Alert.alert('Could not delete ticket', error instanceof Error ? error.message : 'Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -223,11 +322,186 @@ export default function MySupportTicketsScreen() {
                     <Text style={[styles.adminNoteText, { color: colors.textSecondary }]}>{ticket.adminNote}</Text>
                   </View>
                 )}
+
+                <Pressable style={[styles.viewDetailsButton, { backgroundColor: colors.accentSoft }]} onPress={() => openTicketDetails(ticket)}>
+                  <Ionicons name="eye-outline" size={16} color={colors.accent} />
+                  <Text style={[styles.viewDetailsText, { color: colors.accent }]}>View Details</Text>
+                </Pressable>
               </View>
             );
           })
         )}
       </RefreshableScrollView>
+
+      <Modal
+        visible={Boolean(selectedTicket)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedTicket(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {selectedTicket ? (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleWrap}>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{selectedTicket.subject}</Text>
+                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                      {selectedTicket.topic} | {selectedTicket.status}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={[styles.modalCloseButton, { backgroundColor: colors.elevatedCard }]}
+                    onPress={() => setSelectedTicket(null)}>
+                    <Ionicons name="close" size={20} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+
+                {editingTicket ? (
+                  <View style={styles.editForm}>
+                    <TextInput
+                      value={editSubject}
+                      onChangeText={setEditSubject}
+                      placeholder="Subject"
+                      placeholderTextColor={colors.textSecondary}
+                      style={[
+                        styles.modalInput,
+                        { backgroundColor: colors.elevatedCard, borderColor: colors.border, color: colors.textPrimary },
+                      ]}
+                    />
+                    <TextInput
+                      value={editRideReference}
+                      onChangeText={setEditRideReference}
+                      placeholder="Ride reference (optional)"
+                      placeholderTextColor={colors.textSecondary}
+                      style={[
+                        styles.modalInput,
+                        { backgroundColor: colors.elevatedCard, borderColor: colors.border, color: colors.textPrimary },
+                      ]}
+                    />
+                    <TextInput
+                      value={editDescription}
+                      onChangeText={setEditDescription}
+                      placeholder="Description"
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                      textAlignVertical="top"
+                      style={[
+                        styles.modalInput,
+                        styles.modalDescriptionInput,
+                        { backgroundColor: colors.elevatedCard, borderColor: colors.border, color: colors.textPrimary },
+                      ]}
+                    />
+                    <View style={styles.editPriorityRow}>
+                      {(['Normal', 'Urgent'] as const).map((option) => {
+                        const isSelected = editPriority === option;
+                        const isUrgentOption = option === 'Urgent';
+
+                        return (
+                          <Pressable
+                            key={option}
+                            onPress={() => setEditPriority(option)}
+                            style={[
+                              styles.editPriorityOption,
+                              {
+                                backgroundColor: isSelected
+                                  ? isUrgentOption
+                                    ? colors.dangerSoft
+                                    : colors.accentSoft
+                                  : colors.elevatedCard,
+                                borderColor: isSelected
+                                  ? isUrgentOption
+                                    ? colors.danger
+                                    : colors.accent
+                                  : colors.border,
+                              },
+                            ]}>
+                            <Ionicons
+                              name={isUrgentOption ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                              size={16}
+                              color={isSelected ? (isUrgentOption ? colors.danger : colors.accent) : colors.textSecondary}
+                            />
+                            <Text
+                              style={[
+                                styles.editPriorityText,
+                                { color: isSelected ? (isUrgentOption ? colors.danger : colors.accent) : colors.textSecondary },
+                              ]}>
+                              {option}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.modalSectionLabel, { color: colors.textPrimary }]}>Details</Text>
+                    <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+                      {selectedTicket.description}
+                    </Text>
+                    {!!selectedTicket.rideReference && (
+                      <>
+                        <Text style={[styles.modalSectionLabel, { color: colors.textPrimary }]}>Ride Reference</Text>
+                        <Text style={[styles.modalInfoText, { color: colors.textSecondary }]} selectable>
+                          {selectedTicket.rideReference}
+                        </Text>
+                      </>
+                    )}
+                    {!!selectedTicket.adminNote && (
+                      <View style={[styles.modalNoteBox, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
+                        <Text style={[styles.modalSectionLabel, { color: colors.textPrimary }]}>Support Reply</Text>
+                        <Text style={[styles.modalInfoText, { color: colors.textSecondary }]}>{selectedTicket.adminNote}</Text>
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {canModifyTicket(selectedTicket) ? (
+                  <View style={styles.modalActions}>
+                    {editingTicket ? (
+                      <>
+                        <Pressable style={[styles.modalSecondaryButton, { borderColor: colors.border }]} onPress={() => setEditingTicket(false)}>
+                          <Text style={[styles.modalSecondaryText, { color: colors.textSecondary }]}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={savingTicket}
+                          style={[styles.modalPrimaryButton, { backgroundColor: colors.accent }]}
+                          onPress={() => {
+                            void saveTicketUpdate();
+                          }}>
+                          {savingTicket ? <ActivityIndicator color="#FFFFFF" /> : <Ionicons name="save-outline" size={17} color="#FFFFFF" />}
+                          <Text style={styles.modalPrimaryText}>{savingTicket ? 'Saving...' : 'Save'}</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Pressable style={[styles.modalUpdateButton, { backgroundColor: colors.accentSoft }]} onPress={() => setEditingTicket(true)}>
+                          <Ionicons name="create-outline" size={17} color={colors.accent} />
+                          <Text style={[styles.modalUpdateText, { color: colors.accent }]}>Update</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.modalDeleteButton}
+                          onPress={() => {
+                            void deleteTicket(selectedTicket);
+                          }}>
+                          <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                          <Text style={[styles.modalDeleteText, { color: colors.danger }]}>Delete</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                ) : (
+                  <View style={[styles.resolvedNotice, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
+                    <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.resolvedNoticeText, { color: colors.textSecondary }]}>
+                      This ticket is resolved, so updates and deletion are disabled.
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -429,5 +703,188 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '600',
+  },
+  viewDetailsButton: {
+    minHeight: 42,
+    borderRadius: 12,
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  viewDetailsText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(18, 53, 50, 0.42)',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  modalCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    maxHeight: '88%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  modalTitleWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
+  modalCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSectionLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  modalDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  modalInfoText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  modalNoteBox: {
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 11,
+    marginTop: 10,
+  },
+  editForm: {
+    gap: 10,
+  },
+  modalInput: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalDescriptionInput: {
+    minHeight: 128,
+    lineHeight: 19,
+  },
+  editPriorityRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editPriorityOption: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  editPriorityText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  modalPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalUpdateButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  modalUpdateText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  modalDeleteButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#F1D6D6',
+    backgroundColor: '#FFF1F1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  modalDeleteText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  resolvedNotice: {
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 11,
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resolvedNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
   },
 });
