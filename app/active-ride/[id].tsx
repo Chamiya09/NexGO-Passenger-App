@@ -255,6 +255,18 @@ export default function ActiveRideScreen() {
     }, [rideId, token]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
+    const openDriverProfile = () => {
+        if (!driverId) return;
+
+        router.push({
+            pathname: '/driver-profile/[id]',
+            params: {
+                id: driverId,
+                name: driverName,
+                rideId,
+            },
+        });
+    };
 
     return (
         <View style={styles.container}>
@@ -315,9 +327,13 @@ export default function ActiveRideScreen() {
                 </Text>
 
                 <View style={styles.infoBlock}>
-                    <View style={styles.avatar}>
+                    <TouchableOpacity
+                        style={styles.avatar}
+                        onPress={openDriverProfile}
+                        disabled={!driverId}
+                        activeOpacity={0.75}>
                         <Ionicons name="person" size={24} color="#FFF" />
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.metaCol}>
                         <Text style={styles.driverName}>{driverName}</Text>
                         <Text style={styles.vehicleType}>{vehicleType} • {distance}</Text>

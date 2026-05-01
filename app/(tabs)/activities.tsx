@@ -23,6 +23,7 @@ import {
   loadPassengerActiveRide,
   PassengerActiveRideParams,
 } from '@/lib/activeRideStorage';
+import { replaceRideReviews, RideReview, RideReviewMap } from '@/lib/rideReviews';
 
 const teal = '#169F95';
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -56,6 +57,7 @@ type Ride = {
       category?: string;
     } | null;
   } | null;
+  review?: RideReview | null;
 };
 
 const isCompletedRide = (ride: Ride) =>
@@ -198,12 +200,14 @@ const tagStyles = StyleSheet.create({
 // ── Ride Card sub-component ───────────────────────────────────────────────────
 function RideCard({
   ride,
+  review,
   onCancel,
   onViewDetails,
   onResumeNavigation,
   isResumeTarget,
 }: {
   ride: Ride;
+  review?: RideReviewMap[string];
   onCancel?: (id: string) => void;
   onViewDetails: (ride: Ride) => void;
   onResumeNavigation?: () => void;
@@ -211,6 +215,17 @@ function RideCard({
 }) {
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
+  const reviewScore = review?.rating ? `${review.rating}.0` : 'New';
+  const reviewStatusLabel =
+    review?.status === 'approved'
+      ? 'Approved'
+      : review?.status === 'rejected'
+        ? 'Rejected'
+        : review
+          ? 'Pending'
+          : 'Open';
+  const reviewStatusColor = review?.status === 'rejected' ? '#C13B3B' : teal;
+  const reviewStatusBg = review?.status === 'rejected' ? '#FFF4F4' : '#E7F5F3';
 
   return (
     <View style={cardStyles.card}>
@@ -257,10 +272,68 @@ function RideCard({
       </View>
 
       {isCompletedRide(ride) && (
-        <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
-          <Ionicons name="receipt-outline" size={15} color={teal} />
-          <Text style={cardStyles.detailsBtnText}>View details</Text>
-        </TouchableOpacity>
+        <View style={cardStyles.reviewBlock}>
+          <View style={cardStyles.reviewHeader}>
+            <View style={cardStyles.reviewScoreWrap}>
+              <View style={cardStyles.reviewScoreCircle}>
+                <Text style={cardStyles.reviewScore}>{reviewScore}</Text>
+              </View>
+              <View style={cardStyles.reviewTitleWrap}>
+                <Text style={cardStyles.reviewTitle}>{review ? 'Your ride review' : 'Review this ride'}</Text>
+                <Text style={cardStyles.reviewSubtitle}>
+                  {review ? 'Shared with NexGO after this trip' : 'Add a rating for this completed trip'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[cardStyles.reviewStatusPill, { backgroundColor: reviewStatusBg }]}>
+              <Ionicons
+                name={
+                  review?.status === 'approved'
+                    ? 'checkmark-circle'
+                    : review?.status === 'rejected'
+                      ? 'close-circle'
+                      : review
+                        ? 'time-outline'
+                        : 'create-outline'
+                }
+                size={13}
+                color={reviewStatusColor}
+              />
+              <Text style={[cardStyles.reviewStatusText, { color: reviewStatusColor }]}>{reviewStatusLabel}</Text>
+            </View>
+          </View>
+
+          <View style={cardStyles.reviewBody}>
+            <View style={cardStyles.starRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <View key={star} style={[cardStyles.starChip, review && star <= review.rating ? cardStyles.starChipActive : null]}>
+                  <Ionicons
+                    name={review && star <= review.rating ? 'star' : 'star-outline'}
+                    size={14}
+                    color={review && star <= review.rating ? '#F5A623' : '#B7C7C5'}
+                  />
+                </View>
+              ))}
+            </View>
+
+            <View style={cardStyles.reviewCommentBox}>
+              <Ionicons
+                name={review?.comment ? 'chatbubble-ellipses-outline' : 'sparkles-outline'}
+                size={15}
+                color={review?.comment ? teal : '#8CA1A0'}
+              />
+              <Text style={cardStyles.reviewComment} numberOfLines={2}>
+                {review?.comment || 'No review yet. Tell us how the ride felt.'}
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
+            <Ionicons name="receipt-outline" size={15} color={teal} />
+            <Text style={cardStyles.detailsBtnText}>View details</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {isResumeTarget && onResumeNavigation && (
@@ -353,6 +426,117 @@ const cardStyles = StyleSheet.create({
   },
   vehicleText: { fontSize: 12, fontWeight: '800', color: teal },
   fare: { fontSize: 15, fontWeight: '900', color: '#102A28' },
+  reviewBlock: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    padding: 12,
+    gap: 9,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  reviewScoreWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  reviewScoreCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#E7F5F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  reviewScore: {
+    color: teal,
+    fontSize: 15,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
+  reviewTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reviewTitle: {
+    color: '#102A28',
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  reviewSubtitle: {
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  reviewStatusPill: {
+    minHeight: 26,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    backgroundColor: '#E7F5F3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  reviewStatusText: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  reviewBody: {
+    gap: 8,
+  },
+  starRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+  },
+  starChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starChipActive: {
+    borderColor: '#F8D58C',
+    backgroundColor: '#FFFFFF',
+  },
+  reviewCommentBox: {
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+  },
+  reviewComment: {
+    flex: 1,
+    color: '#102A28',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
   cancelBtn: {
     marginTop: 12,
     borderWidth: 1,
@@ -368,7 +552,6 @@ const cardStyles = StyleSheet.create({
     fontSize: 14,
   },
   detailsBtn: {
-    marginTop: 12,
     minHeight: 38,
     borderRadius: 12,
     borderWidth: 1,
@@ -442,6 +625,7 @@ export default function ActivitiesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestNavigation, setLatestNavigation] = useState<PassengerActiveRideParams | null>(null);
+  const [reviews, setReviews] = useState<RideReviewMap>({});
 
   const loadLatestNavigation = useCallback(async () => {
     const stored = await loadPassengerActiveRide();
@@ -470,7 +654,17 @@ export default function ActivitiesScreen() {
       }
 
       const data = await res.json() as { rides: Ride[] };
-      setRides(data.rides ?? []);
+      const savedRides = data.rides ?? [];
+      const serverReviews = savedRides.reduce<RideReviewMap>((acc, ride) => {
+        if (ride.review) {
+          acc[ride.id] = ride.review;
+        }
+        return acc;
+      }, {});
+
+      setRides(savedRides);
+      setReviews(serverReviews);
+      await replaceRideReviews(serverReviews);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to load rides');
     } finally {
@@ -537,9 +731,11 @@ export default function ActivitiesScreen() {
         dName: ride.dropoff?.name ?? '',
         dLat: String(ride.dropoff?.latitude ?? ''),
         dLng: String(ride.dropoff?.longitude ?? ''),
+        driverId: ride.driver?.id ?? '',
         driverName: ride.driver?.fullName ?? '',
         driverPhone: ride.driver?.phoneNumber ?? '',
         driverImage: ride.driver?.profileImageUrl ?? '',
+        driverVehicleType: ride.vehicleType,
         vehicleMake: ride.driver?.vehicle?.make ?? '',
         vehicleModel: ride.driver?.vehicle?.model ?? '',
         vehiclePlate: ride.driver?.vehicle?.plateNumber ?? '',
@@ -683,6 +879,7 @@ export default function ActivitiesScreen() {
           renderItem={({ item }) => (
             <RideCard
               ride={item}
+              review={reviews[item.id]}
               onCancel={handleCancelRide}
               onViewDetails={handleViewRideDetails}
               isResumeTarget={Boolean(latestNavigation?.id && item.id === latestNavigation.id)}

@@ -28,6 +28,15 @@ export default function RootLayout() {
             name="ride-details/[id]"
             options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
           />
+          <Stack.Screen
+            name="driver-profile/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
+              animation: 'fade',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>

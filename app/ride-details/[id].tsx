@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -11,6 +13,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { deleteRideReview, fetchRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
+import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
 
@@ -28,9 +32,11 @@ type RideDetailsParams = {
   dName?: string;
   dLat?: string;
   dLng?: string;
+  driverId?: string;
   driverName?: string;
   driverPhone?: string;
   driverImage?: string;
+  driverVehicleType?: string;
   vehicleMake?: string;
   vehicleModel?: string;
   vehiclePlate?: string;
@@ -77,8 +83,107 @@ const vehicleName = (params: RideDetailsParams) => {
 
 export default function RideDetailsScreen() {
   const router = useRouter();
+  const { token } = useAuth();
   const params = useLocalSearchParams<RideDetailsParams>();
   const isCompleted = String(params.status ?? '').toLowerCase() === 'completed';
+  const rideId = String(params.id ?? '');
+  const driverId = String(params.driverId ?? '');
+  const [review, setReview] = useState<RideReview | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const isRejectedReview = review?.status === 'rejected';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateReview = async () => {
+      const storedReview = await fetchRideReview(rideId, token);
+      if (cancelled) return;
+
+      setReview(storedReview);
+      setRating(storedReview?.rating ?? 0);
+      setComment(storedReview?.comment ?? '');
+    };
+
+    if (rideId) {
+      void hydrateReview();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rideId, token]);
+
+  const handleSaveReview = async () => {
+    if (!rideId || rating < 1 || saving || deleting || isRejectedReview) return;
+
+    try {
+      setSaving(true);
+      setSaveMessage('');
+      const nextReview = await saveRideReview(rideId, rating, comment, token);
+      setReview(nextReview);
+      setSaveMessage('Review saved');
+    } catch (error) {
+      setSaveMessage(error instanceof Error ? error.message : 'Unable to save review');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteReview = () => {
+    if (!rideId || !review || deleting) return;
+
+    Alert.alert(
+      'Delete review?',
+      'This removes your rating and comment from this ride.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              setSaveMessage('');
+              await deleteRideReview(rideId, token);
+              setReview(null);
+              setRating(0);
+              setComment('');
+              setSaveMessage('Review deleted');
+            } catch (error) {
+              setSaveMessage(error instanceof Error ? error.message : 'Unable to delete review');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openDriverProfile = () => {
+    if (!driverId) return;
+
+    router.push({
+      pathname: '/driver-profile/[id]',
+      params: {
+        id: driverId,
+        rideId,
+        name: params.driverName ?? '',
+        phone: params.driverPhone ?? '',
+        image: params.driverImage ?? '',
+        vehicleType: params.driverVehicleType ?? params.vehicleType ?? '',
+        vehicleMake: params.vehicleMake ?? '',
+        vehicleModel: params.vehicleModel ?? '',
+        vehiclePlate: params.vehiclePlate ?? '',
+        vehicleColor: params.vehicleColor ?? '',
+        vehicleCategory: params.vehicleCategory ?? '',
+      },
+    });
+  };
 
   return (
     <View style={styles.overlay}>
@@ -121,7 +226,12 @@ export default function RideDetailsScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Rider Details</Text>
-              <View style={styles.driverRow}>
+              <TouchableOpacity
+                style={styles.driverRow}
+                onPress={openDriverProfile}
+                disabled={!driverId}
+                activeOpacity={0.75}
+              >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
                     {(params.driverName || 'D').trim().charAt(0).toUpperCase()}
@@ -131,7 +241,8 @@ export default function RideDetailsScreen() {
                   <Text style={styles.driverName}>{params.driverName || 'Driver not available'}</Text>
                   <Text style={styles.driverMeta}>{params.driverPhone || 'Phone not available'}</Text>
                 </View>
-              </View>
+                {driverId ? <Ionicons name="chevron-forward" size={18} color="#8CA1A0" /> : null}
+              </TouchableOpacity>
               <InfoRow icon="car-outline" label="Vehicle" value={vehicleName(params)} />
               <InfoRow icon="card-outline" label="Plate number" value={params.vehiclePlate || 'Not available'} selectable />
               <InfoRow icon="apps-outline" label="Category" value={params.vehicleCategory || params.vehicleType || 'Not available'} />
@@ -161,6 +272,119 @@ export default function RideDetailsScreen() {
               <InfoRow icon="flag-outline" label="Completed" value={formatDate(params.completedAt)} />
               <InfoRow icon="pricetag-outline" label="Ride ID" value={params.id || 'Not available'} selectable />
               <InfoRow icon="wallet-outline" label="Payment" value="Cash" />
+            </View>
+
+            <View style={styles.reviewSection}>
+              <View style={styles.reviewHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Review & Rating</Text>
+                  <Text style={styles.reviewSubtitle}>
+                    {review ? 'Your feedback for this ride' : 'Rate your completed ride'}
+                  </Text>
+                </View>
+                {review ? (
+                  <View style={[styles.savedBadge, isRejectedReview && styles.rejectedBadge]}>
+                    <Ionicons
+                      name={isRejectedReview ? 'close-circle' : review.status === 'approved' ? 'checkmark-circle' : 'time-outline'}
+                      size={14}
+                      color={isRejectedReview ? '#C13B3B' : teal}
+                    />
+                    <Text style={[styles.savedBadgeText, isRejectedReview && styles.rejectedBadgeText]}>
+                      {isRejectedReview ? 'Rejected' : review.status === 'approved' ? 'Approved' : 'Pending'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {isRejectedReview ? (
+                <View style={styles.rejectedNotice}>
+                  <Ionicons name="lock-closed-outline" size={16} color="#C13B3B" />
+                  <Text style={styles.rejectedNoticeText}>This review was rejected and cannot be edited.</Text>
+                </View>
+              ) : review?.status === 'approved' ? (
+                <View style={styles.pendingNotice}>
+                  <Ionicons name="information-circle-outline" size={16} color={teal} />
+                  <Text style={styles.pendingNoticeText}>Updating an approved review sends it back to admin approval.</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.starPicker}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    style={[
+                      styles.starButton,
+                      star <= rating && styles.starButtonActive,
+                    ]}
+                    onPress={() => {
+                      if (isRejectedReview) return;
+                      setRating(star);
+                      setSaveMessage('');
+                    }}
+                    disabled={isRejectedReview}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={star <= rating ? 'star' : 'star-outline'}
+                      size={24}
+                      color={star <= rating ? '#F5A623' : '#8CA1A0'}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.reviewInput}
+                value={comment}
+                onChangeText={(value) => {
+                  setComment(value);
+                  setSaveMessage('');
+                }}
+                placeholder="Share what went well..."
+                placeholderTextColor="#8CA1A0"
+                multiline
+                maxLength={220}
+                textAlignVertical="top"
+                editable={!isRejectedReview}
+              />
+
+              <View style={styles.reviewFooter}>
+                <Text style={styles.characterCount}>{comment.trim().length}/220</Text>
+                {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
+              </View>
+
+              <View style={styles.reviewActionRow}>
+                {review ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.deleteReviewButton,
+                      (saving || deleting) && styles.deleteReviewButtonDisabled,
+                    ]}
+                    onPress={handleDeleteReview}
+                    disabled={saving || deleting}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#C13B3B" />
+                    <Text style={styles.deleteReviewButtonText}>
+                      {deleting ? 'Deleting...' : 'Delete'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveReviewButton,
+                    review && styles.saveReviewButtonInline,
+                    (rating < 1 || saving || deleting || isRejectedReview) && styles.saveReviewButtonDisabled,
+                  ]}
+                  onPress={handleSaveReview}
+                  disabled={rating < 1 || saving || deleting || isRejectedReview}
+                >
+                  <Ionicons name="star" size={16} color="#FFFFFF" />
+                  <Text style={styles.saveReviewButtonText}>
+                    {isRejectedReview ? 'Editing locked' : saving ? 'Saving...' : review ? 'Update review' : 'Submit review'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </RefreshableScrollView>
         )}
@@ -431,6 +655,174 @@ const styles = StyleSheet.create({
     color: '#102A28',
     fontSize: 14,
     fontWeight: '800',
+  },
+  reviewSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    padding: 12,
+    gap: 12,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reviewSubtitle: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: '#E7F5F3',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  savedBadgeText: {
+    color: teal,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  rejectedBadge: {
+    backgroundColor: '#FFF4F4',
+  },
+  rejectedBadgeText: {
+    color: '#C13B3B',
+  },
+  rejectedNotice: {
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#F1D6D6',
+    backgroundColor: '#FFF4F4',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rejectedNoticeText: {
+    flex: 1,
+    color: '#C13B3B',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  pendingNotice: {
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#E7F5F3',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingNoticeText: {
+    flex: 1,
+    color: teal,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  starPicker: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  starButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starButtonActive: {
+    borderColor: '#F8D58C',
+    backgroundColor: '#FFF8EC',
+  },
+  reviewInput: {
+    minHeight: 92,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#F7FBFA',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#102A28',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  reviewFooter: {
+    minHeight: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  characterCount: {
+    color: '#8CA1A0',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  saveMessage: {
+    color: teal,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  reviewActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  saveReviewButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  saveReviewButtonInline: {
+    flex: 1.2,
+  },
+  saveReviewButtonDisabled: {
+    backgroundColor: '#A7C8C4',
+  },
+  saveReviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  deleteReviewButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1D6D6',
+    backgroundColor: '#FFF4F4',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  deleteReviewButtonDisabled: {
+    opacity: 0.55,
+  },
+  deleteReviewButtonText: {
+    color: '#C13B3B',
+    fontSize: 14,
+    fontWeight: '900',
   },
   unavailableBox: {
     padding: 28,

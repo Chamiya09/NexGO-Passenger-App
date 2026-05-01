@@ -19,6 +19,7 @@ export default function ProfileStackLayout() {
         }}
       />
       <Stack.Screen name="membership" options={{ title: 'Membership' }} />
+      <Stack.Screen name="my-reviews" options={{ title: 'My Reviews' }} />
       <Stack.Screen name="saved-addresses" options={{ title: 'Saved Addresses' }} />
       <Stack.Screen name="payment-details" options={{ title: 'Payment Details' }} />
       <Stack.Screen name="earn-with-nexgo" options={{ title: 'Earn with NexGO' }} />
