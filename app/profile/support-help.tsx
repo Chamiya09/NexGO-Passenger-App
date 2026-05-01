@@ -50,10 +50,34 @@ const SUPPORT_TILES: SupportTile[] = [
     meta: 'Trips',
   },
   {
+    title: 'Pickup or drop-off',
+    subtitle: 'Wrong pickup pin, missed pickup, or drop-off location problems.',
+    icon: 'location-outline',
+    meta: 'Location',
+  },
+  {
+    title: 'Driver behavior',
+    subtitle: 'Report rude behavior, unsafe driving, or driver communication issues.',
+    icon: 'person-outline',
+    meta: 'Driver',
+  },
+  {
+    title: 'Fare or refund',
+    subtitle: 'Dispute fare changes, cancellation fees, refunds, or overcharges.',
+    icon: 'cash-outline',
+    meta: 'Fare',
+  },
+  {
     title: 'Payment help',
     subtitle: 'Resolve failed payments, refunds, card, and wallet questions.',
     icon: 'card-outline',
     meta: 'Billing',
+  },
+  {
+    title: 'Promo code issue',
+    subtitle: 'Get help with discounts, promotions, and membership offers.',
+    icon: 'ticket-outline',
+    meta: 'Promos',
   },
   {
     title: 'Safety center',
@@ -62,10 +86,34 @@ const SUPPORT_TILES: SupportTile[] = [
     meta: 'Priority',
   },
   {
+    title: 'Lost item',
+    subtitle: 'Report an item left in a vehicle after a completed trip.',
+    icon: 'briefcase-outline',
+    meta: 'Items',
+  },
+  {
     title: 'Account support',
     subtitle: 'Fix login, profile, saved address, and membership problems.',
     icon: 'person-circle-outline',
     meta: 'Account',
+  },
+  {
+    title: 'App or booking issue',
+    subtitle: 'Report app crashes, booking errors, map issues, or notifications.',
+    icon: 'phone-portrait-outline',
+    meta: 'App',
+  },
+  {
+    title: 'Saved addresses',
+    subtitle: 'Get help with home, work, and frequent destination records.',
+    icon: 'home-outline',
+    meta: 'Places',
+  },
+  {
+    title: 'Accessibility help',
+    subtitle: 'Request support for accessibility needs during passenger trips.',
+    icon: 'accessibility-outline',
+    meta: 'Access',
   },
 ];
 
@@ -98,6 +146,7 @@ export default function SupportHelpScreen() {
   const [description, setDescription] = useState('');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [savingTicket, setSavingTicket] = useState(false);
+  const [topicMenuOpen, setTopicMenuOpen] = useState(false);
 
   const colors = {
     background: useThemeColor({ light: '#F4F8F7', dark: '#151718' }, 'background'),
@@ -136,8 +185,8 @@ export default function SupportHelpScreen() {
     void loadTickets();
   }, []);
 
-  const selectedTopicMeta = useMemo(
-    () => SUPPORT_TILES.find((tile) => tile.title === selectedTopic)?.meta ?? 'Support',
+  const selectedTopicInfo = useMemo(
+    () => SUPPORT_TILES.find((tile) => tile.title === selectedTopic) ?? SUPPORT_TILES[0],
     [selectedTopic]
   );
 
@@ -151,6 +200,7 @@ export default function SupportHelpScreen() {
     setRideReference('');
     setDescription('');
     setPriority('Normal');
+    setTopicMenuOpen(false);
   };
 
   const createTicketId = () => {
@@ -291,7 +341,7 @@ export default function SupportHelpScreen() {
         <View style={[styles.ticketComposerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.ticketComposerHeader}>
             <View>
-              <Text style={[styles.composerEyebrow, { color: colors.accent }]}>{selectedTopicMeta} complaint</Text>
+              <Text style={[styles.composerEyebrow, { color: colors.accent }]}>{selectedTopicInfo.meta} complaint</Text>
               <Text style={[styles.composerTitle, { color: colors.textPrimary }]}>Open Support Ticket</Text>
             </View>
             <View style={[styles.openBadge, { backgroundColor: colors.successSoft }]}>
@@ -302,33 +352,59 @@ export default function SupportHelpScreen() {
 
           <View>
             <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Support Topic</Text>
-            <View style={styles.formTopicGrid}>
-              {SUPPORT_TILES.map((tile) => {
-                const isSelected = selectedTopic === tile.title;
+            <Pressable
+              onPress={() => setTopicMenuOpen((isOpen) => !isOpen)}
+              style={[
+                styles.topicSelectButton,
+                {
+                  backgroundColor: colors.elevatedCard,
+                  borderColor: topicMenuOpen ? colors.accent : colors.border,
+                },
+              ]}>
+              <View style={[styles.topicSelectIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name={selectedTopicInfo.icon} size={18} color={colors.accent} />
+              </View>
+              <View style={styles.topicSelectTextWrap}>
+                <Text style={[styles.topicSelectTitle, { color: colors.textPrimary }]}>{selectedTopicInfo.title}</Text>
+                <Text style={[styles.topicSelectSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {selectedTopicInfo.subtitle}
+                </Text>
+              </View>
+              <Ionicons name={topicMenuOpen ? 'chevron-up-outline' : 'chevron-down-outline'} size={19} color={colors.textSecondary} />
+            </Pressable>
 
-                return (
-                  <Pressable
-                    key={tile.title}
-                    onPress={() => setSelectedTopic(tile.title)}
-                    style={[
-                      styles.formTopicOption,
-                      {
-                        backgroundColor: isSelected ? colors.accentSoft : colors.elevatedCard,
-                        borderColor: isSelected ? colors.accent : colors.border,
-                      },
-                    ]}>
-                    <Ionicons name={tile.icon} size={16} color={isSelected ? colors.accent : colors.textSecondary} />
-                    <Text
+            {topicMenuOpen && (
+              <View style={[styles.topicDropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {SUPPORT_TILES.map((tile, index) => {
+                  const isSelected = selectedTopic === tile.title;
+
+                  return (
+                    <Pressable
+                      key={tile.title}
+                      onPress={() => {
+                        setSelectedTopic(tile.title);
+                        setTopicMenuOpen(false);
+                      }}
                       style={[
-                        styles.formTopicOptionText,
-                        { color: isSelected ? colors.accent : colors.textSecondary },
+                        styles.topicDropdownOption,
+                        index > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 },
+                        isSelected && { backgroundColor: colors.accentSoft },
                       ]}>
-                      {tile.title}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <View style={[styles.dropdownOptionIcon, { backgroundColor: colors.elevatedCard }]}>
+                        <Ionicons name={tile.icon} size={17} color={isSelected ? colors.accent : colors.textSecondary} />
+                      </View>
+                      <View style={styles.dropdownOptionTextWrap}>
+                        <Text style={[styles.dropdownOptionTitle, { color: colors.textPrimary }]}>{tile.title}</Text>
+                        <Text style={[styles.dropdownOptionSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                          {tile.subtitle}
+                        </Text>
+                      </View>
+                      {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.accent} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <TextInput
@@ -621,26 +697,68 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 8,
   },
-  formTopicGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  formTopicOption: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    minHeight: 42,
-    borderRadius: 12,
+  topicSelectButton: {
+    minHeight: 62,
+    borderRadius: 13,
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 10,
   },
-  formTopicOptionText: {
+  topicSelectIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topicSelectTextWrap: {
     flex: 1,
-    fontSize: 12,
+    gap: 2,
+  },
+  topicSelectTitle: {
+    fontSize: 14,
     fontWeight: '900',
+  },
+  topicSelectSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  topicDropdownMenu: {
+    borderRadius: 13,
+    borderWidth: 1,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  topicDropdownOption: {
+    minHeight: 66,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dropdownOptionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownOptionTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  dropdownOptionTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  dropdownOptionSubtitle: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
   },
   input: {
     minHeight: 48,
