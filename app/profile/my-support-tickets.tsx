@@ -23,11 +23,11 @@ type SupportTicket = {
 };
 
 const STATUS_COLORS = {
-  Open: { text: '#177245', bg: '#EAF7EF' },
-  'In Review': { text: '#A16207', bg: '#FFF6E3' },
-  Resolved: { text: '#1667A8', bg: '#E9F4FF' },
-  Closed: { text: '#667085', bg: '#F2F4F7' },
-};
+  Open: { text: '#14988F', bg: '#E7F5F3', icon: 'radio-button-on-outline' },
+  'In Review': { text: '#A16207', bg: '#FFF6E3', icon: 'hourglass-outline' },
+  Resolved: { text: '#157A62', bg: '#E9F8EF', icon: 'checkmark-done-outline' },
+  Closed: { text: '#667085', bg: '#F2F4F7', icon: 'lock-closed-outline' },
+} as const;
 
 export default function MySupportTicketsScreen() {
   const { token } = useAuth();
@@ -148,27 +148,30 @@ export default function MySupportTicketsScreen() {
 
             return (
               <View key={ticket.id} style={[styles.ticketCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.ticketAccent, { backgroundColor: isUrgent ? colors.danger : colors.accent }]} />
+
                 <View style={styles.ticketTopRow}>
-                  <View style={styles.ticketIdWrap}>
-                    <Text style={[styles.ticketId, { color: colors.accent }]} selectable>
-                      {ticket.id}
-                    </Text>
-                    <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
-                      Created {formatDate(ticket.createdAt)}
-                    </Text>
+                  <View style={styles.ticketHeadingRow}>
+                    <View style={[styles.ticketIconWrap, { backgroundColor: colors.accentSoft }]}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accent} />
+                    </View>
+                    <View style={styles.ticketIdWrap}>
+                      <Text style={[styles.ticketSubject, { color: colors.textPrimary }]}>{ticket.subject}</Text>
+                      <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
+                        Created {formatDate(ticket.createdAt)}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={[styles.statusBadge, { backgroundColor: statusTone.bg }]}>
+                    <Ionicons name={statusTone.icon} size={13} color={statusTone.text} />
                     <Text style={[styles.statusBadgeText, { color: statusTone.text }]}>{ticket.status}</Text>
                   </View>
                 </View>
 
-                <Text style={[styles.ticketSubject, { color: colors.textPrimary }]}>{ticket.subject}</Text>
                 <Text style={[styles.ticketDescription, { color: colors.textSecondary }]} numberOfLines={3}>
                   {ticket.description}
                 </Text>
-
-                <View style={[styles.ticketDivider, { backgroundColor: colors.divider }]} />
 
                 <View style={styles.metaGrid}>
                   <View style={[styles.metaPill, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
@@ -194,15 +197,29 @@ export default function MySupportTicketsScreen() {
                   </View>
                 </View>
 
-                {!!ticket.rideReference && (
-                  <Text style={[styles.rideReference, { color: colors.textSecondary }]} selectable>
-                    Ride reference: {ticket.rideReference}
-                  </Text>
-                )}
+                <View style={[styles.ticketFooterPanel, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
+                  <View style={styles.footerInfoItem}>
+                    <Ionicons name="calendar-outline" size={15} color={colors.accent} />
+                    <Text style={[styles.footerInfoText, { color: colors.textSecondary }]}>
+                      Updated {formatDate(ticket.updatedAt)}
+                    </Text>
+                  </View>
+                  {!!ticket.rideReference && (
+                    <View style={styles.footerInfoItem}>
+                      <Ionicons name="receipt-outline" size={15} color={colors.accent} />
+                      <Text style={[styles.footerInfoText, { color: colors.textSecondary }]} selectable>
+                        Ride {ticket.rideReference}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 {!!ticket.adminNote && (
                   <View style={[styles.adminNoteCard, { backgroundColor: colors.elevatedCard, borderColor: colors.border }]}>
-                    <Text style={[styles.adminNoteLabel, { color: colors.textPrimary }]}>Support reply</Text>
+                    <View style={styles.adminNoteHeader}>
+                      <Ionicons name="headset-outline" size={15} color={colors.accent} />
+                      <Text style={[styles.adminNoteLabel, { color: colors.textPrimary }]}>Support reply</Text>
+                    </View>
                     <Text style={[styles.adminNoteText, { color: colors.textSecondary }]}>{ticket.adminNote}</Text>
                   </View>
                 )}
@@ -299,6 +316,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 14,
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  ticketAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   ticketTopRow: {
     flexDirection: 'row',
@@ -307,13 +332,22 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 10,
   },
+  ticketHeadingRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ticketIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ticketIdWrap: {
     flex: 1,
     gap: 2,
-  },
-  ticketId: {
-    fontSize: 12,
-    fontWeight: '900',
   },
   ticketDate: {
     fontSize: 11,
@@ -323,6 +357,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   statusBadgeText: {
     fontSize: 11,
@@ -331,22 +368,18 @@ const styles = StyleSheet.create({
   ticketSubject: {
     fontSize: 15,
     fontWeight: '900',
-    marginBottom: 5,
   },
   ticketDescription: {
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '600',
   },
-  ticketDivider: {
-    height: 1,
-    marginVertical: 12,
-  },
   metaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 8,
+    marginTop: 12,
+    marginBottom: 10,
   },
   metaPill: {
     borderRadius: 999,
@@ -361,10 +394,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  rideReference: {
+  ticketFooterPanel: {
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 11,
+    gap: 8,
+  },
+  footerInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  footerInfoText: {
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
   },
   adminNoteCard: {
     borderRadius: 13,
@@ -372,6 +415,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 12,
     gap: 4,
+  },
+  adminNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   adminNoteLabel: {
     fontSize: 12,
