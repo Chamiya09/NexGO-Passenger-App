@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -49,7 +49,26 @@ export default function PersonalDetailsScreen() {
     danger: '#C13B3B',
     dangerSoft: '#FFF4F4',
     success: '#157A62',
+    warning: '#D97706',
+    warningSoft: '#FFF8EC',
+    successSoft: '#E9F8EF',
   };
+
+  const profileStats = useMemo(() => {
+    const completedFields = [
+      user?.fullName,
+      user?.email,
+      user?.phoneNumber,
+      user?.profileImageUrl,
+    ].filter(Boolean).length;
+    const completion = Math.round((completedFields / 4) * 100);
+
+    return {
+      completion,
+      contactCount: [user?.email, user?.phoneNumber].filter(Boolean).length,
+      hasPhoto: Boolean(user?.profileImageUrl),
+    };
+  }, [user?.email, user?.fullName, user?.phoneNumber, user?.profileImageUrl]);
 
   useEffect(() => {
     setForm({
@@ -193,6 +212,14 @@ export default function PersonalDetailsScreen() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
+          <View style={styles.topBar}>
+            <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            </Pressable>
+            <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Personal Details</Text>
+            <View style={styles.topBarSpacer} />
+          </View>
+
           <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.heroTopRow}>
               <View style={[styles.heroAvatar, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
@@ -231,9 +258,46 @@ export default function PersonalDetailsScreen() {
           {errorMessage ? <Text style={[styles.feedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
           {successMessage ? <Text style={[styles.feedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PERSONAL DETAILS</Text>
+          <View style={styles.metricGrid}>
+            <ProfileMetricCard
+              icon="person-circle-outline"
+              label="Profile"
+              value={`${profileStats.completion}%`}
+              color={colors.accent}
+              backgroundColor={colors.accentSoft}
+              borderColor={colors.border}
+              textColor={colors.textPrimary}
+              secondaryColor={colors.textSecondary}
+            />
+            <ProfileMetricCard
+              icon="call-outline"
+              label="Contacts"
+              value={`${profileStats.contactCount}/2`}
+              color={colors.success}
+              backgroundColor={colors.successSoft}
+              borderColor={colors.border}
+              textColor={colors.textPrimary}
+              secondaryColor={colors.textSecondary}
+            />
+            <ProfileMetricCard
+              icon="image-outline"
+              label="Photo"
+              value={profileStats.hasPhoto ? 'Set' : 'Empty'}
+              color={profileStats.hasPhoto ? colors.success : colors.warning}
+              backgroundColor={profileStats.hasPhoto ? colors.successSoft : colors.warningSoft}
+              borderColor={colors.border}
+              textColor={colors.textPrimary}
+              secondaryColor={colors.textSecondary}
+            />
+          </View>
 
-          <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.textSecondary }]}>PROFILE INFORMATION</Text>
+            <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>Passenger account</Text>
+          </View>
+
+          <View style={[styles.groupCard, styles.profileInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.cardAccent, { backgroundColor: colors.accent }]} />
             <View style={styles.detailsHeader}>
               <View>
                 <Text style={[styles.detailsTitle, { color: colors.textPrimary }]}>Account information</Text>
@@ -253,24 +317,30 @@ export default function PersonalDetailsScreen() {
 
             <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
 
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Full name</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.fullName || 'Not set'}</Text>
-            </View>
+            <ProfileInfoRow
+              icon="person-outline"
+              label="Full name"
+              value={user?.fullName || 'Not set'}
+              colors={colors}
+            />
 
             <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
 
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.email || 'Not set'}</Text>
-            </View>
+            <ProfileInfoRow
+              icon="mail-outline"
+              label="Email"
+              value={user?.email || 'Not set'}
+              colors={colors}
+            />
 
             <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
 
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone number</Text>
-              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{user?.phoneNumber || 'Not set'}</Text>
-            </View>
+            <ProfileInfoRow
+              icon="call-outline"
+              label="Phone number"
+              value={user?.phoneNumber || 'Not set'}
+              colors={colors}
+            />
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DANGER ZONE</Text>
@@ -448,6 +518,66 @@ export default function PersonalDetailsScreen() {
   );
 }
 
+function ProfileMetricCard({
+  icon,
+  label,
+  value,
+  color,
+  backgroundColor,
+  borderColor,
+  textColor,
+  secondaryColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  secondaryColor: string;
+}) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor: '#FFFFFF', borderColor }]}>
+      <View style={[styles.metricIcon, { backgroundColor }]}>
+        <Ionicons name={icon} size={17} color={color} />
+      </View>
+      <Text style={[styles.metricValue, { color: textColor }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: secondaryColor }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+function ProfileInfoRow({
+  icon,
+  label,
+  value,
+  colors,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  colors: {
+    accent: string;
+    accentSoft: string;
+    textPrimary: string;
+    textSecondary: string;
+    border: string;
+  };
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={[styles.infoIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+        <Ionicons name={icon} size={15} color={colors.accent} />
+      </View>
+      <View style={styles.infoTextWrap}>
+        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[styles.infoValue, { color: colors.textPrimary }]} numberOfLines={2}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -459,6 +589,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 24,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   heroCard: {
     borderRadius: 16,
@@ -527,6 +681,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
@@ -534,12 +720,39 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 2,
   },
+  sectionHeaderRow: {
+    minHeight: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6,
+  },
+  sectionTitleInline: {
+    marginBottom: 0,
+    marginTop: 0,
+  },
+  sectionHint: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   groupCard: {
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: 12,
     padding: 12,
+  },
+  profileInfoCard: {
+    position: 'relative',
+    paddingLeft: 16,
+  },
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   detailsHeader: {
     flexDirection: 'row',
@@ -574,21 +787,34 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    minHeight: 42,
+  },
+  infoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    minHeight: 22,
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  infoTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   infoLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    flexShrink: 0,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 3,
   },
   infoValue: {
     fontSize: 14,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'right',
+    fontWeight: '800',
+    lineHeight: 19,
   },
   inlineDivider: {
     height: 1,

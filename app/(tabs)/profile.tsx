@@ -22,12 +22,11 @@ type ProfileSection = {
   icon: keyof typeof Ionicons.glyphMap;
   route:
     | '/profile/personal-details'
-    | '/profile/membership'
     | '/profile/support-help'
     | '/profile/my-support-tickets'
     | '/profile/my-reviews'
     | '/profile/saved-addresses'
-    | '/profile/payment-details'
+    | '/profile/wallet'
     | '/profile/privacy-security'
     | '/profile/earn-with-nexgo'
     | '/profile/about-us';
@@ -42,16 +41,10 @@ const PROFILE_SECTIONS: ProfileSection[] = [
     route: '/profile/personal-details',
   },
   {
-    title: 'Membership',
-    subtitle: 'See tier benefits and point milestones',
-    icon: 'ribbon-outline',
-    route: '/profile/membership',
-  },
-  {
-    title: 'Payment',
-    subtitle: 'Cards, wallet setup, and transaction methods',
-    icon: 'card-outline',
-    route: '/profile/payment-details',
+    title: 'Wallet',
+    subtitle: 'Top up ride credit and view wallet activity',
+    icon: 'wallet-outline',
+    route: '/profile/wallet',
   },
   {
     title: 'My Reviews',
@@ -160,12 +153,6 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          <Pressable
-            style={[styles.quickActionButton, { backgroundColor: palette.accent }]}
-            onPress={() => router.push('/profile/membership')}>
-            <Text style={styles.quickActionText}>Open Membership Hub</Text>
-            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-          </Pressable>
         </View>
 
         <View style={styles.sectionHeadingWrap}>
@@ -302,20 +289,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  quickActionButton: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  quickActionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
   },
   sectionHeadingWrap: {
     marginBottom: 10,

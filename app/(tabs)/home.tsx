@@ -374,7 +374,7 @@ export default function HomeScreen() {
       label: 'Wallet',
       caption: 'Payments',
       icon: 'wallet-outline',
-      onPress: () => router.push('/profile/payment-details'),
+      onPress: () => router.push('/profile/wallet'),
     },
     {
       label: 'Trips',

@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -21,34 +20,38 @@ import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
-type PaymentMethod = {
-  _id: string;
-  cardholderName: string;
-  brand: string;
-  last4: string;
-  expiryMonth: string;
-  expiryYear: string;
-  isDefault: boolean;
+type WalletTransaction = {
+  _id?: string;
+  type: 'topup' | 'ride_payment' | 'refund' | 'adjustment';
+  amount: number;
+  balanceAfter: number;
+  paymentMethodId?: string | null;
+  description?: string;
+  createdAt?: string;
 };
 
-const initialForm = {
+type Wallet = {
+  balance: number;
+  transactions: WalletTransaction[];
+};
+
+const initialTopUpForm = {
+  amount: '',
   cardholderName: '',
   cardNumber: '',
   expiryMonth: '',
   expiryYear: '',
-  isDefault: false,
 };
 
-export default function PaymentDetailsScreen() {
+export default function WalletScreen() {
   const { token } = useAuth();
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [wallet, setWallet] = useState<Wallet>({ balance: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [updatingDefaultId, setUpdatingDefaultId] = useState<string | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [topUpSaving, setTopUpSaving] = useState(false);
+  const [isTopUpModalVisible, setIsTopUpModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [form, setForm] = useState(initialForm);
+  const [topUpForm, setTopUpForm] = useState(initialTopUpForm);
 
   const colors = {
     background: useThemeColor({}, 'background'),
@@ -65,155 +68,150 @@ export default function PaymentDetailsScreen() {
     success: '#157A62',
   };
 
-  const loadPaymentMethods = useCallback(async () => {
+  const loadWalletDetails = useCallback(async () => {
     if (!token) {
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/payment-methods`, {
+      const requestConfig = {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
+      };
 
-      const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
-      setPaymentMethods(data.paymentMethods);
+      const walletResponse = await fetch(`${API_BASE_URL}/auth/wallet`, requestConfig);
+      const walletData = await parseApiResponse<{ wallet: Wallet }>(walletResponse);
+
+      setWallet(walletData.wallet);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load payment methods');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load wallet details');
     } finally {
       setLoading(false);
     }
   }, [token]);
 
   useEffect(() => {
-    void loadPaymentMethods();
-  }, [loadPaymentMethods]);
+    void loadWalletDetails();
+  }, [loadWalletDetails]);
 
-  const handleChange = (field: keyof typeof initialForm, value: string | boolean) => {
-    setForm((current) => ({
+  const handleTopUpChange = (field: keyof typeof initialTopUpForm, value: string) => {
+    setTopUpForm((current) => ({
       ...current,
       [field]: value,
     }));
   };
 
-  const openAddModal = () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setForm({
-      ...initialForm,
-      isDefault: paymentMethods.length === 0,
+  const formatMoney = (amount: number) =>
+    `LKR ${Number(amount || 0).toLocaleString('en-LK', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const formatTransactionDate = (dateValue?: string) => {
+    if (!dateValue) {
+      return 'Just now';
+    }
+
+    return new Date(dateValue).toLocaleDateString('en-LK', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     });
-    setIsModalVisible(true);
   };
 
-  const closeAddModal = () => {
-    if (saving) {
+  const openTopUpModal = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setTopUpForm({
+      ...initialTopUpForm,
+    });
+    setIsTopUpModalVisible(true);
+  };
+
+  const closeTopUpModal = () => {
+    if (topUpSaving) {
       return;
     }
 
-    setIsModalVisible(false);
-    setForm(initialForm);
+    setIsTopUpModalVisible(false);
+    setTopUpForm(initialTopUpForm);
   };
 
-  const validatePaymentForm = () => {
-    const cardholderName = form.cardholderName.trim();
-    const cardNumber = form.cardNumber.replace(/\D/g, '');
-    const expiryMonth = form.expiryMonth.trim();
-    const expiryYear = form.expiryYear.trim();
+  const submitTopUp = async () => {
+    if (!token) {
+      setErrorMessage('You need to be logged in to top up your wallet.');
+      return;
+    }
+
+    const amount = Number(topUpForm.amount);
+
+    if (!Number.isFinite(amount) || amount < 100) {
+      setErrorMessage('Enter a top up amount of at least LKR 100.');
+      setSuccessMessage(null);
+      return;
+    }
+
+    const cardNumber = topUpForm.cardNumber.replace(/\D/g, '');
+    const expiryMonth = topUpForm.expiryMonth.trim();
+    const expiryYear = topUpForm.expiryYear.trim();
+    const cardholderName = topUpForm.cardholderName.trim();
 
     if (!cardholderName || !cardNumber || !expiryMonth || !expiryYear) {
-      return 'Please complete all payment method fields.';
+      setErrorMessage('Please complete all card details for this top up.');
+      setSuccessMessage(null);
+      return;
     }
 
     if (cardNumber.length < 12 || cardNumber.length > 19) {
-      return 'Card number must be between 12 and 19 digits.';
-    }
-
-    if (!/^(0?[1-9]|1[0-2])$/.test(expiryMonth)) {
-      return 'Enter a valid expiry month between 1 and 12.';
-    }
-
-    if (!/^\d{2,4}$/.test(expiryYear)) {
-      return 'Enter a valid expiry year with 2 or 4 digits.';
-    }
-
-    return null;
-  };
-
-  const submitPaymentMethod = async () => {
-    if (!token) {
-      setErrorMessage('You need to be logged in to add a payment method.');
+      setErrorMessage('Card number must be between 12 and 19 digits.');
+      setSuccessMessage(null);
       return;
     }
 
-    const validationError = validatePaymentForm();
-    if (validationError) {
-      setErrorMessage(validationError);
+    if (!/^(0?[1-9]|1[0-2])$/.test(expiryMonth)) {
+      setErrorMessage('Enter a valid expiry month between 1 and 12.');
+      setSuccessMessage(null);
+      return;
+    }
+
+    if (!/^\d{2,4}$/.test(expiryYear)) {
+      setErrorMessage('Enter a valid expiry year with 2 or 4 digits.');
       setSuccessMessage(null);
       return;
     }
 
     Keyboard.dismiss();
-
-    setSaving(true);
+    setTopUpSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/payment-methods`, {
+      const response = await fetch(`${API_BASE_URL}/auth/wallet/top-up`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          cardholderName: form.cardholderName.trim(),
-          cardNumber: form.cardNumber.replace(/\D/g, ''),
-          expiryMonth: form.expiryMonth.trim(),
-          expiryYear: form.expiryYear.trim(),
-          isDefault: form.isDefault,
+          amount,
+          cardholderName,
+          cardNumber,
+          expiryMonth,
+          expiryYear,
         }),
       });
 
-      const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
-      setPaymentMethods(data.paymentMethods);
-      setIsModalVisible(false);
-      setForm(initialForm);
-      setSuccessMessage('Payment method added successfully.');
+      const data = await parseApiResponse<{ wallet: Wallet }>(response);
+      setWallet(data.wallet);
+      setIsTopUpModalVisible(false);
+      setTopUpForm(initialTopUpForm);
+      setSuccessMessage('Wallet topped up successfully.');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to save payment method');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to top up wallet');
     } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateDefaultPaymentMethod = async (paymentMethodId: string) => {
-    if (!token) {
-      setErrorMessage('You need to be logged in to update the default payment method.');
-      return;
-    }
-
-    setUpdatingDefaultId(paymentMethodId);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/payment-methods/${paymentMethodId}/default`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await parseApiResponse<{ paymentMethods: PaymentMethod[] }>(response);
-      setPaymentMethods(data.paymentMethods);
-      setSuccessMessage('Default payment method updated.');
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to update default payment method');
-    } finally {
-      setUpdatingDefaultId(null);
+      setTopUpSaving(false);
     }
   };
 
@@ -222,105 +220,83 @@ export default function PaymentDetailsScreen() {
       <RefreshableScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
-        onRefreshPage={loadPaymentMethods}>
+        onRefreshPage={loadWalletDetails}>
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="lock-closed-outline" size={15} color={colors.accent} />
-            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Payments protected</Text>
+            <Ionicons name="wallet-outline" size={15} color={colors.accent} />
+            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Wallet</Text>
           </View>
 
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
-            Add and manage your saved cards here. Raw card numbers are not stored in the database.
+            Keep ride credit ready and top up your wallet using a card.
           </Text>
         </View>
 
         {errorMessage ? <Text style={[styles.pageFeedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
         {successMessage ? <Text style={[styles.pageFeedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PAYMENT METHODS</Text>
-          <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add Method</Text>
-          </Pressable>
-        </View>
+        <View style={[styles.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.walletHeader}>
+            <View>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
+              <Text style={[styles.walletBalance, { color: colors.textPrimary }]}>{formatMoney(wallet.balance)}</Text>
+            </View>
 
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable
+              style={[styles.topUpButton, { backgroundColor: colors.accent }]}
+              onPress={openTopUpModal}
+              disabled={loading}>
+              <Ionicons name="wallet-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.topUpButtonText}>Top Up</Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.walletHint, { color: colors.textSecondary }]}>
+            Enter card details only when you top up. Card numbers are not saved from this wallet page.
+          </Text>
+
+          <View style={[styles.walletDivider, { backgroundColor: colors.divider }]} />
+
+          <Text style={[styles.walletHistoryTitle, { color: colors.textPrimary }]}>Recent activity</Text>
           {loading ? (
-            <View style={styles.stateRow}>
+            <View style={styles.compactStateRow}>
               <ActivityIndicator size="small" color={colors.accent} />
-              <Text style={[styles.stateText, { color: colors.textSecondary }]}>Loading payment methods...</Text>
+              <Text style={[styles.stateText, { color: colors.textSecondary }]}>Loading wallet...</Text>
             </View>
-          ) : paymentMethods.length === 0 ? (
-            <View style={styles.emptyStateWrap}>
-              <View style={[styles.emptyIconWrap, { backgroundColor: colors.accentSoft }]}>
-                <Ionicons name="card-outline" size={22} color={colors.accent} />
-              </View>
-              <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>No payment methods yet</Text>
-              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                Tap Add Method to save your first card.
-              </Text>
-            </View>
+          ) : wallet.transactions.length === 0 ? (
+            <Text style={[styles.walletHint, { color: colors.textSecondary }]}>No wallet activity yet.</Text>
           ) : (
-            paymentMethods.map((method, index) => {
-              const isUpdatingDefault = updatingDefaultId === method._id;
-
-              return (
-                <View key={method._id || `${method.brand}-${method.last4}-${index}`}>
-                  <View style={styles.methodRow}>
-                    <View style={styles.rowLeft}>
-                      <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
-                        <Ionicons name="card-outline" size={16} color={colors.accent} />
-                      </View>
-
-                      <View style={styles.methodTextWrap}>
-                        <View style={styles.methodTitleRow}>
-                          <Text style={[styles.rowValue, { color: colors.textPrimary }]}>
-                            {method.brand} ending {method.last4}
-                          </Text>
-                          {method.isDefault ? (
-                            <View style={[styles.defaultPill, { backgroundColor: colors.accentSoft }]}>
-                              <Text style={[styles.defaultPillText, { color: colors.accent }]}>Default</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{method.cardholderName}</Text>
-                        <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
-                          Expires {method.expiryMonth}/{method.expiryYear}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.defaultToggleWrap}>
-                      {isUpdatingDefault ? (
-                        <ActivityIndicator size="small" color={colors.accent} />
-                      ) : (
-                        <Switch
-                          value={method.isDefault}
-                          onValueChange={(value) => {
-                            if (value && !method.isDefault) {
-                              void updateDefaultPaymentMethod(method._id);
-                            }
-                          }}
-                          trackColor={{ false: '#C7D4D2', true: colors.accent }}
-                          thumbColor="#FFFFFF"
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {index < paymentMethods.length - 1 ? (
-                    <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-                  ) : null}
+            wallet.transactions.slice(0, 3).map((transaction, index) => (
+              <View
+                key={transaction._id || `${transaction.type}-${transaction.createdAt}-${index}`}
+                style={styles.transactionRow}>
+                <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+                  <Ionicons
+                    name={transaction.type === 'topup' ? 'arrow-down-circle-outline' : 'receipt-outline'}
+                    size={16}
+                    color={colors.accent}
+                  />
                 </View>
-              );
-            })
+
+                <View style={styles.transactionTextWrap}>
+                  <Text style={[styles.rowValue, { color: colors.textPrimary }]}>
+                    {transaction.description || 'Wallet transaction'}
+                  </Text>
+                  <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
+                    {formatTransactionDate(transaction.createdAt)} - Balance {formatMoney(transaction.balanceAfter)}
+                  </Text>
+                </View>
+
+                <Text style={[styles.transactionAmount, { color: colors.success }]}>
+                  +{formatMoney(transaction.amount)}
+                </Text>
+              </View>
+            ))
           )}
         </View>
       </RefreshableScrollView>
 
-      <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={closeAddModal}>
+      <Modal visible={isTopUpModalVisible} transparent animationType="fade" onRequestClose={closeTopUpModal}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <KeyboardAvoidingView
             style={styles.modalKeyboardWrap}
@@ -333,22 +309,50 @@ export default function PaymentDetailsScreen() {
               <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.modalHeader}>
                   <View>
-                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Add Payment Method</Text>
-                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                      Save masked card details securely for future rides.
-                    </Text>
+                    <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Top Up Wallet</Text>
+                    <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Add credit using a card.</Text>
                   </View>
 
-                  <Pressable style={styles.closeButton} onPress={closeAddModal} disabled={saving}>
+                  <Pressable style={styles.closeButton} onPress={closeTopUpModal} disabled={topUpSaving}>
                     <Ionicons name="close" size={20} color={colors.textPrimary} />
                   </Pressable>
+                </View>
+
+                <View style={[styles.topUpBalanceBox, { backgroundColor: colors.accentSoft }]}>
+                  <Text style={[styles.topUpBalanceLabel, { color: colors.accent }]}>Current balance</Text>
+                  <Text style={[styles.topUpBalanceValue, { color: colors.textPrimary }]}>
+                    {formatMoney(wallet.balance)}
+                  </Text>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Top up amount</Text>
+                  <TextInput
+                    value={topUpForm.amount}
+                    onChangeText={(value) => handleTopUpChange('amount', value.replace(/[^\d.]/g, ''))}
+                    placeholder="1000"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={() => {
+                      void submitTopUp();
+                    }}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
+                  />
                 </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Cardholder name</Text>
                   <TextInput
-                    value={form.cardholderName}
-                    onChangeText={(value) => handleChange('cardholderName', value)}
+                    value={topUpForm.cardholderName}
+                    onChangeText={(value) => handleTopUpChange('cardholderName', value)}
                     placeholder="Name on card"
                     placeholderTextColor={colors.textSecondary}
                     returnKeyType="next"
@@ -366,8 +370,8 @@ export default function PaymentDetailsScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Card number</Text>
                   <TextInput
-                    value={form.cardNumber}
-                    onChangeText={(value) => handleChange('cardNumber', value)}
+                    value={topUpForm.cardNumber}
+                    onChangeText={(value) => handleTopUpChange('cardNumber', value)}
                     placeholder="1234 5678 9012 3456"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="number-pad"
@@ -387,8 +391,8 @@ export default function PaymentDetailsScreen() {
                   <View style={[styles.inputGroup, styles.inlineField]}>
                     <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry month</Text>
                     <TextInput
-                      value={form.expiryMonth}
-                      onChangeText={(value) => handleChange('expiryMonth', value)}
+                      value={topUpForm.expiryMonth}
+                      onChangeText={(value) => handleTopUpChange('expiryMonth', value)}
                       placeholder="MM"
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="number-pad"
@@ -407,14 +411,14 @@ export default function PaymentDetailsScreen() {
                   <View style={[styles.inputGroup, styles.inlineField]}>
                     <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Expiry year</Text>
                     <TextInput
-                      value={form.expiryYear}
-                      onChangeText={(value) => handleChange('expiryYear', value)}
+                      value={topUpForm.expiryYear}
+                      onChangeText={(value) => handleTopUpChange('expiryYear', value)}
                       placeholder="YYYY"
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="number-pad"
                       returnKeyType="done"
                       onSubmitEditing={() => {
-                        void submitPaymentMethod();
+                        void submitTopUp();
                       }}
                       style={[
                         styles.input,
@@ -428,27 +432,11 @@ export default function PaymentDetailsScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.switchRow, { borderColor: colors.border }]}>
-                  <View>
-                    <Text style={[styles.switchTitle, { color: colors.textPrimary }]}>Set as default</Text>
-                    <Text style={[styles.switchHint, { color: colors.textSecondary }]}>
-                      Use this payment method first for future rides.
-                    </Text>
-                  </View>
-
-                  <Switch
-                    value={form.isDefault}
-                    onValueChange={(value) => handleChange('isDefault', value)}
-                    trackColor={{ false: '#C7D4D2', true: colors.accent }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
-
                 <View style={styles.modalActions}>
                   <Pressable
                     style={[styles.secondaryButton, { borderColor: colors.border }]}
-                    onPress={closeAddModal}
-                    disabled={saving}>
+                    onPress={closeTopUpModal}
+                    disabled={topUpSaving}>
                     <Text style={[styles.secondaryButtonText, { color: colors.textPrimary }]}>Cancel</Text>
                   </Pressable>
 
@@ -456,13 +444,13 @@ export default function PaymentDetailsScreen() {
                     style={[
                       styles.submitButton,
                       { backgroundColor: colors.accent },
-                      saving ? styles.submitButtonDisabled : null,
+                      topUpSaving ? styles.submitButtonDisabled : null,
                     ]}
                     onPress={() => {
-                      void submitPaymentMethod();
+                      void submitTopUp();
                     }}
-                    disabled={saving}>
-                    <Text style={styles.submitButtonText}>{saving ? 'Saving...' : 'Save Method'}</Text>
+                    disabled={topUpSaving}>
+                    <Text style={styles.submitButtonText}>{topUpSaving ? 'Processing...' : 'Top Up'}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -542,6 +530,72 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: 14,
+  },
+  walletCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+  },
+  walletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  walletBalance: {
+    fontSize: 30,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  walletHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+    marginTop: 10,
+  },
+  topUpButton: {
+    minHeight: 40,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  topUpButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  walletDivider: {
+    height: 1,
+    marginVertical: 14,
+  },
+  walletHistoryTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  compactStateRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  transactionRow: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  transactionTextWrap: {
+    flex: 1,
+  },
+  transactionAmount: {
+    fontSize: 13,
+    fontWeight: '900',
   },
   stateRow: {
     minHeight: 76,
@@ -702,6 +756,35 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     fontWeight: '600',
+  },
+  topUpBalanceBox: {
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  topUpBalanceLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  topUpBalanceValue: {
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  cardSelectorList: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  cardSelectorItem: {
+    minHeight: 66,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   inlineFields: {
     flexDirection: 'row',
