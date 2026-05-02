@@ -34,7 +34,6 @@ const palette = {
   border: '#D9E9E6',
   success: '#157A62',
   warning: '#D97706',
-  warningBg: '#FFF8EC',
 };
 
 type QuickAction = {
@@ -92,6 +91,8 @@ const serviceCards: ServiceCard[] = [
   },
 ];
 
+const SERVICE_CARD_SNAP_INTERVAL = 226;
+
 function getFirstName(fullName?: string) {
   return fullName?.trim().split(/\s+/)[0] || 'Passenger';
 }
@@ -99,15 +100,23 @@ function getFirstName(fullName?: string) {
 function getTimeGreeting() {
   const hour = new Date().getHours();
 
-  if (hour < 12) {
+  if (hour >= 5 && hour < 8) {
+    return 'Early Morning';
+  }
+
+  if (hour >= 8 && hour < 12) {
     return 'Good Morning';
   }
 
-  if (hour < 17) {
+  if (hour >= 12 && hour < 17) {
     return 'Good Afternoon';
   }
 
-  return 'Good Evening';
+  if (hour >= 17 && hour < 21) {
+    return 'Good Evening';
+  }
+
+  return 'Good Night';
 }
 
 function getActivePromotions(promotions: PromotionSummary[]) {
@@ -388,6 +397,8 @@ export default function HomeScreen() {
   const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
   const promoScrollRef = React.useRef<ScrollView>(null);
   const promoAutoIndexRef = React.useRef(0);
+  const serviceScrollRef = React.useRef<ScrollView>(null);
+  const serviceAutoIndexRef = React.useRef(0);
 
   const loadActiveRide = useCallback(async () => {
     const ride = await loadPassengerActiveRide();
@@ -438,6 +449,20 @@ export default function HomeScreen() {
 
     return () => clearInterval(interval);
   }, [promotions.length]);
+
+  useEffect(() => {
+    if (serviceCards.length <= 1) return undefined;
+
+    const interval = setInterval(() => {
+      serviceAutoIndexRef.current = (serviceAutoIndexRef.current + 1) % serviceCards.length;
+      serviceScrollRef.current?.scrollTo({
+        x: serviceAutoIndexRef.current * SERVICE_CARD_SNAP_INTERVAL,
+        animated: true,
+      });
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const getPromoCaption = (promotion: PromotionSummary) => (
     promotion.discountType === 'Percentage'
@@ -565,7 +590,19 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.servicesScroll}>
+        <ScrollView
+          ref={serviceScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.servicesScroll}
+          decelerationRate="fast"
+          snapToInterval={SERVICE_CARD_SNAP_INTERVAL}
+          snapToAlignment="start"
+          onMomentumScrollEnd={(event) => {
+            serviceAutoIndexRef.current = Math.round(
+              event.nativeEvent.contentOffset.x / SERVICE_CARD_SNAP_INTERVAL
+            );
+          }}>
           {serviceCards.map((service) => (
             <ServiceTile key={service.title} service={service} onPress={() => router.push('/(tabs)/ride')} />
           ))}
@@ -617,18 +654,6 @@ export default function HomeScreen() {
             <Ionicons name="shield-checkmark-outline" size={18} color={palette.warning} />
             <Text style={styles.tripTipValue}>Verified</Text>
             <Text style={styles.tripTipLabel}>Check driver info</Text>
-          </View>
-        </View>
-
-        <View style={styles.safetyCard}>
-          <View style={styles.safetyIcon}>
-            <Ionicons name="shield-outline" size={22} color={palette.warning} />
-          </View>
-          <View style={styles.safetyCopy}>
-            <Text style={styles.safetyTitle}>Safety reminder</Text>
-            <Text style={styles.safetyText}>
-              Check the driver name, vehicle color, and plate number before starting your trip.
-            </Text>
           </View>
         </View>
 
@@ -1114,38 +1139,6 @@ const styles = StyleSheet.create({
     color: '#1F1300',
     fontSize: 11,
     fontWeight: '900',
-  },
-  safetyCard: {
-    backgroundColor: palette.warningBg,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#F3E5C8',
-    padding: 15,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  safetyIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  safetyCopy: {
-    flex: 1,
-  },
-  safetyTitle: {
-    color: palette.primary,
-    fontSize: 15,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  safetyText: {
-    color: palette.secondary,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '600',
   },
   bottomSpacer: {
     height: 24,
