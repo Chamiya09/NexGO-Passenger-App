@@ -9,6 +9,7 @@ export type PassengerActiveRideParams = {
   id: string;
   driverId?: string;
   driverName?: string;
+  driverImage?: string;
   vehicleType?: string;
   status?: string;
   pLat?: string;

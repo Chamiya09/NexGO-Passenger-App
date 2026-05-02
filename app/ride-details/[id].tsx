@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -233,9 +234,13 @@ export default function RideDetailsScreen() {
                 activeOpacity={0.75}
               >
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(params.driverName || 'D').trim().charAt(0).toUpperCase()}
-                  </Text>
+                  {params.driverImage ? (
+                    <Image source={{ uri: params.driverImage }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {(params.driverName || 'D').trim().charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.driverTextWrap}>
                   <Text style={styles.driverName}>{params.driverName || 'Driver not available'}</Text>
@@ -477,6 +482,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   headerText: {
     flex: 1,

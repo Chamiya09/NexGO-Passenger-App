@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { pickProfileImageFromGallery, uploadProfileImage } from '@/src/utils/profileImageUpload';
 
 export default function PersonalDetailsScreen() {
   const { user, updateProfile, deleteAccount } = useAuth();
@@ -29,6 +30,7 @@ export default function PersonalDetailsScreen() {
     profileImageUrl: user?.profileImageUrl || '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -127,6 +129,26 @@ export default function PersonalDetailsScreen() {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to update personal details');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePickProfileImage = async () => {
+    setUploadingImage(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const pickedImage = await pickProfileImageFromGallery();
+      if (!pickedImage) {
+        return;
+      }
+
+      const uploadedUrl = await uploadProfileImage(pickedImage);
+      handleChange('profileImageUrl', uploadedUrl);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to upload profile image.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -321,29 +343,21 @@ export default function PersonalDetailsScreen() {
                     )}
                   </View>
                   <Text style={[styles.avatarEditorHint, { color: colors.textSecondary }]}>
-                    Paste an image URL to update your profile icon.
+                    Select a square photo from your gallery for your passenger profile.
                   </Text>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Profile image URL</Text>
-                  <TextInput
-                    value={form.profileImageUrl}
-                    onChangeText={(value) => handleChange('profileImageUrl', value)}
-                    placeholder="https://example.com/avatar.jpg"
-                    placeholderTextColor={colors.textSecondary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.border,
-                        color: colors.textPrimary,
-                      },
-                    ]}
-                  />
-                </View>
+                <Pressable
+                  style={[styles.imageSelectButton, { borderColor: colors.border, backgroundColor: colors.accentSoft }]}
+                  onPress={() => {
+                    void handlePickProfileImage();
+                  }}
+                  disabled={saving || uploadingImage}>
+                  <Ionicons name="image-outline" size={17} color={colors.accent} />
+                  <Text style={[styles.imageSelectButtonText, { color: colors.accent }]}>
+                    {uploadingImage ? 'Uploading...' : form.profileImageUrl ? 'Change Profile Image' : 'Choose From Gallery'}
+                  </Text>
+                </Pressable>
 
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Full name</Text>
@@ -421,7 +435,7 @@ export default function PersonalDetailsScreen() {
                     onPress={() => {
                       void handleSave();
                     }}
-                    disabled={saving}>
+                    disabled={saving || uploadingImage}>
                     <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Update Details'}</Text>
                   </Pressable>
                 </View>
@@ -610,6 +624,20 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  imageSelectButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  imageSelectButtonText: {
+    fontSize: 13,
+    fontWeight: '900',
   },
   inputLabel: {
     fontSize: 12,

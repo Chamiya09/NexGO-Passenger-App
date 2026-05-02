@@ -29,6 +29,7 @@ type AcceptedRideData = {
   rideId: string;
   driverId: string;
   driverName?: string;
+  driverImage?: string;
   vehicleType: string;
   status?: string;
   pickup?: {
@@ -225,6 +226,7 @@ export default function ConfirmRouteScreen() {
         id: data.rideId,
         driverId: data.driverId,
         driverName: data.driverName ?? 'Driver',
+        driverImage: data.driverImage ?? '',
         vehicleType: data.vehicleType ?? selectedVehicle,
         status: data.status ?? 'Accepted',
         pLat: String(data.pickup?.latitude ?? pLat),
@@ -241,6 +243,7 @@ export default function ConfirmRouteScreen() {
         rideId: data.rideId,
         driverId: data.driverId,
         driverName: data.driverName ?? 'Driver',
+        driverImage: data.driverImage ?? '',
         vehicleType: data.vehicleType ?? selectedVehicle,
         status: data.status ?? 'Accepted',
         pickup: data.pickup,
@@ -409,6 +412,7 @@ export default function ConfirmRouteScreen() {
         id: acceptedData.rideId,
         driverId: acceptedData.driverId,
         driverName: acceptedData.driverName ?? 'Driver',
+        driverImage: acceptedData.driverImage ?? '',
         vehicleType: acceptedData.vehicleType ?? selectedVehicle,
         status: acceptedData.status ?? 'Accepted',
         pLat: String(acceptedData.pickup?.latitude ?? pLat),

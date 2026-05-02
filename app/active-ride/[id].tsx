@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { Image, View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -65,6 +65,7 @@ export default function ActiveRideScreen() {
     const drLng = parseFloat(params.drLng as string);
     const vehicleType = params.vehicleType as string || 'Vehicle';
     const driverName = params.driverName as string || 'Driver';
+    const driverImage = params.driverImage as string || '';
     const statusParam = params.status as string || 'Accepted';
 
     const pickup = useMemo<LatLng>(() => ({ latitude: pLat, longitude: pLng }), [pLat, pLng]);
@@ -95,6 +96,7 @@ export default function ActiveRideScreen() {
             id: rideId,
             driverId,
             driverName,
+            driverImage,
             vehicleType,
             status: activeStatus,
             pLat: String(pLat),
@@ -110,6 +112,7 @@ export default function ActiveRideScreen() {
         dLat,
         dLng,
         driverId,
+        driverImage,
         driverName,
         drLat,
         drLng,
@@ -263,6 +266,7 @@ export default function ActiveRideScreen() {
             params: {
                 id: driverId,
                 name: driverName,
+                image: driverImage,
                 rideId,
             },
         });
@@ -332,7 +336,11 @@ export default function ActiveRideScreen() {
                         onPress={openDriverProfile}
                         disabled={!driverId}
                         activeOpacity={0.75}>
-                        <Ionicons name="person" size={24} color="#FFF" />
+                        {driverImage ? (
+                            <Image source={{ uri: driverImage }} style={styles.avatarImage} />
+                        ) : (
+                            <Ionicons name="person" size={24} color="#FFF" />
+                        )}
                     </TouchableOpacity>
                     <View style={styles.metaCol}>
                         <Text style={styles.driverName}>{driverName}</Text>
@@ -425,7 +433,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7FBFA', padding: 16, borderRadius: 24, borderWidth: 1, borderColor: '#E6F5F4'
     },
     avatar: {
-        width: 50, height: 50, borderRadius: 25, backgroundColor: '#C8DDD9', justifyContent: 'center', alignItems: 'center'
+        width: 50, height: 50, borderRadius: 25, backgroundColor: '#C8DDD9', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'
+    },
+    avatarImage: {
+        width: '100%', height: '100%'
     },
     metaCol: {
         flex: 1, marginLeft: 16
