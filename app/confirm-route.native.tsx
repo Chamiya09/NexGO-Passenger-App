@@ -93,6 +93,7 @@ export default function ConfirmRouteScreen() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'WALLET'>('CASH');
   const [promoCode, setPromoCode] = useState(() => {
     const initialPromoCode = params.promoCode;
     return typeof initialPromoCode === 'string' ? initialPromoCode.toUpperCase() : '';
@@ -473,6 +474,7 @@ export default function ConfirmRouteScreen() {
       passengerName: user.fullName ?? 'Passenger',
       vehicleType: socketVehicleType,
       price: ridePrice,
+      paymentMethod,
       promotion: appliedPromotion
         ? {
             id: appliedPromotion.id,
@@ -794,14 +796,29 @@ export default function ConfirmRouteScreen() {
 
                   <View style={styles.formDivider} />
 
-                  <TouchableOpacity style={styles.paymentMethodRow} activeOpacity={0.82}>
+                  <TouchableOpacity
+                    style={styles.paymentMethodRow}
+                    activeOpacity={0.82}
+                    onPress={() => {
+                      Alert.alert('Payment Method', 'Select how you want to pay', [
+                        { text: 'Cash', onPress: () => setPaymentMethod('CASH') },
+                        { text: 'Wallet', onPress: () => setPaymentMethod('WALLET') },
+                        { text: 'Cancel', style: 'cancel' },
+                      ]);
+                    }}>
                     <View style={styles.paymentMethodLeft}>
                       <View style={styles.formIconWrap}>
-                        <MaterialCommunityIcons name="cash" size={18} color="#017270" />
+                        <MaterialCommunityIcons
+                          name={paymentMethod === 'WALLET' ? 'wallet-outline' : 'cash'}
+                          size={18}
+                          color="#017270"
+                        />
                       </View>
                       <View style={styles.paymentTextWrap}>
                         <Text style={styles.formLabel}>Payment method</Text>
-                        <Text style={styles.paymentMethodValue}>Cash</Text>
+                        <Text style={styles.paymentMethodValue}>
+                          {paymentMethod === 'WALLET' ? 'Wallet' : 'Cash'}
+                        </Text>
                       </View>
                     </View>
                     <Feather name="chevron-right" size={18} color="#8A9A9A" />
