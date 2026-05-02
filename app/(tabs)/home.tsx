@@ -48,6 +48,8 @@ type ServiceCard = {
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   tone: 'primary' | 'light';
+  badge: string;
+  eta: string;
 };
 
 type PromotionSummary = {
@@ -68,23 +70,43 @@ const serviceCards: ServiceCard[] = [
     subtitle: 'Fast daily rides around town',
     icon: 'car-sport-outline',
     tone: 'primary',
+    badge: 'Popular',
+    eta: '3-5 min',
   },
   {
     title: 'Airport Drop',
     subtitle: 'Plan reliable airport travel',
     icon: 'airplane-outline',
     tone: 'light',
+    badge: 'Planned',
+    eta: 'Schedule',
   },
   {
     title: 'Family Trip',
     subtitle: 'Spacious cars for group rides',
     icon: 'people-outline',
     tone: 'light',
+    badge: 'Comfort',
+    eta: '6 seats',
   },
 ];
 
 function getFirstName(fullName?: string) {
   return fullName?.trim().split(/\s+/)[0] || 'Passenger';
+}
+
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return 'Good Morning';
+  }
+
+  if (hour < 17) {
+    return 'Good Afternoon';
+  }
+
+  return 'Good Evening';
 }
 
 function getActivePromotions(promotions: PromotionSummary[]) {
@@ -156,15 +178,39 @@ function ServiceTile({ service, onPress }: { service: ServiceCard; onPress: () =
     <Pressable
       style={[styles.serviceTile, isPrimary ? styles.serviceTilePrimary : styles.serviceTileLight]}
       onPress={onPress}>
-      <View style={[styles.serviceIcon, isPrimary ? styles.serviceIconPrimary : styles.serviceIconLight]}>
-        <Ionicons name={service.icon} size={23} color={isPrimary ? '#FFFFFF' : palette.accentDark} />
+      <View style={[styles.serviceAccentRail, { backgroundColor: isPrimary ? palette.accent : palette.border }]} />
+
+      <View style={styles.serviceTopRow}>
+        <View style={[styles.serviceIcon, isPrimary ? styles.serviceIconPrimary : styles.serviceIconLight]}>
+          <Ionicons name={service.icon} size={22} color={isPrimary ? palette.accent : palette.accentDark} />
+        </View>
+
+        <View style={[styles.serviceBadge, { backgroundColor: isPrimary ? palette.accent : palette.accentMuted }]}>
+          <Text style={[styles.serviceBadgeText, { color: isPrimary ? '#FFFFFF' : palette.accentDark }]}>
+            {service.badge}
+          </Text>
+        </View>
       </View>
-      <Text style={[styles.serviceTitle, isPrimary ? styles.serviceTitlePrimary : styles.serviceTitleLight]}>
-        {service.title}
-      </Text>
-      <Text style={[styles.serviceSubtitle, isPrimary ? styles.serviceSubtitlePrimary : styles.serviceSubtitleLight]}>
-        {service.subtitle}
-      </Text>
+
+      <View style={styles.serviceContent}>
+        <Text style={styles.serviceTitle} numberOfLines={1} ellipsizeMode="tail">
+          {service.title}
+        </Text>
+        <Text style={styles.serviceSubtitle} numberOfLines={2} ellipsizeMode="tail">
+          {service.subtitle}
+        </Text>
+      </View>
+
+      <View style={styles.serviceFooter}>
+        <View style={styles.serviceEtaPill}>
+          <Ionicons name="time-outline" size={13} color={palette.secondary} />
+          <Text style={styles.serviceEtaText}>{service.eta}</Text>
+        </View>
+
+        <View style={[styles.serviceArrow, { backgroundColor: isPrimary ? palette.accent : palette.accentMuted }]}>
+          <Ionicons name="arrow-forward" size={14} color={isPrimary ? '#FFFFFF' : palette.accentDark} />
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -420,7 +466,7 @@ export default function HomeScreen() {
         onRefreshPage={handleRefreshPage}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>Hi, {getFirstName(user?.fullName)}</Text>
+            <Text style={styles.greeting}>{getTimeGreeting()}, {getFirstName(user?.fullName)}</Text>
             <Text style={styles.subtext}>Ready for your next NexGO ride?</Text>
           </View>
 
@@ -688,55 +734,107 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   serviceTile: {
-    width: 180,
-    minHeight: 150,
-    borderRadius: 20,
-    padding: 16,
-    gap: 9,
+    position: 'relative',
+    width: 214,
+    minHeight: 168,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingLeft: 18,
+    gap: 12,
     borderWidth: 1,
+    overflow: 'hidden',
   },
   serviceTilePrimary: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#BFE2DD',
   },
   serviceTileLight: {
     backgroundColor: palette.card,
     borderColor: palette.border,
   },
+  serviceAccentRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 5,
+  },
+  serviceTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   serviceIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   serviceIconPrimary: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: palette.accentMuted,
   },
   serviceIconLight: {
     backgroundColor: palette.accentMuted,
   },
-  serviceTitle: {
-    fontSize: 18,
+  serviceBadge: {
+    minHeight: 26,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceBadgeText: {
+    fontSize: 10,
     fontWeight: '900',
-    marginTop: 4,
+    letterSpacing: 0.2,
   },
-  serviceTitlePrimary: {
-    color: '#FFFFFF',
+  serviceContent: {
+    minHeight: 50,
   },
-  serviceTitleLight: {
+  serviceTitle: {
     color: palette.primary,
+    fontSize: 17,
+    fontWeight: '900',
+    marginBottom: 4,
   },
   serviceSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  serviceSubtitlePrimary: {
-    color: 'rgba(255,255,255,0.88)',
-  },
-  serviceSubtitleLight: {
     color: palette.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  serviceFooter: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  serviceEtaPill: {
+    minHeight: 30,
+    borderRadius: 999,
+    backgroundColor: palette.elevated,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  serviceEtaText: {
+    color: palette.secondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  serviceArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   promoScroll: {
     gap: 12,
