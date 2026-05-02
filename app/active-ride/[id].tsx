@@ -8,6 +8,7 @@ import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
+import { fetchPublicDriverProfile, type PublicDriverProfile } from '@/lib/driverProfiles';
 import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
@@ -17,6 +18,12 @@ const formatMoney = (value?: number | string | null) => {
     const amount = Number(value ?? 0);
     if (!Number.isFinite(amount)) return 'LKR 0';
     return `LKR ${amount.toLocaleString()}`;
+};
+
+const formatDriverVehicle = (driver?: PublicDriverProfile | null, fallbackVehicleType = 'Vehicle') => {
+    const vehicle = driver?.vehicle;
+    const parts = [vehicle?.color, vehicle?.make, vehicle?.model].filter(Boolean);
+    return parts.length ? parts.join(' ') : vehicle?.category || fallbackVehicleType;
 };
 
 // Types
@@ -88,6 +95,13 @@ export default function ActiveRideScreen() {
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
     const [paymentVisible, setPaymentVisible] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
+    const [driverProfile, setDriverProfile] = useState<PublicDriverProfile | null>(null);
+
+    const displayDriverName = driverProfile?.fullName || driverName;
+    const displayDriverImage = driverProfile?.profileImageUrl || driverImage;
+    const displayVehicle = formatDriverVehicle(driverProfile, vehicleType);
+    const displayPlate = driverProfile?.vehicle?.plateNumber || '';
+    const displayRating = driverProfile?.ratingCount ? driverProfile.ratingAverage.toFixed(1) : 'New';
 
     useEffect(() => {
         if (!rideId) return;
@@ -121,6 +135,27 @@ export default function ActiveRideScreen() {
         rideId,
         vehicleType,
     ]);
+
+    useEffect(() => {
+        if (!driverId && !rideId) return;
+
+        let active = true;
+        fetchPublicDriverProfile(driverId, rideId)
+            .then((profile) => {
+                if (active) {
+                    setDriverProfile(profile);
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setDriverProfile(null);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [driverId, rideId]);
 
     // Map Phase Route Computation
     useEffect(() => {
@@ -265,8 +300,8 @@ export default function ActiveRideScreen() {
             pathname: '/driver-profile/[id]',
             params: {
                 id: driverId,
-                name: driverName,
-                image: driverImage,
+                name: displayDriverName,
+                image: displayDriverImage,
                 rideId,
             },
         });
@@ -336,15 +371,27 @@ export default function ActiveRideScreen() {
                         onPress={openDriverProfile}
                         disabled={!driverId}
                         activeOpacity={0.75}>
-                        {driverImage ? (
-                            <Image source={{ uri: driverImage }} style={styles.avatarImage} />
+                        {displayDriverImage ? (
+                            <Image source={{ uri: displayDriverImage }} style={styles.avatarImage} />
                         ) : (
                             <Ionicons name="person" size={24} color="#FFF" />
                         )}
                     </TouchableOpacity>
                     <View style={styles.metaCol}>
-                        <Text style={styles.driverName}>{driverName}</Text>
-                        <Text style={styles.vehicleType}>{vehicleType} • {distance}</Text>
+                        <Text style={styles.driverName}>{displayDriverName}</Text>
+                        <Text style={styles.vehicleType}>{displayVehicle} • {distance}</Text>
+                        <View style={styles.driverDetailRow}>
+                            <View style={styles.driverDetailPill}>
+                                <Ionicons name="star" size={12} color="#D79A00" />
+                                <Text style={styles.driverDetailText}>{displayRating}</Text>
+                            </View>
+                            {displayPlate ? (
+                                <View style={styles.driverDetailPill}>
+                                    <Ionicons name="card-outline" size={12} color={teal} />
+                                    <Text style={styles.driverDetailText}>{displayPlate}</Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
                     <TouchableOpacity style={styles.callIcon}>
                         <Ionicons name="call" size={20} color="#FFF" />
@@ -446,6 +493,15 @@ const styles = StyleSheet.create({
     },
     vehicleType: {
         fontSize: 14, fontWeight: '600', color: '#6AA8A4', marginTop: 4
+    },
+    driverDetailRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap'
+    },
+    driverDetailPill: {
+        minHeight: 24, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D9E9E6', paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4
+    },
+    driverDetailText: {
+        color: '#102A28', fontSize: 11, fontWeight: '800'
     },
     callIcon: {
         width: 44, height: 44, borderRadius: 22, backgroundColor: teal, justifyContent: 'center', alignItems: 'center', elevation: 4
