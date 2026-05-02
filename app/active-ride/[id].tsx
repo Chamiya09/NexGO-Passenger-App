@@ -95,6 +95,7 @@ export default function ActiveRideScreen() {
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
     const [paymentVisible, setPaymentVisible] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
+    const [paymentSubmitting, setPaymentSubmitting] = useState(false);
     const [driverProfile, setDriverProfile] = useState<PublicDriverProfile | null>(null);
 
     const displayDriverName = driverProfile?.fullName || driverName;
@@ -307,6 +308,26 @@ export default function ActiveRideScreen() {
         });
     };
 
+    const handleConfirmPayment = async () => {
+        if (!token || !rideId || paymentSubmitting) return;
+
+        try {
+            setPaymentSubmitting(true);
+            const response = await fetch(`${API_BASE_URL}/rides/${rideId}/confirm-payment`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            await parseApiResponse(response);
+
+            setPaymentVisible(false);
+            router.replace('/(tabs)');
+        } catch (error) {
+            console.log('[ActiveRide] confirm payment failed:', error);
+        } finally {
+            setPaymentSubmitting(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
@@ -431,11 +452,11 @@ export default function ActiveRideScreen() {
                         <Text style={styles.paymentValue}>{paymentAmount}</Text>
                         <TouchableOpacity
                             style={styles.paymentButton}
-                            onPress={() => {
-                                setPaymentVisible(false);
-                                router.replace('/(tabs)');
-                            }}>
-                            <Text style={styles.paymentButtonText}>Confirm Payment</Text>
+                            onPress={handleConfirmPayment}
+                            disabled={paymentSubmitting}>
+                            <Text style={styles.paymentButtonText}>
+                                {paymentSubmitting ? 'Processing...' : 'Confirm Payment'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
