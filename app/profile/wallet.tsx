@@ -237,7 +237,7 @@ export default function WalletScreen() {
 
         <View style={[styles.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.walletHeader}>
-            <View>
+            <View style={styles.walletBalanceWrap}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
               <Text style={[styles.walletBalance, { color: colors.textPrimary }]}>{formatMoney(wallet.balance)}</Text>
             </View>
@@ -534,19 +534,24 @@ const styles = StyleSheet.create({
   walletCard: {
     borderRadius: 14,
     borderWidth: 1,
-    padding: 16,
+    padding: 18,
     marginBottom: 14,
   },
   walletHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 14,
+  },
+  walletBalanceWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   walletBalance: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
     marginTop: 6,
+    flexShrink: 1,
   },
   walletHint: {
     fontSize: 13,
@@ -556,12 +561,14 @@ const styles = StyleSheet.create({
   },
   topUpButton: {
     minHeight: 40,
+    minWidth: 104,
     borderRadius: 999,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   topUpButtonText: {
     color: '#FFFFFF',
@@ -586,16 +593,19 @@ const styles = StyleSheet.create({
   transactionRow: {
     minHeight: 50,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     paddingVertical: 6,
   },
   transactionTextWrap: {
     flex: 1,
+    minWidth: 0,
   },
   transactionAmount: {
     fontSize: 13,
     fontWeight: '900',
+    flexShrink: 0,
+    paddingTop: 2,
   },
   stateRow: {
     minHeight: 76,
