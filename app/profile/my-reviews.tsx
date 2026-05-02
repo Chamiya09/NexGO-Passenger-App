@@ -270,61 +270,117 @@ export default function MyReviewsScreen() {
     }
   };
 
+  const approvedCount = reviewRides.filter((ride) => ride.review?.status === 'approved').length;
+  const pendingCount = reviewRides.filter((ride) => !ride.review?.status || ride.review?.status === 'review').length;
+  const averageRating = reviewRides.length
+    ? reviewRides.reduce((total, ride) => total + (ride.review?.rating || 0), 0) / reviewRides.length
+    : 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <RefreshableScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         onRefreshPage={() => loadReviews(true)}>
-        <View style={styles.heroCard}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="star-half-outline" size={24} color={palette.accent} />
-          </View>
-          <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>My Reviews</Text>
-            <Text style={styles.heroSubtitle}>Manage ratings and comments you shared after completed rides.</Text>
-          </View>
-          <View style={styles.heroCount}>
-            <Text style={styles.heroCountValue}>{reviewRides.length}</Text>
-            <Text style={styles.heroCountLabel}>Total</Text>
-          </View>
+        <View style={styles.topBar}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={palette.primaryText} />
+          </Pressable>
+          <Text style={styles.topBarTitle}>My Reviews</Text>
+          <View style={styles.topBarSpacer} />
         </View>
 
-        {error ? (
-          <View style={styles.feedbackCard}>
-            <Ionicons name="information-circle-outline" size={17} color={palette.danger} />
-            <Text style={styles.feedbackText}>{error}</Text>
-          </View>
-        ) : null}
-
-        {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="small" color={palette.accent} />
-            <Text style={styles.loadingText}>Loading your reviews...</Text>
-          </View>
-        ) : reviewRides.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="star-outline" size={25} color={palette.accent} />
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroIcon}>
+              <Ionicons name="star-half-outline" size={26} color={palette.accent} />
             </View>
-            <Text style={styles.emptyTitle}>No reviews yet</Text>
-            <Text style={styles.emptyText}>Completed ride reviews will appear here after you submit them.</Text>
+
+            <View style={styles.heroIdentity}>
+              <Text style={styles.heroTitle}>Ride Reviews</Text>
+              <Text style={styles.heroSubtitle}>Ratings and comments shared after completed rides.</Text>
+            </View>
           </View>
-        ) : (
-          <View style={styles.reviewList}>
-            {reviewRides.map((ride) => (
-              <ReviewCard
-                key={ride.id}
-                ride={ride}
-                isRemoving={removingRideId === ride.id}
-                isUpdating={updatingRideId === ride.id}
-                onView={() => openRideDetails(ride)}
-                onUpdate={() => openUpdatePopup(ride)}
-                onRemove={() => confirmRemoveReview(ride)}
-              />
-            ))}
+
+          <View style={styles.heroBadge}>
+            <Ionicons name="shield-checkmark-outline" size={15} color={palette.accent} />
+            <Text style={styles.heroBadgeText}>Admin moderated</Text>
           </View>
-        )}
+
+          <Text style={styles.heroHint}>
+            Update pending or approved feedback, view ride details, and remove reviews you no longer want to keep.
+          </Text>
+        </View>
+
+        {error ? <Text style={styles.feedbackText}>{error}</Text> : null}
+
+        <View style={styles.metricGrid}>
+          <ReviewMetricCard
+            icon="star-outline"
+            label="Average"
+            value={averageRating ? averageRating.toFixed(1) : '0.0'}
+            color={palette.accent}
+            backgroundColor={palette.accentSoft}
+          />
+          <ReviewMetricCard
+            icon="checkmark-circle-outline"
+            label="Approved"
+            value={`${approvedCount}`}
+            color="#157A62"
+            backgroundColor="#E9F8EF"
+          />
+          <ReviewMetricCard
+            icon="time-outline"
+            label="Pending"
+            value={`${pendingCount}`}
+            color={palette.warning}
+            backgroundColor={palette.warningSoft}
+          />
+        </View>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>YOUR REVIEWS</Text>
+          <Text style={styles.sectionHint}>{reviewRides.length} total</Text>
+        </View>
+
+        <View style={styles.reviewSectionCard}>
+          <View style={styles.cardAccent} />
+          <View style={styles.detailsHeader}>
+            <View>
+              <Text style={styles.detailsTitle}>Review activity</Text>
+              <Text style={styles.detailsHint}>Manage passenger ride feedback.</Text>
+            </View>
+          </View>
+
+          {loading ? (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="small" color={palette.accent} />
+              <Text style={styles.loadingText}>Loading your reviews...</Text>
+            </View>
+          ) : reviewRides.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="star-outline" size={25} color={palette.accent} />
+              </View>
+              <Text style={styles.emptyTitle}>No reviews yet</Text>
+              <Text style={styles.emptyText}>Completed ride reviews will appear here after you submit them.</Text>
+            </View>
+          ) : (
+            <View style={styles.reviewList}>
+              {reviewRides.map((ride) => (
+                <ReviewCard
+                  key={ride.id}
+                  ride={ride}
+                  isRemoving={removingRideId === ride.id}
+                  isUpdating={updatingRideId === ride.id}
+                  onView={() => openRideDetails(ride)}
+                  onUpdate={() => openUpdatePopup(ride)}
+                  onRemove={() => confirmRemoveReview(ride)}
+                />
+              ))}
+            </View>
+          )}
+        </View>
 
         {refreshing ? <Text style={styles.refreshText}>Refreshing reviews...</Text> : null}
       </RefreshableScrollView>
@@ -508,93 +564,227 @@ function RouteLine({
   );
 }
 
+function ReviewMetricCard({
+  icon,
+  label,
+  value,
+  color,
+  backgroundColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+  backgroundColor: string;
+}) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor }]}>
+      <View style={styles.metricIcon}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: palette.background,
   },
   container: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 30,
-    gap: 12,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    color: palette.primaryText,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   heroCard: {
-    minHeight: 92,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.card,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 10,
   },
   heroIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: palette.border,
     backgroundColor: palette.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroText: {
+  heroIdentity: {
     flex: 1,
     minWidth: 0,
   },
   heroTitle: {
     color: palette.primaryText,
-    fontSize: 19,
-    fontWeight: '900',
-    marginBottom: 3,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
   },
   heroSubtitle: {
     color: palette.secondaryText,
     fontSize: 12,
-    fontWeight: '600',
     lineHeight: 17,
+    fontWeight: '500',
   },
-  heroCount: {
-    minWidth: 54,
-    borderRadius: 14,
-    backgroundColor: palette.elevatedCard,
-    borderWidth: 1,
-    borderColor: palette.border,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  heroCountValue: {
-    color: palette.primaryText,
-    fontSize: 17,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-  },
-  heroCountLabel: {
-    color: palette.secondaryText,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  feedbackCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F1D6D6',
-    backgroundColor: palette.dangerSoft,
-    padding: 12,
+  heroBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+  },
+  heroBadgeText: {
+    color: palette.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  heroHint: {
+    color: palette.secondaryText,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   feedbackText: {
-    flex: 1,
     color: palette.danger,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
+    marginBottom: 8,
   },
-  loadingCard: {
-    minHeight: 90,
-    borderRadius: 16,
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    color: palette.primaryText,
+    fontSize: 16,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  metricLabel: {
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  sectionHeaderRow: {
+    minHeight: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6,
+  },
+  sectionTitle: {
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  sectionHint: {
+    color: palette.secondaryText,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reviewSectionCard: {
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.card,
+    padding: 12,
+    paddingLeft: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: palette.accent,
+  },
+  detailsHeader: {
+    marginBottom: 10,
+  },
+  detailsTitle: {
+    color: palette.primaryText,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  detailsHint: {
+    color: palette.secondaryText,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  loadingCard: {
+    minHeight: 76,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
@@ -605,11 +795,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   emptyCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.card,
-    padding: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 24,
     alignItems: 'center',
     gap: 8,
   },
@@ -637,10 +824,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   reviewCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: palette.border,
-    backgroundColor: palette.card,
+    backgroundColor: '#FBFEFD',
     padding: 12,
     gap: 10,
   },
