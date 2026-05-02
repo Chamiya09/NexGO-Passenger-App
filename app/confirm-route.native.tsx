@@ -335,11 +335,16 @@ export default function ConfirmRouteScreen() {
 
   // ── confirmRide ────────────────────────────────────────────────────────────
   const PRICE_MAP: Record<string, number> = {
-    Bike: 850,
-    Tuk: 1115,
-    Mini: 1301,
-    Car: 1450,
-    Van: 2100,
+    Bike: 70,
+    Tuk: 150,
+    Mini: 300,
+    Car: 350,
+    Van: 1250,
+  };
+
+  const parseDistanceKm = (value: string) => {
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
   };
 
   const formatMoney = (value: number) => `LKR ${Math.max(0, Math.round(value))}`;
@@ -356,7 +361,11 @@ export default function ConfirmRouteScreen() {
     return Math.min(price, numericValue);
   };
 
-  const basePrice = PRICE_MAP[selectedVehicle] ?? PRICE_MAP.Mini;
+  const distanceKm = parseDistanceKm(distance) ?? 1;
+  const baseRate = PRICE_MAP[selectedVehicle] ?? PRICE_MAP.Mini;
+  const basePrice = baseRate * distanceKm;
+  const getEstimatedFare = (category: string) =>
+    formatMoney((PRICE_MAP[category] ?? PRICE_MAP.Mini) * distanceKm);
   const discountAmount = appliedPromotion ? getDiscountAmount(appliedPromotion, basePrice) : 0;
   const finalPrice = Math.max(0, basePrice - discountAmount);
 
@@ -696,7 +705,7 @@ export default function ConfirmRouteScreen() {
                   onPress={() => setSelectedVehicle('Bike')}>
                   <MaterialCommunityIcons name="motorbike" size={26} color={selectedVehicle === 'Bike' ? '#FFF' : '#017270'} />
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Bike' && { color: '#FFF' }]}>Bike</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && { color: '#FFF' }]}>LKR 850</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && { color: '#FFF' }]}>{getEstimatedFare('Bike')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Bike' && { color: '#FFF' }]}>15 min</Text>
                 </TouchableOpacity>
 
@@ -705,7 +714,7 @@ export default function ConfirmRouteScreen() {
                   onPress={() => setSelectedVehicle('Tuk')}>
                   <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'Tuk' ? '#FFF' : '#017270'} />
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>Tuk</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>LKR 1115</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>{getEstimatedFare('Tuk')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>28 min</Text>
                 </TouchableOpacity>
 
@@ -714,7 +723,7 @@ export default function ConfirmRouteScreen() {
                   onPress={() => setSelectedVehicle('Mini')}>
                   <MaterialCommunityIcons name="car" size={26} color={selectedVehicle === 'Mini' ? '#FFF' : '#017270'} />
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Mini' && { color: '#FFF' }]}>Mini</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && { color: '#FFF' }]}>LKR 1301</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && { color: '#FFF' }]}>{getEstimatedFare('Mini')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Mini' && { color: '#FFF' }]}>26 min</Text>
                 </TouchableOpacity>
 
@@ -723,7 +732,7 @@ export default function ConfirmRouteScreen() {
                   onPress={() => setSelectedVehicle('Car')}>
                   <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Car' ? '#FFF' : '#017270'} />
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Car' && { color: '#FFF' }]}>Car</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>LKR 1450</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>{getEstimatedFare('Car')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Car' && { color: '#FFF' }]}>24 min</Text>
                 </TouchableOpacity>
 
@@ -732,7 +741,7 @@ export default function ConfirmRouteScreen() {
                   onPress={() => setSelectedVehicle('Van')}>
                   <MaterialCommunityIcons name="van-passenger" size={26} color={selectedVehicle === 'Van' ? '#FFF' : '#017270'} />
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Van' && { color: '#FFF' }]}>Van</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && { color: '#FFF' }]}>LKR 2100</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && { color: '#FFF' }]}>{getEstimatedFare('Van')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Van' && { color: '#FFF' }]}>30 min</Text>
                 </TouchableOpacity>
               </ScrollView>
