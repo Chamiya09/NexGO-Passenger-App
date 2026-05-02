@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
@@ -121,6 +122,11 @@ export default function WalletScreen() {
     });
   };
 
+  const walletStats = {
+    transactions: wallet.transactions.length,
+    latestTopUp: wallet.transactions.find((transaction) => transaction.type === 'topup')?.amount || 0,
+  };
+
   const openTopUpModal = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -221,10 +227,31 @@ export default function WalletScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         onRefreshPage={loadWalletDetails}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Wallet</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="wallet-outline" size={26} color={colors.accent} />
+            </View>
+
+            <View style={styles.heroIdentity}>
+              <Text style={[styles.heroName, { color: colors.textPrimary }]}>NexGO Wallet</Text>
+              <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                Passenger ride credit and top up history
+              </Text>
+            </View>
+          </View>
+
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="wallet-outline" size={15} color={colors.accent} />
-            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Wallet</Text>
+            <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
+            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Card details not saved</Text>
           </View>
 
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
@@ -235,13 +262,54 @@ export default function WalletScreen() {
         {errorMessage ? <Text style={[styles.pageFeedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
         {successMessage ? <Text style={[styles.pageFeedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
-        <View style={[styles.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.metricGrid}>
+          <WalletMetricCard
+            icon="checkmark-circle-outline"
+            label="Status"
+            value={wallet.balance > 0 ? 'Ready' : 'Empty'}
+            color={colors.accent}
+            backgroundColor={colors.accentSoft}
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <WalletMetricCard
+            icon="swap-vertical-outline"
+            label="Activity"
+            value={`${walletStats.transactions}`}
+            color={colors.success}
+            backgroundColor="#E9F8EF"
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <WalletMetricCard
+            icon="card-outline"
+            label="Last top up"
+            value={walletStats.latestTopUp ? `LKR ${Number(walletStats.latestTopUp).toLocaleString('en-LK')}` : 'None'}
+            color="#D97706"
+            backgroundColor="#FFF8EC"
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+        </View>
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
+          <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>Passenger wallet</Text>
+        </View>
+
+        <View style={[styles.groupCard, styles.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.cardAccent, { backgroundColor: colors.accent }]} />
           <View style={styles.walletHeader}>
             <View style={styles.walletBalanceWrap}>
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
+              <Text style={[styles.detailsTitle, { color: colors.textPrimary }]}>Available credit</Text>
+              <Text style={[styles.detailsHint, { color: colors.textSecondary }]}>
+                Balance ready for future rides.
+              </Text>
               <Text style={[styles.walletBalance, { color: colors.textPrimary }]}>{formatMoney(wallet.balance)}</Text>
             </View>
-
             <Pressable
               style={[styles.topUpButton, { backgroundColor: colors.accent }]}
               onPress={openTopUpModal}
@@ -254,23 +322,40 @@ export default function WalletScreen() {
           <Text style={[styles.walletHint, { color: colors.textSecondary }]}>
             Enter card details only when you top up. Card numbers are not saved from this wallet page.
           </Text>
+        </View>
 
-          <View style={[styles.walletDivider, { backgroundColor: colors.divider }]} />
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.textSecondary }]}>RECENT ACTIVITY</Text>
+          <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>Latest 3</Text>
+        </View>
 
-          <Text style={[styles.walletHistoryTitle, { color: colors.textPrimary }]}>Recent activity</Text>
+        <View style={[styles.groupCard, styles.activityCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {loading ? (
             <View style={styles.compactStateRow}>
               <ActivityIndicator size="small" color={colors.accent} />
               <Text style={[styles.stateText, { color: colors.textSecondary }]}>Loading wallet...</Text>
             </View>
           ) : wallet.transactions.length === 0 ? (
-            <Text style={[styles.walletHint, { color: colors.textSecondary }]}>No wallet activity yet.</Text>
+            <View style={styles.emptyActivityWrap}>
+              <View style={[styles.emptyActivityIcon, { backgroundColor: colors.accentSoft }]}>
+                <Ionicons name="receipt-outline" size={20} color={colors.accent} />
+              </View>
+              <Text style={[styles.emptyActivityTitle, { color: colors.textPrimary }]}>No wallet activity yet</Text>
+              <Text style={[styles.emptyActivityText, { color: colors.textSecondary }]}>
+                Your top ups and wallet payments will appear here.
+              </Text>
+            </View>
           ) : (
             wallet.transactions.slice(0, 3).map((transaction, index) => (
               <View
                 key={transaction._id || `${transaction.type}-${transaction.createdAt}-${index}`}
-                style={styles.transactionRow}>
-                <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
+                style={[
+                  styles.transactionRow,
+                  index < Math.min(wallet.transactions.length, 3) - 1
+                    ? { borderBottomColor: colors.divider, borderBottomWidth: 1 }
+                    : null,
+                ]}>
+                <View style={[styles.iconWrap, styles.transactionIconWrap, { backgroundColor: colors.accentSoft }]}>
                   <Ionicons
                     name={transaction.type === 'topup' ? 'arrow-down-circle-outline' : 'receipt-outline'}
                     size={16}
@@ -279,17 +364,28 @@ export default function WalletScreen() {
                 </View>
 
                 <View style={styles.transactionTextWrap}>
-                  <Text style={[styles.rowValue, { color: colors.textPrimary }]}>
+                  <Text
+                    style={[styles.rowValue, { color: colors.textPrimary }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail">
                     {transaction.description || 'Wallet transaction'}
                   </Text>
-                  <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[styles.rowMeta, { color: colors.textSecondary }]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail">
                     {formatTransactionDate(transaction.createdAt)} - Balance {formatMoney(transaction.balanceAfter)}
                   </Text>
                 </View>
 
-                <Text style={[styles.transactionAmount, { color: colors.success }]}>
-                  +{formatMoney(transaction.amount)}
-                </Text>
+                <View style={styles.transactionAmountWrap}>
+                  <Text
+                    style={[styles.transactionAmount, { color: colors.success }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail">
+                    +{formatMoney(transaction.amount)}
+                  </Text>
+                </View>
               </View>
             ))
           )}
@@ -462,25 +558,111 @@ export default function WalletScreen() {
   );
 }
 
+function WalletMetricCard({
+  icon,
+  label,
+  value,
+  color,
+  backgroundColor,
+  borderColor,
+  textColor,
+  secondaryColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  secondaryColor: string;
+}) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor, borderColor }]}>
+      <View style={[styles.metricIcon, { backgroundColor: '#FFFFFF' }]}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={[styles.metricValue, { color: textColor }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[styles.metricLabel, { color: secondaryColor }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIdentity: {
+    flex: 1,
+  },
+  heroName: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  heroSubline: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   heroBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -490,52 +672,91 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroHint: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
   },
   pageFeedback: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    fontSize: 15,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   sectionHeaderRow: {
+    minHeight: 22,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
+    marginBottom: 6,
+    marginTop: 2,
   },
-  addButton: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+  sectionTitleInline: {
+    marginBottom: 0,
+    marginTop: 0,
   },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+  sectionHint: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   groupCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
+    padding: 12,
   },
   walletCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 14,
+    position: 'relative',
+    paddingLeft: 16,
+  },
+  activityCard: {
+    paddingVertical: 4,
+  },
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   walletHeader: {
     flexDirection: 'row',
@@ -550,14 +771,24 @@ const styles = StyleSheet.create({
   walletBalance: {
     fontSize: 28,
     fontWeight: '900',
-    marginTop: 6,
+    marginTop: 8,
     flexShrink: 1,
+  },
+  detailsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  detailsHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   walletHint: {
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',
-    marginTop: 10,
+    marginTop: 12,
   },
   topUpButton: {
     minHeight: 40,
@@ -575,98 +806,66 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  walletDivider: {
-    height: 1,
-    marginVertical: 14,
-  },
-  walletHistoryTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
   compactStateRow: {
-    minHeight: 42,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingHorizontal: 4,
   },
   transactionRow: {
-    minHeight: 50,
+    minHeight: 64,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 10,
-    paddingVertical: 6,
+    paddingVertical: 10,
+  },
+  transactionIconWrap: {
+    flexShrink: 0,
   },
   transactionTextWrap: {
     flex: 1,
     minWidth: 0,
   },
-  transactionAmount: {
-    fontSize: 13,
-    fontWeight: '900',
+  transactionAmountWrap: {
+    width: 104,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
     flexShrink: 0,
-    paddingTop: 2,
   },
-  stateRow: {
-    minHeight: 76,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  transactionAmount: {
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'right',
   },
   stateText: {
     fontSize: 14,
     fontWeight: '500',
   },
-  emptyStateWrap: {
+  emptyActivityWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 26,
   },
-  emptyIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  emptyActivityIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  emptyStateTitle: {
+  emptyActivityTitle: {
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
   },
-  emptyStateText: {
+  emptyActivityText: {
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  methodRow: {
-    minHeight: 88,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  methodTextWrap: {
-    flex: 1,
-  },
-  methodTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-    flexWrap: 'wrap',
+    lineHeight: 18,
   },
   iconWrap: {
     width: 32,
@@ -675,37 +874,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rowLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
   rowValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   rowMeta: {
     fontSize: 12,
     fontWeight: '500',
     marginTop: 2,
-  },
-  defaultPill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  defaultPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  defaultToggleWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 52,
-  },
-  divider: {
-    height: 1,
-    marginLeft: 58,
   },
   modalOverlay: {
     flex: 1,
@@ -781,49 +957,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
   },
-  cardSelectorList: {
-    gap: 10,
-    marginBottom: 14,
-  },
-  cardSelectorItem: {
-    minHeight: 66,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
   inlineFields: {
     flexDirection: 'row',
     gap: 10,
   },
   inlineField: {
     flex: 1,
-  },
-  switchRow: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 2,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  switchHint: {
-    fontSize: 12,
-    fontWeight: '500',
-    maxWidth: 220,
   },
   modalActions: {
     flexDirection: 'row',

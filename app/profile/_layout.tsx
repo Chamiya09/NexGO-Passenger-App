@@ -16,12 +16,13 @@ export default function ProfileStackLayout() {
         name="personal-details"
         options={{
           title: 'Personal Details',
+          headerShown: false,
         }}
       />
       <Stack.Screen name="membership" options={{ title: 'Membership' }} />
       <Stack.Screen name="my-reviews" options={{ title: 'My Reviews' }} />
       <Stack.Screen name="saved-addresses" options={{ title: 'Saved Addresses' }} />
-      <Stack.Screen name="wallet" options={{ title: 'Wallet' }} />
+      <Stack.Screen name="wallet" options={{ title: 'Wallet', headerShown: false }} />
       <Stack.Screen name="earn-with-nexgo" options={{ title: 'Earn with NexGO' }} />
       <Stack.Screen name="about-us" options={{ title: 'About Us' }} />
       <Stack.Screen name="privacy-security" options={{ title: 'Privacy & Security' }} />
