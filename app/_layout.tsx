@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import ActiveRideOverlays from '@/components/ActiveRideOverlays';
+import passengerSocket from '@/lib/passengerSocket';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -81,7 +82,29 @@ export default function RootLayout() {
 }
 
 function SuspendedOverlay() {
-  const { user, initializing } = useAuth();
+  const { user, initializing, applyStatus } = useAuth();
+
+  useEffect(() => {
+    const handleStatus = (payload: { passengerId: string; status: string }) => {
+      if (!user?.id || payload.passengerId !== user.id) return;
+      applyStatus(payload.status);
+    };
+
+    if (user?.id && passengerSocket.connected) {
+      passengerSocket.emit('registerPassenger', user.id);
+    }
+
+    passengerSocket.on('connect', () => {
+      if (user?.id) {
+        passengerSocket.emit('registerPassenger', user.id);
+      }
+    });
+    passengerSocket.on('passenger_account_status', handleStatus);
+
+    return () => {
+      passengerSocket.off('passenger_account_status', handleStatus);
+    };
+  }, [user?.id, applyStatus]);
 
   if (initializing || user?.status !== 'suspended') {
     return null;

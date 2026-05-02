@@ -47,6 +47,7 @@ type AuthContextValue = {
   updateProfile: (payload: UpdateProfilePayload) => Promise<void>;
   changePassword: (payload: ChangePasswordPayload) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  applyStatus: (status: string) => void;
   logout: () => void;
 };
 
@@ -232,6 +233,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void clearSession();
   };
 
+  const applyStatus = (status: string) => {
+    setUser((current) => (current ? { ...current, status } : current));
+  };
+
   const value = useMemo(
     () => ({
       user,
@@ -243,6 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateProfile,
       changePassword,
       deleteAccount,
+      applyStatus,
       logout,
     }),
     [user, token, initializing, loading]
