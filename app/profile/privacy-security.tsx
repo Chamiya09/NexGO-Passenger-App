@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
@@ -148,13 +149,32 @@ export default function PrivacySecurityScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Account Security</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="shield-checkmark-outline" size={26} color={colors.accent} />
+            </View>
+            <View style={styles.heroIdentity}>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Account Protection</Text>
+              <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                Password, privacy, and trusted access settings.
+              </Text>
+            </View>
+          </View>
+
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="shield-checkmark-outline" size={15} color={colors.accent} />
             <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Protection active</Text>
           </View>
 
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Privacy & security controls</Text>
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
             Review sign-in safety, data visibility, and trusted access across your NexGO account.
           </Text>
@@ -330,11 +350,54 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
   },
-  heroCard: {
-    borderRadius: 18,
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
+  },
+  heroCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -351,9 +414,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 2,
+  },
+  heroSubline: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   heroHint: {
     fontSize: 13,

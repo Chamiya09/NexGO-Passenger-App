@@ -1,6 +1,7 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
@@ -68,12 +69,15 @@ export default function AboutUsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
-            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>NexGO mobility</Text>
-          </View>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>About Us</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
 
+        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.brandRow}>
             <View style={[styles.logoMark, { backgroundColor: colors.accent }]}>
               <Text style={styles.logoText}>N</Text>
@@ -82,6 +86,11 @@ export default function AboutUsScreen() {
               <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>NexGO Passenger</Text>
               <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>Reliable rides, clearer trips.</Text>
             </View>
+          </View>
+
+          <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
+            <Text style={[styles.heroBadgeText, { color: colors.accent }]}>NexGO mobility</Text>
           </View>
 
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
@@ -171,18 +180,43 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 30,
   },
-  heroCard: {
-    borderRadius: 22,
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
+  },
+  heroCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
   },
   heroBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: 13,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -195,12 +229,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   logoMark: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -213,17 +247,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroTitle: {
-    fontSize: 23,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   heroSubtitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   heroHint: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '500',
   },
   metricsRow: {

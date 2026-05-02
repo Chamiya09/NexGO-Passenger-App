@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { ProfileDetailsGroup } from '@/components/profile/profile-details-group';
@@ -237,13 +238,32 @@ export default function SupportHelpScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Help & Support</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="headset-outline" size={26} color={colors.accent} />
+            </View>
+            <View style={styles.heroIdentity}>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Support Center</Text>
+              <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                Ride, payment, safety, and account help.
+              </Text>
+            </View>
+          </View>
+
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="headset-outline" size={15} color={colors.accent} />
             <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Passenger support</Text>
           </View>
 
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>How can we help?</Text>
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
             Get support for rides, payment, safety, and account questions without leaving your NexGO profile.
           </Text>
@@ -483,11 +503,54 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 30,
   },
-  heroCard: {
-    borderRadius: 22,
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
+  },
+  heroCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -504,9 +567,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 23,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 2,
+  },
+  heroSubline: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   heroHint: {
     fontSize: 14,

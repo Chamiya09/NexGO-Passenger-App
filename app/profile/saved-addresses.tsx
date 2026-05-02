@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import MapView, { UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
@@ -320,43 +321,99 @@ export default function SavedAddressesScreen() {
     [selectedLocation]
   );
 
+  const defaultAddress = addresses.find((address) => address.isDefault);
+  const homeCount = addresses.filter((address) => address.label === 'Home').length;
+  const workCount = addresses.filter((address) => address.label === 'Work').length;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <RefreshableScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         onRefreshPage={loadSavedAddresses}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Saved Addresses</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="location-outline" size={26} color={colors.accent} />
+            </View>
+
+            <View style={styles.heroIdentity}>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Saved Places</Text>
+              <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                Home, work, and favorite pickup points.
+              </Text>
+            </View>
+          </View>
+
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="navigate-outline" size={15} color={colors.accent} />
             <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Faster pickups</Text>
           </View>
 
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Saved Addresses</Text>
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
             Keep your most-used places ready for one-tap ride booking and smoother pickups.
           </Text>
-
-          <View style={[styles.tipCard, { backgroundColor: colors.warningSoft, borderColor: '#F4DFB8' }]}>
-            <Ionicons name="map-outline" size={16} color={colors.warning} />
-            <Text style={[styles.tipText, { color: colors.textPrimary }]}>
-              New addresses are selected directly from the map, just like the ride booking flow.
-            </Text>
-          </View>
         </View>
 
         {errorMessage ? <Text style={[styles.pageFeedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
         {successMessage ? <Text style={[styles.pageFeedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
+        <View style={styles.metricGrid}>
+          <AddressMetricCard
+            icon="location-outline"
+            label="Saved"
+            value={`${addresses.length}`}
+            color={colors.accent}
+            backgroundColor={colors.accentSoft}
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <AddressMetricCard
+            icon="home-outline"
+            label="Home"
+            value={`${homeCount}`}
+            color={colors.success}
+            backgroundColor="#E9F8EF"
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <AddressMetricCard
+            icon="briefcase-outline"
+            label="Work"
+            value={`${workCount}`}
+            color={colors.warning}
+            backgroundColor={colors.warningSoft}
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+        </View>
+
         <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SAVED PLACES</Text>
+          <View>
+            <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.textSecondary }]}>SAVED PLACES</Text>
+            <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>
+              {defaultAddress ? `Default: ${defaultAddress.title}` : 'No default address'}
+            </Text>
+          </View>
           <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
             <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add Address</Text>
+            <Text style={styles.addButtonText}>Add</Text>
           </Pressable>
         </View>
 
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.groupCard, styles.addressSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.cardAccent, { backgroundColor: colors.accent }]} />
           {loading ? (
             <View style={styles.stateRow}>
               <ActivityIndicator size="small" color={colors.accent} />
@@ -620,18 +677,95 @@ export default function SavedAddressesScreen() {
   );
 }
 
+function AddressMetricCard({
+  icon,
+  label,
+  value,
+  color,
+  backgroundColor,
+  borderColor,
+  textColor,
+  secondaryColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  secondaryColor: string;
+}) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor, borderColor }]}>
+      <View style={styles.metricIcon}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={[styles.metricValue, { color: textColor }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[styles.metricLabel, { color: secondaryColor }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -648,48 +782,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 2,
   },
-  heroHint: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  tipCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tipText: {
-    flex: 1,
+  heroSubline: {
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  heroHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   pageFeedback: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   sectionHeaderRow: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+  sectionTitleInline: {
+    marginBottom: 2,
+  },
+  sectionHint: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   addButton: {
     borderRadius: 999,
@@ -705,10 +869,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   groupCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
+  },
+  addressSectionCard: {
+    position: 'relative',
+    paddingLeft: 4,
+  },
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   stateRow: {
     minHeight: 76,
@@ -747,8 +922,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addressRow: {
-    minHeight: 96,
-    paddingHorizontal: 14,
+    minHeight: 104,
+    paddingHorizontal: 12,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -764,6 +939,7 @@ const styles = StyleSheet.create({
   rowRight: {
     alignItems: 'flex-end',
     gap: 8,
+    flexShrink: 0,
   },
   iconWrap: {
     width: 34,

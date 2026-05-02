@@ -137,8 +137,14 @@ function QuickActionButton({ action }: { action: QuickAction }) {
       <View style={styles.quickIconWrap}>
         <Ionicons name={action.icon} size={21} color={palette.accentDark} />
       </View>
-      <Text style={styles.quickLabel}>{action.label}</Text>
-      <Text style={styles.quickCaption}>{action.caption}</Text>
+      <View style={styles.quickTextWrap}>
+        <Text style={styles.quickLabel} numberOfLines={1} adjustsFontSizeToFit>
+          {action.label}
+        </Text>
+        <Text style={styles.quickCaption} numberOfLines={1} adjustsFontSizeToFit>
+          {action.caption}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -602,38 +608,51 @@ const styles = StyleSheet.create({
   },
   quickGrid: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
+    alignItems: 'stretch',
   },
   quickAction: {
     flex: 1,
-    minHeight: 98,
+    minWidth: 0,
+    height: 94,
     backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 18,
-    padding: 11,
+    borderRadius: 16,
+    paddingHorizontal: 7,
+    paddingVertical: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
+    justifyContent: 'space-between',
   },
   quickIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     backgroundColor: palette.accentMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
+    flexShrink: 0,
+  },
+  quickTextWrap: {
+    width: '100%',
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickLabel: {
     color: palette.primary,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 15,
     fontWeight: '900',
+    textAlign: 'center',
   },
   quickCaption: {
     color: palette.muted,
-    fontSize: 11,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
