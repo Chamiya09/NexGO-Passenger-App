@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 14,
   },
-  codeTitle: { fontSize: 22, fontWeight: '900', color: '#102A28', marginBottom: 8 },
+  codeTitle: { fontSize: 22, fontWeight: '900', color: '#102A28', marginBottom: 8, textAlign: 'left', alignSelf: 'stretch' },
   codeSubtitle: { fontSize: 14, fontWeight: '700', color: '#617C79', textAlign: 'center', lineHeight: 20, marginBottom: 18 },
   codeValue: {
     width: '100%',
@@ -422,6 +422,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 12,
     paddingHorizontal: 22,
+    width: '100%',
+    alignItems: 'center',
   },
   paymentButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
 });
