@@ -32,6 +32,7 @@ const palette = {
   accentDark: '#017270',
   accentMuted: '#E7F5F3',
   border: '#D9E9E6',
+  success: '#157A62',
   warning: '#D97706',
   warningBg: '#FFF8EC',
 };
@@ -212,6 +213,35 @@ function ServiceTile({ service, onPress }: { service: ServiceCard; onPress: () =
         </View>
       </View>
     </Pressable>
+  );
+}
+
+function RideDetailItem({
+  icon,
+  title,
+  subtitle,
+  badge,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  badge: string;
+}) {
+  return (
+    <View style={styles.rideDetailItem}>
+      <View style={styles.rideDetailIcon}>
+        <Ionicons name={icon} size={18} color={palette.accentDark} />
+      </View>
+
+      <View style={styles.rideDetailTextWrap}>
+        <Text style={styles.rideDetailTitle}>{title}</Text>
+        <Text style={styles.rideDetailSubtitle}>{subtitle}</Text>
+      </View>
+
+      <View style={styles.rideDetailBadge}>
+        <Text style={styles.rideDetailBadgeText}>{badge}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -541,6 +571,55 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Ride Details</Text>
+            <Text style={styles.sectionCaption}>Everything ready before booking</Text>
+          </View>
+        </View>
+
+        <View style={styles.rideDetailsCard}>
+          <View style={styles.rideDetailsAccent} />
+          <RideDetailItem
+            icon="navigate-outline"
+            title="Pickup accuracy"
+            subtitle="Use saved places or adjust the pickup pin before confirming."
+            badge="Map"
+          />
+          <View style={styles.rideDetailDivider} />
+          <RideDetailItem
+            icon="wallet-outline"
+            title="Fare readiness"
+            subtitle="Top up wallet credit or keep payment details ready for faster checkout."
+            badge="Pay"
+          />
+          <View style={styles.rideDetailDivider} />
+          <RideDetailItem
+            icon="chatbubble-ellipses-outline"
+            title="Driver contact"
+            subtitle="After acceptance, call or message the driver from your active ride."
+            badge="Live"
+          />
+        </View>
+
+        <View style={styles.tripTipsGrid}>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="time-outline" size={18} color={palette.accentDark} />
+            <Text style={styles.tripTipValue}>3 steps</Text>
+            <Text style={styles.tripTipLabel}>Book, match, ride</Text>
+          </View>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="receipt-outline" size={18} color={palette.success} />
+            <Text style={styles.tripTipValue}>Clear fare</Text>
+            <Text style={styles.tripTipLabel}>Review before start</Text>
+          </View>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={palette.warning} />
+            <Text style={styles.tripTipValue}>Verified</Text>
+            <Text style={styles.tripTipLabel}>Check driver info</Text>
+          </View>
+        </View>
+
         <View style={styles.safetyCard}>
           <View style={styles.safetyIcon}>
             <Ionicons name="shield-outline" size={22} color={palette.warning} />
@@ -835,6 +914,107 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rideDetailsCard: {
+    position: 'relative',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingLeft: 16,
+    overflow: 'hidden',
+  },
+  rideDetailsAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: palette.accent,
+  },
+  rideDetailItem: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  rideDetailIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: palette.accentMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rideDetailTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rideDetailTitle: {
+    color: palette.primary,
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  rideDetailSubtitle: {
+    color: palette.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  rideDetailBadge: {
+    minHeight: 28,
+    borderRadius: 999,
+    backgroundColor: palette.elevated,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rideDetailBadgeText: {
+    color: palette.accentDark,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  rideDetailDivider: {
+    height: 1,
+    backgroundColor: palette.border,
+    marginLeft: 48,
+  },
+  tripTipsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  tripTipCard: {
+    flex: 1,
+    minHeight: 88,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  tripTipValue: {
+    color: palette.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  tripTipLabel: {
+    color: palette.secondary,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   promoScroll: {
     gap: 12,
