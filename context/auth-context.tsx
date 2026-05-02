@@ -9,6 +9,7 @@ type AuthUser = {
   email: string;
   phoneNumber: string;
   profileImageUrl?: string;
+  status?: string;
 };
 
 type LoginPayload = {
