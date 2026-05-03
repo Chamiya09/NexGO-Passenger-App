@@ -9,6 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { VehicleCategoryIcon } from '@/components/VehicleCategoryIcon';
 
 const teal = '#169F95';
 
@@ -705,7 +706,9 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Bike' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Bike')}>
-                  <MaterialCommunityIcons name="motorbike" size={26} color={selectedVehicle === 'Bike' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Bike' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Bike" size={32} active={selectedVehicle === 'Bike'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Bike' && { color: '#FFF' }]}>Bike</Text>
                   <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && { color: '#FFF' }]}>{getEstimatedFare('Bike')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Bike' && { color: '#FFF' }]}>15 min</Text>
@@ -714,7 +717,9 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Tuk' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Tuk')}>
-                  <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'Tuk' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Tuk' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Tuk" size={32} active={selectedVehicle === 'Tuk'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>Tuk</Text>
                   <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>{getEstimatedFare('Tuk')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>28 min</Text>
@@ -723,7 +728,9 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Mini' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Mini')}>
-                  <MaterialCommunityIcons name="car" size={26} color={selectedVehicle === 'Mini' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Mini' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Mini" size={32} active={selectedVehicle === 'Mini'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Mini' && { color: '#FFF' }]}>Mini</Text>
                   <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && { color: '#FFF' }]}>{getEstimatedFare('Mini')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Mini' && { color: '#FFF' }]}>26 min</Text>
@@ -732,7 +739,9 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Car' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Car')}>
-                  <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Car' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Car' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Car" size={32} active={selectedVehicle === 'Car'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Car' && { color: '#FFF' }]}>Car</Text>
                   <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>{getEstimatedFare('Car')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Car' && { color: '#FFF' }]}>24 min</Text>
@@ -741,7 +750,9 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Van' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Van')}>
-                  <MaterialCommunityIcons name="van-passenger" size={26} color={selectedVehicle === 'Van' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Van' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Van" size={32} active={selectedVehicle === 'Van'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Van' && { color: '#FFF' }]}>Van</Text>
                   <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && { color: '#FFF' }]}>{getEstimatedFare('Van')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Van' && { color: '#FFF' }]}>30 min</Text>
@@ -1225,6 +1236,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F5F4',
     marginRight: 10,
     alignItems: 'center',
+  },
+  vehicleCategoryIconWrap: {
+    width: 46,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  vehicleCategoryIconWrapActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.45)',
   },
   activeRideSquare: {
     backgroundColor: '#017270',
