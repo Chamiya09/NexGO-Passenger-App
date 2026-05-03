@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth-context';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import { useResponsiveLayout } from '@/lib/responsive';
 
 type ProfileSection = {
   title: string;
@@ -127,6 +128,7 @@ function formatMoney(amount: number) {
 
 export default function ProfileScreen() {
   const { user, token, logout } = useAuth();
+  const responsive = useResponsiveLayout();
   const [profileSummary, setProfileSummary] = useState<ProfileSummary>(emptyProfileSummary);
 
   const palette = {
@@ -204,10 +206,10 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <StatusBar style="dark" />
       <RefreshableScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingHorizontal: responsive.screenPadding }]}
         showsVerticalScrollIndicator={false}
         onRefreshPage={loadProfileSummary}>
-        <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+        <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border, padding: responsive.cardPadding }]}>
           <View style={styles.profileHead}>
             <View style={[styles.avatarCircle, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}>
               {user?.profileImageUrl ? (
@@ -225,7 +227,10 @@ export default function ProfileScreen() {
             {profileMetrics.map((metric) => (
               <View
                 key={metric.label}
-                style={[styles.metricItem, { backgroundColor: palette.elevatedCard, borderColor: palette.border }]}>
+                style={[
+                  styles.metricItem,
+                  { backgroundColor: palette.elevatedCard, borderColor: palette.border, minWidth: responsive.metricMinWidth },
+                ]}>
                 <Ionicons name={metric.icon} size={16} color={palette.accent} />
                 <Text style={[styles.metricValue, { color: palette.primaryText }]}>{metric.value}</Text>
                 <Text style={[styles.metricLabel, { color: palette.secondaryText }]}>{metric.label}</Text>
@@ -305,14 +310,12 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   container: {
-    paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 34,
   },
   heroCard: {
     borderRadius: 22,
     borderWidth: 1,
-    padding: 16,
     marginBottom: 18,
   },
   profileHead: {
@@ -348,6 +351,7 @@ const styles = StyleSheet.create({
   },
   metricsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 14,
   },
