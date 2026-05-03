@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
@@ -51,6 +52,8 @@ export default function MySupportTicketsScreen() {
   const [editRideReference, setEditRideReference] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editPriority, setEditPriority] = useState<SupportTicket['priority']>('Normal');
+  const [ticketPendingDelete, setTicketPendingDelete] = useState<SupportTicket | null>(null);
+  const [deletingTicket, setDeletingTicket] = useState(false);
 
   const colors = {
     background: useThemeColor({ light: '#F4F8F7', dark: '#151718' }, 'background'),
@@ -179,29 +182,29 @@ export default function MySupportTicketsScreen() {
 
   const deleteTicket = async (ticket: SupportTicket) => {
     if (!token) return;
+    setTicketPendingDelete(ticket);
+  };
 
-    Alert.alert('Delete support ticket', 'This will permanently remove this support ticket.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
+  const confirmDeleteTicket = async () => {
+    if (!token || !ticketPendingDelete) return;
+
+    setDeletingTicket(true);
           try {
-            const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${ticket.id}`, {
+            const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${ticketPendingDelete.id}`, {
               method: 'DELETE',
               headers: {
                 Authorization: `Bearer ${token}`,
               },
             });
             await parseApiResponse<{ id: string; message?: string }>(response);
-            setTickets((current) => current.filter((item) => item.id !== ticket.id));
+            setTickets((current) => current.filter((item) => item.id !== ticketPendingDelete.id));
             setSelectedTicket(null);
+      setTicketPendingDelete(null);
           } catch (error) {
             Alert.alert('Could not delete ticket', error instanceof Error ? error.message : 'Please try again.');
-          }
-        },
-      },
-    ]);
+    } finally {
+      setDeletingTicket(false);
+    }
   };
 
   return (
@@ -513,6 +516,19 @@ export default function MySupportTicketsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmDialog
+        visible={Boolean(ticketPendingDelete)}
+        title="Delete support ticket"
+        message="This will permanently remove this support ticket."
+        confirmLabel="Delete"
+        destructive
+        loading={deletingTicket}
+        icon="trash-outline"
+        onCancel={() => {
+          if (!deletingTicket) setTicketPendingDelete(null);
+        }}
+        onConfirm={confirmDeleteTicket}
+      />
     </SafeAreaView>
   );
 }
