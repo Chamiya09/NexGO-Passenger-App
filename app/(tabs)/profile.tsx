@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
 type ProfileSection = {
   title: string;
@@ -93,14 +94,40 @@ const PROFILE_SECTIONS: ProfileSection[] = [
   },
 ];
 
-const PROFILE_METRICS = [
-  { label: 'Points', value: '450', icon: 'star-outline' as const },
-  { label: 'Completed', value: '37', icon: 'checkmark-done-outline' as const },
-  { label: 'Wallet', value: 'PHP 820', icon: 'wallet-outline' as const },
-];
+type WalletSummary = {
+  balance: number;
+  transactions?: unknown[];
+};
+
+type RideSummary = {
+  status?: string;
+  canonicalStatus?: string;
+  review?: unknown;
+};
+
+type ProfileSummary = {
+  walletBalance: number;
+  completedRides: number;
+  reviewedRides: number;
+};
+
+const emptyProfileSummary: ProfileSummary = {
+  walletBalance: 0,
+  completedRides: 0,
+  reviewedRides: 0,
+};
+
+function getRideStatus(ride: RideSummary) {
+  return String(ride.canonicalStatus || ride.status || '').toLowerCase();
+}
+
+function formatMoney(amount: number) {
+  return `LKR ${Number(amount || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
+}
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const [profileSummary, setProfileSummary] = useState<ProfileSummary>(emptyProfileSummary);
 
   const palette = {
     background: '#F4F8F7',
@@ -123,10 +150,63 @@ export default function ProfileScreen() {
     .map((part) => part[0]?.toUpperCase() || '')
     .join('');
 
+  const loadProfileSummary = useCallback(async () => {
+    if (!token) {
+      setProfileSummary(emptyProfileSummary);
+      return;
+    }
+
+    try {
+      const requestConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      const [walletResponse, ridesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/auth/wallet`, requestConfig),
+        fetch(`${API_BASE_URL}/rides/my-rides`, requestConfig),
+      ]);
+
+      const [{ wallet }, { rides }] = await Promise.all([
+        parseApiResponse<{ wallet: WalletSummary }>(walletResponse),
+        parseApiResponse<{ rides: RideSummary[] }>(ridesResponse),
+      ]);
+
+      const safeRides = rides ?? [];
+      const completedRides = safeRides.filter((ride) => getRideStatus(ride) === 'completed').length;
+      const reviewedRides = safeRides.filter((ride) => Boolean(ride.review)).length;
+
+      setProfileSummary({
+        walletBalance: Number(wallet?.balance || 0),
+        completedRides,
+        reviewedRides,
+      });
+    } catch {
+      setProfileSummary(emptyProfileSummary);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadProfileSummary();
+  }, [loadProfileSummary]);
+
+  const profileMetrics = useMemo(
+    () => [
+      { label: 'Wallet', value: formatMoney(profileSummary.walletBalance), icon: 'wallet-outline' as const },
+      { label: 'Completed', value: String(profileSummary.completedRides), icon: 'checkmark-done-outline' as const },
+      { label: 'Reviews', value: String(profileSummary.reviewedRides), icon: 'star-outline' as const },
+    ],
+    [profileSummary.completedRides, profileSummary.reviewedRides, profileSummary.walletBalance]
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <StatusBar style="dark" />
-      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <RefreshableScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={loadProfileSummary}>
         <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <View style={styles.profileHead}>
             <View style={[styles.avatarCircle, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}>
@@ -142,7 +222,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.metricsRow}>
-            {PROFILE_METRICS.map((metric) => (
+            {profileMetrics.map((metric) => (
               <View
                 key={metric.label}
                 style={[styles.metricItem, { backgroundColor: palette.elevatedCard, borderColor: palette.border }]}>
@@ -152,7 +232,6 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
-
         </View>
 
         <View style={styles.sectionHeadingWrap}>
