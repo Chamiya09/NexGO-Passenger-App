@@ -86,22 +86,25 @@ function SuspendedOverlay() {
 
   useEffect(() => {
     const handleStatus = (payload: { passengerId: string; status: string }) => {
-      if (!user?.id || payload.passengerId !== user.id) return;
+      if (!user?.id || String(payload.passengerId) !== String(user.id)) return;
       applyStatus(payload.status);
     };
 
-    if (user?.id && passengerSocket.connected) {
-      passengerSocket.emit('registerPassenger', user.id);
-    }
-
-    passengerSocket.on('connect', () => {
+    const registerCurrentPassenger = () => {
       if (user?.id) {
         passengerSocket.emit('registerPassenger', user.id);
       }
-    });
+    };
+
+    if (user?.id && passengerSocket.connected) {
+      registerCurrentPassenger();
+    }
+
+    passengerSocket.on('connect', registerCurrentPassenger);
     passengerSocket.on('passenger_account_status', handleStatus);
 
     return () => {
+      passengerSocket.off('connect', registerCurrentPassenger);
       passengerSocket.off('passenger_account_status', handleStatus);
     };
   }, [user?.id, applyStatus]);
