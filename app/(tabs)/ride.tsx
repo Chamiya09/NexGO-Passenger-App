@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWindowDimensions, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import MapView, { UrlTile } from 'react-native-maps';
 import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { useAuth } from '@/context/auth-context';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
 const teal = '#169F95';
 const MARKER_TIP_TOP_RATIO = 0.4;
@@ -44,7 +46,21 @@ type PhotonReverseGeocodeResponse = {
   }[];
 };
 
+type AddressLabel = 'Home' | 'Work' | 'Other';
+
+type SavedAddress = {
+  _id: string;
+  label: AddressLabel;
+  title: string;
+  addressLine: string;
+  latitude: number;
+  longitude: number;
+  note: string;
+  isDefault: boolean;
+};
+
 export default function RideScreen() {
+  const { token } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
@@ -62,7 +78,7 @@ export default function RideScreen() {
   const selectedPromoCode = typeof params.promoCode === 'string' ? params.promoCode : '';
 
   const [selectedLocation, setSelectedLocation] = useState(DEFAULT_LOCATION);
-  const [locationSource, setLocationSource] = useState<'map' | 'device'>('map');
+  const [locationSource, setLocationSource] = useState<'map' | 'device' | 'saved'>('map');
   const [locationNameRefreshKey, setLocationNameRefreshKey] = useState(0);
   const [activeStep, setActiveStep] = useState<'PICKUP' | 'DROP'>('PICKUP');
   const [isLocating, setIsLocating] = useState(false);
@@ -77,6 +93,26 @@ export default function RideScreen() {
     coords: null as any,
     name: 'Unknown Location',
   });
+
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      async function fetchSavedAddresses() {
+        if (!token) return;
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/saved-addresses`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await parseApiResponse<{ savedAddresses: SavedAddress[] }>(response);
+          setSavedAddresses(data.savedAddresses);
+        } catch (error) {
+          console.error('Failed to load saved addresses', error);
+        }
+      }
+      void fetchSavedAddresses();
+    }, [token])
+  );
 
   useEffect(() => {
     activeStepRef.current = activeStep;
@@ -257,6 +293,10 @@ export default function RideScreen() {
 
   useEffect(() => {
     const fetchLocationName = async () => {
+      if (locationSource === 'saved') {
+        return;
+      }
+
       const requestId = geocodeRequestRef.current + 1;
       geocodeRequestRef.current = requestId;
 
@@ -363,6 +403,28 @@ export default function RideScreen() {
       }
     };
   }, [applyDeviceLocation, moveToDeviceLocation]);
+
+  const handleSelectSavedAddress = useCallback((address: SavedAddress) => {
+    const coords = { latitude: address.latitude, longitude: address.longitude };
+    
+    programmaticMoveRef.current = true;
+    if (programmaticMoveTimerRef.current) {
+      clearTimeout(programmaticMoveTimerRef.current);
+    }
+    programmaticMoveTimerRef.current = setTimeout(() => {
+      programmaticMoveRef.current = false;
+    }, 600);
+
+    setLocationSource('saved');
+    setSelectedLocation(coords);
+    mapRef.current?.animateToRegion(getMarkerAlignedRegion(coords), 350);
+
+    if (activeStep === 'PICKUP') {
+      setPickupData({ coords, name: address.title });
+    } else {
+      setDropData({ coords, name: address.title });
+    }
+  }, [activeStep]);
 
   return (
     <View style={styles.container}>
@@ -504,16 +566,32 @@ export default function RideScreen() {
           </View>
 
           {/* Location Tags */}
-          <View style={styles.tagsContainer}>
-            <TouchableOpacity style={styles.tagPill}>
-              <Feather name="home" size={16} color="#017270" />
-              <Text style={styles.tagText}>Home</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.tagPill}>
-              <Feather name="briefcase" size={16} color="#017270" />
-              <Text style={styles.tagText}>Work</Text>
-            </TouchableOpacity>
-          </View>
+          {savedAddresses.length > 0 && (
+            <View style={styles.tagsContainerWrapper}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.tagsContainer}
+              >
+                {savedAddresses.map((address) => {
+                  let iconName: React.ComponentProps<typeof Feather>['name'] = 'map-pin';
+                  if (address.label === 'Home') iconName = 'home';
+                  if (address.label === 'Work') iconName = 'briefcase';
+
+                  return (
+                    <TouchableOpacity 
+                      key={address._id} 
+                      style={styles.tagPill}
+                      onPress={() => handleSelectSavedAddress(address)}
+                    >
+                      <Feather name={iconName} size={16} color="#017270" />
+                      <Text style={styles.tagText}>{address.title}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Confirm Button */}
           <TouchableOpacity 
@@ -763,10 +841,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F5F4',
     marginVertical: 4,
   },
+  tagsContainerWrapper: {
+    marginBottom: 20,
+    marginHorizontal: -16, 
+  },
   tagsContainer: {
+    paddingHorizontal: 16,
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
   },
   tagPill: {
     flexDirection: 'row',

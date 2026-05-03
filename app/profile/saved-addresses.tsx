@@ -35,6 +35,7 @@ type SavedAddress = {
   longitude: number;
   note: string;
   isDefault: boolean;
+  showOnRidePage: boolean;
 };
 
 const DEFAULT_REGION = {
@@ -66,6 +67,7 @@ export default function SavedAddressesScreen() {
   const [saving, setSaving] = useState(false);
   const [updatingDefaultId, setUpdatingDefaultId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: DEFAULT_REGION.latitude,
     longitude: DEFAULT_REGION.longitude,
@@ -311,6 +313,36 @@ export default function SavedAddressesScreen() {
     }
   };
 
+  const toggleVisibility = async (addressId: string) => {
+    if (!token) {
+      setErrorMessage('You need to be logged in to update a saved address.');
+      return;
+    }
+
+    setTogglingVisibilityId(addressId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/saved-addresses/${addressId}/visibility`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseApiResponse<{ savedAddresses: SavedAddress[] }>(response);
+      setAddresses(data.savedAddresses);
+      setSuccessMessage(data.savedAddresses.find((a) => a._id === addressId)?.showOnRidePage
+        ? 'Address is now shown on ride page.'
+        : 'Address hidden from ride page.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update address visibility');
+    } finally {
+      setTogglingVisibilityId(null);
+    }
+  };
+
   const mapRegion = useMemo(
     () => ({
       latitude: selectedLocation.latitude,
@@ -461,6 +493,33 @@ export default function SavedAddressesScreen() {
                     </View>
 
                     <View style={styles.rowRight}>
+                      {/* Show on ride page toggle */}
+                      <View style={styles.visibilityToggleWrap}>
+                        <Text style={[styles.visibilityLabel, { color: colors.textSecondary }]}>
+                          Show
+                        </Text>
+                        {togglingVisibilityId === address._id ? (
+                          <ActivityIndicator size="small" color={colors.accent} style={styles.toggleLoader} />
+                        ) : (
+                          <Switch
+                            value={Boolean(address.showOnRidePage)}
+                            onValueChange={() => {
+                              void toggleVisibility(address._id);
+                            }}
+                            trackColor={{ false: '#C7D4D2', true: colors.accent }}
+                            thumbColor="#FFFFFF"
+                            disabled={
+                              isUpdatingDefault ||
+                              isDeleting ||
+                              togglingVisibilityId !== null ||
+                              (!address.showOnRidePage &&
+                                addresses.filter((a) => a.showOnRidePage).length >= 4)
+                            }
+                            style={styles.visibilitySwitch}
+                          />
+                        )}
+                      </View>
+
                       {!address.isDefault ? (
                         <Pressable
                           style={[styles.inlineActionButton, { borderColor: colors.border }]}
@@ -1006,6 +1065,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  visibilityToggleWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  visibilityLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  visibilitySwitch: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
+  },
+  toggleLoader: {
+    width: 32,
+    height: 20,
   },
   divider: {
     height: 1,
