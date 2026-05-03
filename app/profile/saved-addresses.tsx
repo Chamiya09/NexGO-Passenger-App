@@ -356,6 +356,7 @@ export default function SavedAddressesScreen() {
   const defaultAddress = addresses.find((address) => address.isDefault);
   const homeCount = addresses.filter((address) => address.label === 'Home').length;
   const workCount = addresses.filter((address) => address.label === 'Work').length;
+  const showCount = addresses.filter((a) => a.showOnRidePage).length;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -438,10 +439,25 @@ export default function SavedAddressesScreen() {
               {defaultAddress ? `Default: ${defaultAddress.title}` : 'No default address'}
             </Text>
           </View>
-          <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add</Text>
-          </Pressable>
+          <View style={styles.sectionHeaderActions}>
+            <View
+              style={[
+                styles.shownBadge,
+                {
+                  backgroundColor: showCount >= 4 ? colors.warningSoft : colors.accentSoft,
+                  borderColor: showCount >= 4 ? colors.warning : colors.accent,
+                },
+              ]}>
+              <Ionicons name="eye-outline" size={12} color={showCount >= 4 ? colors.warning : colors.accent} />
+              <Text style={[styles.shownBadgeText, { color: showCount >= 4 ? colors.warning : colors.accent }]}>
+                {showCount} / 4
+              </Text>
+            </View>
+            <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.groupCard, styles.addressSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -468,78 +484,26 @@ export default function SavedAddressesScreen() {
 
               return (
                 <View key={address._id}>
-                  <View style={styles.addressRow}>
-                    <View style={styles.rowLeft}>
+                  {/* ── address card ── */}
+                  <View style={styles.addressCard}>
+                    {/* Top row: icon | info text | delete */}
+                    <View style={styles.addressCardTop}>
                       <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
                         <Ionicons name={labelIconMap[address.label]} size={16} color={colors.accent} />
                       </View>
 
                       <View style={styles.addressTextWrap}>
-                        <View style={styles.addressTitleRow}>
-                          <Text style={[styles.addressTitle, { color: colors.textPrimary }]}>{address.title}</Text>
-                          {address.isDefault ? (
-                            <View style={[styles.defaultPill, { backgroundColor: colors.accentSoft }]}>
-                              <Text style={[styles.defaultPillText, { color: colors.accent }]}>Default</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
+                        <Text style={[styles.addressTitle, { color: colors.textPrimary }]}>{address.title}</Text>
                         <Text style={[styles.addressMeta, { color: colors.textSecondary }]}>{address.label}</Text>
-                        <Text style={[styles.addressLine, { color: colors.textPrimary }]}>{address.addressLine}</Text>
+                        <Text style={[styles.addressLine, { color: colors.textPrimary }]} numberOfLines={2}>{address.addressLine}</Text>
                         {address.note ? (
                           <Text style={[styles.addressNote, { color: colors.textSecondary }]}>{address.note}</Text>
                         ) : null}
                       </View>
-                    </View>
-
-                    <View style={styles.rowRight}>
-                      {/* Show on ride page toggle */}
-                      <View style={styles.visibilityToggleWrap}>
-                        <Text style={[styles.visibilityLabel, { color: colors.textSecondary }]}>
-                          Show
-                        </Text>
-                        {togglingVisibilityId === address._id ? (
-                          <ActivityIndicator size="small" color={colors.accent} style={styles.toggleLoader} />
-                        ) : (
-                          <Switch
-                            value={Boolean(address.showOnRidePage)}
-                            onValueChange={() => {
-                              void toggleVisibility(address._id);
-                            }}
-                            trackColor={{ false: '#C7D4D2', true: colors.accent }}
-                            thumbColor="#FFFFFF"
-                            disabled={
-                              isUpdatingDefault ||
-                              isDeleting ||
-                              togglingVisibilityId !== null ||
-                              (!address.showOnRidePage &&
-                                addresses.filter((a) => a.showOnRidePage).length >= 4)
-                            }
-                            style={styles.visibilitySwitch}
-                          />
-                        )}
-                      </View>
-
-                      {!address.isDefault ? (
-                        <Pressable
-                          style={[styles.inlineActionButton, { borderColor: colors.border }]}
-                          onPress={() => {
-                            void markAsDefault(address._id);
-                          }}
-                          disabled={isUpdatingDefault || isDeleting}>
-                          {isUpdatingDefault ? (
-                            <ActivityIndicator size="small" color={colors.accent} />
-                          ) : (
-                            <Text style={[styles.inlineActionText, { color: colors.textPrimary }]}>Default</Text>
-                          )}
-                        </Pressable>
-                      ) : null}
 
                       <Pressable
                         style={[styles.deleteIconButton, { backgroundColor: colors.accentSoft }]}
-                        onPress={() => {
-                          void deleteAddress(address._id);
-                        }}
+                        onPress={() => { void deleteAddress(address._id); }}
                         disabled={isUpdatingDefault || isDeleting}>
                         {isDeleting ? (
                           <ActivityIndicator size="small" color={colors.danger} />
@@ -547,6 +511,55 @@ export default function SavedAddressesScreen() {
                           <Ionicons name="trash-outline" size={16} color={colors.danger} />
                         )}
                       </Pressable>
+                    </View>
+
+                    {/* Footer action bar: default badge/button | show toggle */}
+                    <View style={[styles.addressCardFooter, { borderTopColor: colors.divider }]}>
+                      {/* Left side: Default badge or Set-as-default button */}
+                      <View style={styles.footerLeft}>
+                        {address.isDefault ? (
+                          <View style={[styles.defaultPill, { backgroundColor: colors.accentSoft }]}>
+                            <Ionicons name="star" size={10} color={colors.accent} />
+                            <Text style={[styles.defaultPillText, { color: colors.accent }]}>Default pickup</Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            style={[styles.setDefaultButton, { borderColor: colors.border }]}
+                            onPress={() => { void markAsDefault(address._id); }}
+                            disabled={isUpdatingDefault || isDeleting || togglingVisibilityId !== null}>
+                            {isUpdatingDefault ? (
+                              <ActivityIndicator size="small" color={colors.accent} />
+                            ) : (
+                              <>
+                                <Ionicons name="star-outline" size={11} color={colors.textSecondary} />
+                                <Text style={[styles.setDefaultText, { color: colors.textSecondary }]}>Set as default</Text>
+                              </>
+                            )}
+                          </Pressable>
+                        )}
+                      </View>
+
+                      {/* Right side: Show on ride page toggle */}
+                      <View style={styles.footerRight}>
+                        <Text style={[styles.visibilityLabel, { color: colors.textSecondary }]}>Show on ride page</Text>
+                        {togglingVisibilityId === address._id ? (
+                          <ActivityIndicator size="small" color={colors.accent} style={styles.toggleLoader} />
+                        ) : (
+                          <Switch
+                            value={Boolean(address.showOnRidePage)}
+                            onValueChange={() => { void toggleVisibility(address._id); }}
+                            trackColor={{ false: '#C7D4D2', true: colors.accent }}
+                            thumbColor="#FFFFFF"
+                            disabled={
+                              isUpdatingDefault ||
+                              isDeleting ||
+                              togglingVisibilityId !== null ||
+                              (!address.showOnRidePage && addresses.filter((a) => a.showOnRidePage).length >= 4)
+                            }
+                            style={styles.visibilitySwitch}
+                          />
+                        )}
+                      </View>
                     </View>
                   </View>
 
@@ -980,25 +993,66 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  addressRow: {
-    minHeight: 104,
+  addressCard: {
     paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingTop: 12,
+    paddingBottom: 0,
+  },
+  addressCardTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+  },
+  addressCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    gap: 10,
   },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  footerLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  rowRight: {
-    alignItems: 'flex-end',
-    gap: 8,
+  footerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flexShrink: 0,
+  },
+  setDefaultButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  setDefaultText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  shownBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   iconWrap: {
     width: 34,
@@ -1038,24 +1092,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   defaultPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   defaultPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  inlineActionButton: {
-    minWidth: 70,
-    minHeight: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inlineActionText: {
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1066,18 +1110,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  visibilityToggleWrap: {
-    alignItems: 'center',
-    gap: 4,
-  },
   visibilityLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.3,
+    fontSize: 12,
+    fontWeight: '600',
   },
   visibilitySwitch: {
-    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
+    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
   },
   toggleLoader: {
     width: 32,
