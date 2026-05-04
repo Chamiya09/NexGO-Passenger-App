@@ -437,12 +437,16 @@ export default function ConfirmRouteScreen() {
     });
   };
 
-  const confirmRide = () => {
+  const confirmRide = async () => {
     if (!socketRef.current?.connected) {
       Alert.alert('Not Connected', 'Unable to reach the server. Please check your connection.');
       return;
     }
     if (!user?.id) {
+      Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
+      return;
+    }
+    if (!token) {
       Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
       return;
     }
@@ -469,31 +473,58 @@ export default function ConfirmRouteScreen() {
     const socketVehicleType = getSocketVehicleType(selectedVehicle);
     const ridePrice = finalPrice;
 
-    socketRef.current.emit('requestRide', {
-      passengerId: user.id,
-      passengerName: user.fullName ?? 'Passenger',
-      vehicleType: socketVehicleType,
-      price: ridePrice,
-      paymentMethod,
-      promotion: appliedPromotion
-        ? {
-            id: appliedPromotion.id,
-            code: appliedPromotion.code,
-          }
-        : null,
-      pickup: {
-        latitude: pLat,
-        longitude: pLng,
-        name: pName ?? '',
-      },
-      dropoff: {
-        latitude: dLat,
-        longitude: dLng,
-        name: dName ?? '',
-      },
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/rides`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          passengerName: user.fullName ?? 'Passenger',
+          vehicleType: socketVehicleType,
+          price: ridePrice,
+          paymentMethod,
+          promotion: appliedPromotion
+            ? {
+                id: appliedPromotion.id,
+                code: appliedPromotion.code,
+              }
+            : null,
+          pickup: {
+            latitude: pLat,
+            longitude: pLng,
+            name: pName ?? '',
+          },
+          dropoff: {
+            latitude: dLat,
+            longitude: dLng,
+            name: dName ?? '',
+          },
+        }),
+      });
+      const data = await parseApiResponse<{ ride: { id?: string; _id?: string } }>(response);
+      const rideId = data.ride.id ?? data.ride._id ?? null;
 
-    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle, socketVehicleType);
+      if (rideId) {
+        if (cancelRequestedRef.current) {
+          socketRef.current?.emit('cancelRide', { rideId });
+          setCurrentRideId(null);
+        } else {
+          setCurrentRideId(rideId);
+        }
+      }
+
+      console.log('[Passenger] ride created via REST for vehicle:', selectedVehicle, socketVehicleType);
+    } catch (error) {
+      console.error('[Passenger] create ride failed:', error);
+      setRideRequesting(false);
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
+      cancelRequestedRef.current = false;
+      setHasActiveRide(false);
+      Alert.alert('Request Failed', error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+    }
   };
 
   // Derived price calculator for dynamic button
