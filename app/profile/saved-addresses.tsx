@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,14 +14,13 @@ import {
   View,
   StatusBar as RNStatusBar,
 } from 'react-native';
-import MapView, { UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { CustomOsmMap } from '@/components/CustomOsmMap';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 type AddressLabel = 'Home' | 'Work' | 'Other';
@@ -343,16 +342,6 @@ export default function SavedAddressesScreen() {
     }
   };
 
-  const mapRegion = useMemo(
-    () => ({
-      latitude: selectedLocation.latitude,
-      longitude: selectedLocation.longitude,
-      latitudeDelta: DEFAULT_REGION.latitudeDelta,
-      longitudeDelta: DEFAULT_REGION.longitudeDelta,
-    }),
-    [selectedLocation]
-  );
-
   const defaultAddress = addresses.find((address) => address.isDefault);
   const homeCount = addresses.filter((address) => address.label === 'Home').length;
   const workCount = addresses.filter((address) => address.label === 'Work').length;
@@ -632,26 +621,16 @@ export default function SavedAddressesScreen() {
                   </View>
 
                   <View style={[styles.mapCard, { borderColor: colors.border }]}>
-                    <MapView
+                    <CustomOsmMap
                       style={StyleSheet.absoluteFillObject}
-                      mapType="none"
-                      loadingEnabled={MAP_LOADING_ENABLED}
-                      loadingBackgroundColor="#EAE6DF"
-                      loadingIndicatorColor="#169F95"
-                      showsUserLocation={false}
-                      showsMyLocationButton={false}
-                      toolbarEnabled={false}
                       initialRegion={DEFAULT_REGION}
-                      region={mapRegion}
                       onRegionChangeComplete={(region) => {
                         setSelectedLocation({
                           latitude: region.latitude,
                           longitude: region.longitude,
                         });
                       }}
-                    >
-                      <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-                    </MapView>
+                    />
 
                     <View pointerEvents="none" style={styles.fixedMarkerContainer}>
                       <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />

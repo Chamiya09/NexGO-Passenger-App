@@ -2,13 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { CustomOsmMap, CustomOsmMapRef, OsmMarker, OsmPolyline } from '@/components/CustomOsmMap';
 import { VehicleCategoryIcon } from '@/components/VehicleCategoryIcon';
 
 const teal = '#169F95';
@@ -83,7 +82,7 @@ const getSocketVehicleType = (category: string) => normalizeVehicleCategory(cate
 export default function ConfirmRouteScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<CustomOsmMapRef>(null);
   const socketRef = useRef<Socket | null>(null);
   const cancelRequestedRef = useRef(false);
   const { user } = useAuth();
@@ -500,6 +499,58 @@ export default function ConfirmRouteScreen() {
   // Derived price calculator for dynamic button
   const displayBasePrice = formatMoney(basePrice);
   const displayFinalPrice = formatMoney(finalPrice);
+  const mapPolylines: OsmPolyline[] = [
+    ...routesData.slice(1).flatMap((route, index) => [
+      { id: `alt-${index}-outer`, coordinates: route.coords, color: '#B0B0B0', width: 6, opacity: 0.82 },
+      { id: `alt-${index}-inner`, coordinates: route.coords, color: '#E0E0E0', width: 3, opacity: 0.95 },
+    ]),
+    ...(routesData[0]
+      ? [
+          { id: 'primary-outer', coordinates: routesData[0].coords, color: '#017270', width: 8, opacity: 0.92 },
+          { id: 'primary-inner', coordinates: routesData[0].coords, color: '#169F95', width: 4, opacity: 1 },
+        ]
+      : []),
+  ];
+  const mapMarkers: OsmMarker[] = [
+    ...(pLat && pLng
+      ? [{ id: 'pickup', coordinate: { latitude: pLat, longitude: pLng }, color: '#169F95', label: 'Pickup', kind: 'label' as const, zIndex: 30 }]
+      : []),
+    ...(dLat && dLng
+      ? [{ id: 'dropoff', coordinate: { latitude: dLat, longitude: dLng }, color: '#E74C3C', label: 'Dropoff', kind: 'label' as const, zIndex: 40 }]
+      : []),
+    ...(routesData[0]?.coords.length
+      ? [{
+          id: 'primary-route-label',
+          coordinate: routesData[0].coords[Math.floor(routesData[0].coords.length / 2)],
+          color: '#017270',
+          label: 'Local Fastest',
+          kind: 'label' as const,
+          zIndex: 50,
+        }]
+      : []),
+    ...(routesData[1]?.coords.length
+      ? [{
+          id: 'alt-route-label',
+          coordinate: routesData[1].coords[Math.floor(routesData[1].coords.length / 2)],
+          color: '#526E6C',
+          label: 'Short Way',
+          kind: 'label' as const,
+          zIndex: 45,
+        }]
+      : []),
+    ...availableDrivers.map((driver) => {
+      const markerCategory = normalizeVehicleCategory(driver.vehicleCategory || selectedVehicle);
+      const marker = VEHICLE_MARKERS[markerCategory];
+      return {
+        id: `driver-${driver.driverId}`,
+        coordinate: { latitude: driver.latitude, longitude: driver.longitude },
+        color: marker.color,
+        title: `${markerCategory} driver`,
+        kind: 'vehicle' as const,
+        zIndex: 60,
+      };
+    }),
+  ];
 
   return (
     <View style={styles.container}>
@@ -508,138 +559,18 @@ export default function ConfirmRouteScreen() {
 
       {/* Map Background */}
       <View style={styles.mapPlaceholder}>
-        <MapView
+        <CustomOsmMap
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          mapType="none"
-          loadingEnabled={MAP_LOADING_ENABLED}
-          loadingBackgroundColor="#EAE6DF"
-          loadingIndicatorColor="#169F95"
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          toolbarEnabled={false}
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
-          }}>
-          <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-
-          {/* Pickup Marker */}
-          {pLat && pLng && (
-            <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3} tracksViewChanges={false}>
-              <View style={styles.mapLabelPill}>
-                <View style={[styles.mapLabelDot, { backgroundColor: '#169F95' }]} />
-                <Text style={styles.mapLabelText} numberOfLines={1}>Pickup</Text>
-              </View>
-              <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
-            </Marker>
-          )}
-
-          {/* Dropoff Marker */}
-          {dLat && dLng && (
-            <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
-              <View style={styles.mapLabelPill}>
-                <View style={[styles.mapLabelDot, { backgroundColor: '#E74C3C' }]} />
-                <Text style={styles.mapLabelText} numberOfLines={1}>Dropoff</Text>
-              </View>
-              <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
-            </Marker>
-          )}
-
-          {/* Alternative Routes (Rendered First so they are beneath primary) */}
-          {routesData.length > 1 && routesData.slice(1).map((route, index) => (
-            <React.Fragment key={`alt-${index}`}>
-              <Polyline
-                coordinates={route.coords}
-                strokeColor="#B0B0B0"
-                strokeWidth={6}
-                lineJoin="round"
-                lineCap="round"
-                zIndex={1}
-              />
-              <Polyline
-                coordinates={route.coords}
-                strokeColor="#E0E0E0"
-                strokeWidth={3}
-                lineJoin="round"
-                lineCap="round"
-                zIndex={1}
-              />
-            </React.Fragment>
-          ))}
-
-          {/* Primary Route Line Highlight (Outer Border) */}
-          {routesData.length > 0 && (
-            <Polyline
-              coordinates={routesData[0].coords}
-              strokeColor="#017270"
-              strokeWidth={8}
-              lineJoin="round"
-              lineCap="round"
-              zIndex={2}
-            />
-          )}
-          {/* Primary Route Line Core (Inner) */}
-          {routesData.length > 0 && (
-            <Polyline
-              coordinates={routesData[0].coords}
-              strokeColor="#169F95"
-              strokeWidth={4}
-              lineJoin="round"
-              lineCap="round"
-              zIndex={3}
-            />
-          )}
-
-          {/* Primary Route Label Midway */}
-          {routesData.length > 0 && (
-            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={5} tracksViewChanges={false}>
-              <View style={styles.routeTagPill}>
-                <Text style={styles.routeTagText}>Local Fastest</Text>
-              </View>
-            </Marker>
-          )}
-
-          {/* Alternative Route Label Midway */}
-          {routesData.length > 1 && (
-            <Marker coordinate={routesData[1].coords[Math.floor(routesData[1].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4} tracksViewChanges={false}>
-              <View style={[styles.routeTagPill, { backgroundColor: '#FFFFFF', borderColor: '#B0B0B0' }]}>
-                <Text style={[styles.routeTagText, { color: '#526E6C' }]}>Short Way</Text>
-              </View>
-            </Marker>
-          )}
-
-          {/* Categorized Driver Markers with Fade Transition */}
-          {availableDrivers.map((driver) => {
-            const markerCategory = normalizeVehicleCategory(driver.vehicleCategory || selectedVehicle);
-            const marker = VEHICLE_MARKERS[markerCategory];
-
-            return (
-              <Marker
-                key={driver.driverId}
-                coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                zIndex={5}
-                tracksViewChanges={false}
-              >
-                <Animated.View
-                  style={[
-                    styles.driverMarker,
-                    {
-                      opacity: driversFadeAnim,
-                      backgroundColor: marker.bg,
-                      borderColor: marker.color,
-                    },
-                  ]}>
-                  <MaterialCommunityIcons name={marker.icon} size={21} color={marker.color} />
-                  <View style={[styles.driverMarkerDot, { backgroundColor: marker.color }]} />
-                </Animated.View>
-              </Marker>
-            );
-          })}
-        </MapView>
+          }}
+          markers={mapMarkers}
+          polylines={mapPolylines}
+        />
       </View>
 
       {/* Back Button */}

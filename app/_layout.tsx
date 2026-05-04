@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import ActiveRideOverlays from '@/components/ActiveRideOverlays';
+import { useAppPermissions } from '@/hooks/useAppPermissions';
 import passengerSocket from '@/lib/passengerSocket';
 
 export const unstable_settings = {
@@ -42,6 +43,8 @@ function KeyboardDismissView({ children }: PropsWithChildren) {
 }
 
 export default function RootLayout() {
+  useAppPermissions();
+
   return (
     <AuthProvider>
       <ThemeProvider value={DefaultTheme}>

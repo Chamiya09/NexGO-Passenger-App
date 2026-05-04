@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
@@ -9,7 +8,7 @@ import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
 import { fetchPublicDriverProfile, type PublicDriverProfile } from '@/lib/driverProfiles';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { CustomOsmMap, CustomOsmMapRef } from '@/components/CustomOsmMap';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -57,7 +56,7 @@ async function fetchOsrmRoute(from: LatLng, to: LatLng) {
 export default function ActiveRideScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<CustomOsmMapRef>(null);
     const socketRef = useRef<Socket | null>(null);
     const { user, token } = useAuth();
 
@@ -294,6 +293,30 @@ export default function ActiveRideScreen() {
     }, [rideId, token]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
+    const mapMarkers = [
+        ...(driverPos
+            ? [{
+                id: 'driver',
+                coordinate: driverPos,
+                color: teal,
+                heading: driverHeading,
+                kind: 'vehicle' as const,
+                title: displayDriverName,
+                zIndex: 50,
+            }]
+            : []),
+        {
+            id: 'target',
+            coordinate: phase === 'TRACK_DRIVER' ? pickup : dropoff,
+            color: pathColor,
+            kind: 'pin' as const,
+            title: phase === 'TRACK_DRIVER' ? 'Pickup' : 'Drop-off',
+            zIndex: 40,
+        },
+    ];
+    const mapPolylines = slicedRouteCoords.length > 0
+        ? [{ id: 'active-route', coordinates: slicedRouteCoords, color: pathColor, width: 5 }]
+        : [];
     const openDriverProfile = () => {
         if (!driverId) return;
 
@@ -331,46 +354,18 @@ export default function ActiveRideScreen() {
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            <MapView
+            <CustomOsmMap
                 ref={mapRef}
                 style={StyleSheet.absoluteFillObject}
-                mapType="none"
-                loadingEnabled={MAP_LOADING_ENABLED}
-                loadingBackgroundColor="#EAE6DF"
-                loadingIndicatorColor="#169F95"
-                showsUserLocation={false}
-                showsMyLocationButton={false}
-                toolbarEnabled={false}
                 initialRegion={{
                     latitude: Number.isFinite(pLat) ? pLat : 6.9271,
                     longitude: Number.isFinite(pLng) ? pLng : 79.8612,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05
-                }}>
-                <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-
-                {/* Dynamic Route */}
-                {slicedRouteCoords.length > 0 && (
-                    <Polyline coordinates={slicedRouteCoords} strokeColor={pathColor} strokeWidth={5} lineCap="round" lineJoin="round" zIndex={3} />
-                )}
-
-                {/* Driver Marker */}
-                {driverPos && (
-                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5} tracksViewChanges={false}>
-                        <View style={styles.driverCar}>
-                            <Ionicons name="car-sport" size={20} color="#FFF" />
-                        </View>
-                    </Marker>
-                )}
-
-                {/* Target Marker */}
-                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
-                    <View style={styles.nexusMarker}>
-                        <View style={[styles.markerRing, { backgroundColor: pathColor }]} />
-                    </View>
-                    <View style={[styles.markerPointer, { borderTopColor: '#FFF' }]} />
-                </Marker>
-            </MapView>
+                }}
+                markers={mapMarkers}
+                polylines={mapPolylines}
+            />
 
             {/* Safety Header Back Btn */}
             <View style={styles.topNav}>

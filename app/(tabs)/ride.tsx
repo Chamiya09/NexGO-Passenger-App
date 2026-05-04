@@ -4,8 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, useWi
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import MapView, { UrlTile } from 'react-native-maps';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { CustomOsmMap, CustomOsmMapRef } from '@/components/CustomOsmMap';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 
@@ -63,7 +62,7 @@ export default function RideScreen() {
   const { token } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<CustomOsmMapRef>(null);
   const geocodeRequestRef = useRef(0);
   const locatingRef = useRef(false);
   const programmaticMoveRef = useRef(false);
@@ -72,8 +71,8 @@ export default function RideScreen() {
   const latestDeviceLocationRef = useRef<Coordinates | null>(null);
   const deviceLocationLockedRef = useRef(false);
   const activeStepRef = useRef<'PICKUP' | 'DROP'>('PICKUP');
-  const locationSourceRef = useRef<'map' | 'device'>('map');
-  const { width, height } = useWindowDimensions();
+  const locationSourceRef = useRef<'map' | 'device' | 'saved'>('map');
+  const { height } = useWindowDimensions();
   const markerTipTop = height * MARKER_TIP_TOP_RATIO;
   const selectedPromoCode = typeof params.promoCode === 'string' ? params.promoCode : '';
 
@@ -432,15 +431,8 @@ export default function RideScreen() {
       
       {/* Map Background */}
       <View style={styles.mapPlaceholder}>
-        <MapView
+        <CustomOsmMap
           style={StyleSheet.absoluteFillObject}
-          mapType="none"
-          loadingEnabled={MAP_LOADING_ENABLED}
-          loadingBackgroundColor="#EAE6DF"
-          loadingIndicatorColor="#169F95"
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          toolbarEnabled={false}
           initialRegion={{
             latitude: DEFAULT_LOCATION.latitude,
             longitude: DEFAULT_LOCATION.longitude,
@@ -457,25 +449,10 @@ export default function RideScreen() {
               return;
             }
 
-            const updateSelectedLocation = async () => {
-              setLocationSource('map');
-              try {
-                const coordinate = await mapRef.current?.coordinateForPoint({
-                  x: width / 2,
-                  y: markerTipTop,
-                });
-
-                setSelectedLocation(coordinate || { latitude: region.latitude, longitude: region.longitude });
-              } catch {
-                setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
-              }
-            };
-
-            updateSelectedLocation();
+            setLocationSource('map');
+            setSelectedLocation({ latitude: region.latitude, longitude: region.longitude });
           }}
-        >
-          <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-        </MapView>
+        />
 
         {/* Fixed Center Selection Marker */}
         <View pointerEvents="none" style={[styles.fixedMarkerContainer, { top: markerTipTop }]}>
