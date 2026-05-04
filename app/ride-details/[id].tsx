@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { deleteRideReview, fetchRideReview, RideReview, saveRideReview } from '@/lib/rideReviews';
+import { fetchPublicDriverProfile, type PublicDriverProfile } from '@/lib/driverProfiles';
 import { useAuth } from '@/context/auth-context';
 
 const teal = '#169F95';
@@ -81,6 +83,12 @@ const vehicleName = (params: RideDetailsParams) => {
   return parts.length ? parts.join(' ') : params.vehicleType || 'Vehicle not available';
 };
 
+const profileVehicleName = (driver?: PublicDriverProfile | null, params?: RideDetailsParams) => {
+  const vehicle = driver?.vehicle;
+  const parts = [vehicle?.color, vehicle?.make, vehicle?.model].filter(Boolean);
+  return parts.length ? parts.join(' ') : vehicle?.category || (params ? vehicleName(params) : 'Vehicle not available');
+};
+
 export default function RideDetailsScreen() {
   const router = useRouter();
   const { token } = useAuth();
@@ -94,7 +102,12 @@ export default function RideDetailsScreen() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [driverProfile, setDriverProfile] = useState<PublicDriverProfile | null>(null);
   const isRejectedReview = review?.status === 'rejected';
+  const displayDriverName = driverProfile?.fullName || params.driverName || 'Driver not available';
+  const displayDriverPhone = driverProfile?.phoneNumber || params.driverPhone || 'Phone not available';
+  const displayDriverImage = driverProfile?.profileImageUrl || params.driverImage || '';
+  const displayDriverRating = driverProfile?.ratingCount ? driverProfile.ratingAverage.toFixed(1) : 'New';
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +129,27 @@ export default function RideDetailsScreen() {
       cancelled = true;
     };
   }, [rideId, token]);
+
+  useEffect(() => {
+    if (!driverId && !rideId) return;
+
+    let active = true;
+    fetchPublicDriverProfile(driverId, rideId)
+      .then((profile) => {
+        if (active) {
+          setDriverProfile(profile);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDriverProfile(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [driverId, rideId]);
 
   const handleSaveReview = async () => {
     if (!rideId || rating < 1 || saving || deleting || isRejectedReview) return;
@@ -172,15 +206,15 @@ export default function RideDetailsScreen() {
       params: {
         id: driverId,
         rideId,
-        name: params.driverName ?? '',
-        phone: params.driverPhone ?? '',
-        image: params.driverImage ?? '',
-        vehicleType: params.driverVehicleType ?? params.vehicleType ?? '',
-        vehicleMake: params.vehicleMake ?? '',
-        vehicleModel: params.vehicleModel ?? '',
-        vehiclePlate: params.vehiclePlate ?? '',
-        vehicleColor: params.vehicleColor ?? '',
-        vehicleCategory: params.vehicleCategory ?? '',
+        name: displayDriverName,
+        phone: displayDriverPhone,
+        image: displayDriverImage,
+        vehicleType: driverProfile?.vehicle?.category ?? params.driverVehicleType ?? params.vehicleType ?? '',
+        vehicleMake: driverProfile?.vehicle?.make ?? params.vehicleMake ?? '',
+        vehicleModel: driverProfile?.vehicle?.model ?? params.vehicleModel ?? '',
+        vehiclePlate: driverProfile?.vehicle?.plateNumber ?? params.vehiclePlate ?? '',
+        vehicleColor: driverProfile?.vehicle?.color ?? params.vehicleColor ?? '',
+        vehicleCategory: driverProfile?.vehicle?.category ?? params.vehicleCategory ?? '',
       },
     });
   };
@@ -233,19 +267,31 @@ export default function RideDetailsScreen() {
                 activeOpacity={0.75}
               >
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(params.driverName || 'D').trim().charAt(0).toUpperCase()}
-                  </Text>
+                  {displayDriverImage ? (
+                    <Image source={{ uri: displayDriverImage }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {(displayDriverName || 'D').trim().charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.driverTextWrap}>
-                  <Text style={styles.driverName}>{params.driverName || 'Driver not available'}</Text>
-                  <Text style={styles.driverMeta}>{params.driverPhone || 'Phone not available'}</Text>
+                  <Text style={styles.driverName}>{displayDriverName}</Text>
+                  <View style={styles.driverMetaRow}>
+                    <Text style={styles.driverMeta}>{displayDriverPhone}</Text>
+                    <View style={styles.driverRatingPill}>
+                      <Ionicons name="star" size={12} color="#D79A00" />
+                      <Text style={styles.driverRatingText}>{displayDriverRating}</Text>
+                    </View>
+                  </View>
                 </View>
                 {driverId ? <Ionicons name="chevron-forward" size={18} color="#8CA1A0" /> : null}
               </TouchableOpacity>
-              <InfoRow icon="car-outline" label="Vehicle" value={vehicleName(params)} />
-              <InfoRow icon="card-outline" label="Plate number" value={params.vehiclePlate || 'Not available'} selectable />
-              <InfoRow icon="apps-outline" label="Category" value={params.vehicleCategory || params.vehicleType || 'Not available'} />
+              <InfoRow icon="car-outline" label="Vehicle" value={profileVehicleName(driverProfile, params)} />
+              <InfoRow icon="card-outline" label="Plate number" value={driverProfile?.vehicle?.plateNumber || params.vehiclePlate || 'Not available'} selectable />
+              <InfoRow icon="apps-outline" label="Category" value={driverProfile?.vehicle?.category || params.vehicleCategory || params.vehicleType || 'Not available'} />
+              <InfoRow icon="people-outline" label="Seats" value={driverProfile?.vehicle?.seats ? String(driverProfile.vehicle.seats) : 'Not available'} />
+              <InfoRow icon="checkmark-done-outline" label="Completed trips" value={String(driverProfile?.completedRides ?? 0)} />
             </View>
 
             <View style={styles.routeBox}>
@@ -477,6 +523,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   headerText: {
     flex: 1,
@@ -581,7 +632,27 @@ const styles = StyleSheet.create({
     color: '#617C79',
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
+  },
+  driverMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 3,
+    flexWrap: 'wrap',
+  },
+  driverRatingPill: {
+    minHeight: 22,
+    borderRadius: 999,
+    backgroundColor: '#FFF8EC',
+    paddingHorizontal: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  driverRatingText: {
+    color: '#102A28',
+    fontSize: 11,
+    fontWeight: '900',
   },
   routeBox: {
     backgroundColor: '#FFFFFF',

@@ -32,8 +32,8 @@ const palette = {
   accentDark: '#017270',
   accentMuted: '#E7F5F3',
   border: '#D9E9E6',
+  success: '#157A62',
   warning: '#D97706',
-  warningBg: '#FFF8EC',
 };
 
 type QuickAction = {
@@ -48,6 +48,8 @@ type ServiceCard = {
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   tone: 'primary' | 'light';
+  badge: string;
+  eta: string;
 };
 
 type PromotionSummary = {
@@ -68,23 +70,53 @@ const serviceCards: ServiceCard[] = [
     subtitle: 'Fast daily rides around town',
     icon: 'car-sport-outline',
     tone: 'primary',
+    badge: 'Popular',
+    eta: '3-5 min',
   },
   {
     title: 'Airport Drop',
     subtitle: 'Plan reliable airport travel',
     icon: 'airplane-outline',
     tone: 'light',
+    badge: 'Planned',
+    eta: 'Schedule',
   },
   {
     title: 'Family Trip',
     subtitle: 'Spacious cars for group rides',
     icon: 'people-outline',
     tone: 'light',
+    badge: 'Comfort',
+    eta: '6 seats',
   },
 ];
 
+const SERVICE_CARD_SNAP_INTERVAL = 226;
+
 function getFirstName(fullName?: string) {
   return fullName?.trim().split(/\s+/)[0] || 'Passenger';
+}
+
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 8) {
+    return 'Early Morning';
+  }
+
+  if (hour >= 8 && hour < 12) {
+    return 'Good Morning';
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return 'Good Afternoon';
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return 'Good Evening';
+  }
+
+  return 'Good Night';
 }
 
 function getActivePromotions(promotions: PromotionSummary[]) {
@@ -137,8 +169,14 @@ function QuickActionButton({ action }: { action: QuickAction }) {
       <View style={styles.quickIconWrap}>
         <Ionicons name={action.icon} size={21} color={palette.accentDark} />
       </View>
-      <Text style={styles.quickLabel}>{action.label}</Text>
-      <Text style={styles.quickCaption}>{action.caption}</Text>
+      <View style={styles.quickTextWrap}>
+        <Text style={styles.quickLabel} numberOfLines={1} adjustsFontSizeToFit>
+          {action.label}
+        </Text>
+        <Text style={styles.quickCaption} numberOfLines={1} adjustsFontSizeToFit>
+          {action.caption}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -150,16 +188,69 @@ function ServiceTile({ service, onPress }: { service: ServiceCard; onPress: () =
     <Pressable
       style={[styles.serviceTile, isPrimary ? styles.serviceTilePrimary : styles.serviceTileLight]}
       onPress={onPress}>
-      <View style={[styles.serviceIcon, isPrimary ? styles.serviceIconPrimary : styles.serviceIconLight]}>
-        <Ionicons name={service.icon} size={23} color={isPrimary ? '#FFFFFF' : palette.accentDark} />
+      <View style={[styles.serviceAccentRail, { backgroundColor: isPrimary ? palette.accent : palette.border }]} />
+
+      <View style={styles.serviceTopRow}>
+        <View style={[styles.serviceIcon, isPrimary ? styles.serviceIconPrimary : styles.serviceIconLight]}>
+          <Ionicons name={service.icon} size={22} color={isPrimary ? palette.accent : palette.accentDark} />
+        </View>
+
+        <View style={[styles.serviceBadge, { backgroundColor: isPrimary ? palette.accent : palette.accentMuted }]}>
+          <Text style={[styles.serviceBadgeText, { color: isPrimary ? '#FFFFFF' : palette.accentDark }]}>
+            {service.badge}
+          </Text>
+        </View>
       </View>
-      <Text style={[styles.serviceTitle, isPrimary ? styles.serviceTitlePrimary : styles.serviceTitleLight]}>
-        {service.title}
-      </Text>
-      <Text style={[styles.serviceSubtitle, isPrimary ? styles.serviceSubtitlePrimary : styles.serviceSubtitleLight]}>
-        {service.subtitle}
-      </Text>
+
+      <View style={styles.serviceContent}>
+        <Text style={styles.serviceTitle} numberOfLines={1} ellipsizeMode="tail">
+          {service.title}
+        </Text>
+        <Text style={styles.serviceSubtitle} numberOfLines={2} ellipsizeMode="tail">
+          {service.subtitle}
+        </Text>
+      </View>
+
+      <View style={styles.serviceFooter}>
+        <View style={styles.serviceEtaPill}>
+          <Ionicons name="time-outline" size={13} color={palette.secondary} />
+          <Text style={styles.serviceEtaText}>{service.eta}</Text>
+        </View>
+
+        <View style={[styles.serviceArrow, { backgroundColor: isPrimary ? palette.accent : palette.accentMuted }]}>
+          <Ionicons name="arrow-forward" size={14} color={isPrimary ? '#FFFFFF' : palette.accentDark} />
+        </View>
+      </View>
     </Pressable>
+  );
+}
+
+function RideDetailItem({
+  icon,
+  title,
+  subtitle,
+  badge,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  badge: string;
+}) {
+  return (
+    <View style={styles.rideDetailItem}>
+      <View style={styles.rideDetailIcon}>
+        <Ionicons name={icon} size={18} color={palette.accentDark} />
+      </View>
+
+      <View style={styles.rideDetailTextWrap}>
+        <Text style={styles.rideDetailTitle}>{title}</Text>
+        <Text style={styles.rideDetailSubtitle}>{subtitle}</Text>
+      </View>
+
+      <View style={styles.rideDetailBadge}>
+        <Text style={styles.rideDetailBadgeText}>{badge}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -306,6 +397,8 @@ export default function HomeScreen() {
   const [promotions, setPromotions] = useState<PromotionSummary[]>([]);
   const promoScrollRef = React.useRef<ScrollView>(null);
   const promoAutoIndexRef = React.useRef(0);
+  const serviceScrollRef = React.useRef<ScrollView>(null);
+  const serviceAutoIndexRef = React.useRef(0);
 
   const loadActiveRide = useCallback(async () => {
     const ride = await loadPassengerActiveRide();
@@ -357,6 +450,20 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [promotions.length]);
 
+  useEffect(() => {
+    if (serviceCards.length <= 1) return undefined;
+
+    const interval = setInterval(() => {
+      serviceAutoIndexRef.current = (serviceAutoIndexRef.current + 1) % serviceCards.length;
+      serviceScrollRef.current?.scrollTo({
+        x: serviceAutoIndexRef.current * SERVICE_CARD_SNAP_INTERVAL,
+        animated: true,
+      });
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const getPromoCaption = (promotion: PromotionSummary) => (
     promotion.discountType === 'Percentage'
       ? `Use code ${promotion.code} to get ${Math.min(100, Math.max(0, Number(promotion.discountValue)))}% off your next ride.`
@@ -374,7 +481,7 @@ export default function HomeScreen() {
       label: 'Wallet',
       caption: 'Payments',
       icon: 'wallet-outline',
-      onPress: () => router.push('/profile/payment-details'),
+      onPress: () => router.push('/profile/wallet'),
     },
     {
       label: 'Trips',
@@ -414,7 +521,7 @@ export default function HomeScreen() {
         onRefreshPage={handleRefreshPage}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>Hi, {getFirstName(user?.fullName)}</Text>
+            <Text style={styles.greeting}>{getTimeGreeting()}, {getFirstName(user?.fullName)}</Text>
             <Text style={styles.subtext}>Ready for your next NexGO ride?</Text>
           </View>
 
@@ -483,21 +590,70 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.servicesScroll}>
+        <ScrollView
+          ref={serviceScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.servicesScroll}
+          decelerationRate="fast"
+          snapToInterval={SERVICE_CARD_SNAP_INTERVAL}
+          snapToAlignment="start"
+          onMomentumScrollEnd={(event) => {
+            serviceAutoIndexRef.current = Math.round(
+              event.nativeEvent.contentOffset.x / SERVICE_CARD_SNAP_INTERVAL
+            );
+          }}>
           {serviceCards.map((service) => (
             <ServiceTile key={service.title} service={service} onPress={() => router.push('/(tabs)/ride')} />
           ))}
         </ScrollView>
 
-        <View style={styles.safetyCard}>
-          <View style={styles.safetyIcon}>
-            <Ionicons name="shield-outline" size={22} color={palette.warning} />
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Ride Details</Text>
+            <Text style={styles.sectionCaption}>Everything ready before booking</Text>
           </View>
-          <View style={styles.safetyCopy}>
-            <Text style={styles.safetyTitle}>Safety reminder</Text>
-            <Text style={styles.safetyText}>
-              Check the driver name, vehicle color, and plate number before starting your trip.
-            </Text>
+        </View>
+
+        <View style={styles.rideDetailsCard}>
+          <View style={styles.rideDetailsAccent} />
+          <RideDetailItem
+            icon="navigate-outline"
+            title="Pickup accuracy"
+            subtitle="Use saved places or adjust the pickup pin before confirming."
+            badge="Map"
+          />
+          <View style={styles.rideDetailDivider} />
+          <RideDetailItem
+            icon="wallet-outline"
+            title="Fare readiness"
+            subtitle="Top up wallet credit or keep payment details ready for faster checkout."
+            badge="Pay"
+          />
+          <View style={styles.rideDetailDivider} />
+          <RideDetailItem
+            icon="chatbubble-ellipses-outline"
+            title="Driver contact"
+            subtitle="After acceptance, call or message the driver from your active ride."
+            badge="Live"
+          />
+        </View>
+
+        <View style={styles.tripTipsGrid}>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="time-outline" size={18} color={palette.accentDark} />
+            <Text style={styles.tripTipValue}>3 steps</Text>
+            <Text style={styles.tripTipLabel}>Book, match, ride</Text>
+          </View>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="receipt-outline" size={18} color={palette.success} />
+            <Text style={styles.tripTipValue}>Clear fare</Text>
+            <Text style={styles.tripTipLabel}>Review before start</Text>
+          </View>
+          <View style={styles.tripTipCard}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={palette.warning} />
+            <Text style={styles.tripTipValue}>Verified</Text>
+            <Text style={styles.tripTipLabel}>Check driver info</Text>
           </View>
         </View>
 
@@ -602,38 +758,51 @@ const styles = StyleSheet.create({
   },
   quickGrid: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
+    alignItems: 'stretch',
   },
   quickAction: {
     flex: 1,
-    minHeight: 98,
+    minWidth: 0,
+    height: 94,
     backgroundColor: palette.card,
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 18,
-    padding: 11,
+    borderRadius: 16,
+    paddingHorizontal: 7,
+    paddingVertical: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
+    justifyContent: 'space-between',
   },
   quickIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     backgroundColor: palette.accentMuted,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
+    flexShrink: 0,
+  },
+  quickTextWrap: {
+    width: '100%',
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickLabel: {
     color: palette.primary,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 15,
     fontWeight: '900',
+    textAlign: 'center',
   },
   quickCaption: {
     color: palette.muted,
-    fontSize: 11,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -669,55 +838,208 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   serviceTile: {
-    width: 180,
-    minHeight: 150,
-    borderRadius: 20,
-    padding: 16,
-    gap: 9,
+    position: 'relative',
+    width: 214,
+    minHeight: 168,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingLeft: 18,
+    gap: 12,
     borderWidth: 1,
+    overflow: 'hidden',
   },
   serviceTilePrimary: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#BFE2DD',
   },
   serviceTileLight: {
     backgroundColor: palette.card,
     borderColor: palette.border,
   },
+  serviceAccentRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 5,
+  },
+  serviceTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   serviceIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   serviceIconPrimary: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: palette.accentMuted,
   },
   serviceIconLight: {
     backgroundColor: palette.accentMuted,
   },
-  serviceTitle: {
-    fontSize: 18,
+  serviceBadge: {
+    minHeight: 26,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceBadgeText: {
+    fontSize: 10,
     fontWeight: '900',
-    marginTop: 4,
+    letterSpacing: 0.2,
   },
-  serviceTitlePrimary: {
-    color: '#FFFFFF',
+  serviceContent: {
+    minHeight: 50,
   },
-  serviceTitleLight: {
+  serviceTitle: {
     color: palette.primary,
+    fontSize: 17,
+    fontWeight: '900',
+    marginBottom: 4,
   },
   serviceSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  serviceSubtitlePrimary: {
-    color: 'rgba(255,255,255,0.88)',
-  },
-  serviceSubtitleLight: {
     color: palette.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  serviceFooter: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  serviceEtaPill: {
+    minHeight: 30,
+    borderRadius: 999,
+    backgroundColor: palette.elevated,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  serviceEtaText: {
+    color: palette.secondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  serviceArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rideDetailsCard: {
+    position: 'relative',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingLeft: 16,
+    overflow: 'hidden',
+  },
+  rideDetailsAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: palette.accent,
+  },
+  rideDetailItem: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  rideDetailIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: palette.accentMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rideDetailTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rideDetailTitle: {
+    color: palette.primary,
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  rideDetailSubtitle: {
+    color: palette.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  rideDetailBadge: {
+    minHeight: 28,
+    borderRadius: 999,
+    backgroundColor: palette.elevated,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rideDetailBadgeText: {
+    color: palette.accentDark,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  rideDetailDivider: {
+    height: 1,
+    backgroundColor: palette.border,
+    marginLeft: 48,
+  },
+  tripTipsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  tripTipCard: {
+    flex: 1,
+    minHeight: 88,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  tripTipValue: {
+    color: palette.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  tripTipLabel: {
+    color: palette.secondary,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   promoScroll: {
     gap: 12,
@@ -817,38 +1139,6 @@ const styles = StyleSheet.create({
     color: '#1F1300',
     fontSize: 11,
     fontWeight: '900',
-  },
-  safetyCard: {
-    backgroundColor: palette.warningBg,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#F3E5C8',
-    padding: 15,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  safetyIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  safetyCopy: {
-    flex: 1,
-  },
-  safetyTitle: {
-    color: palette.primary,
-    fontSize: 15,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  safetyText: {
-    color: palette.secondary,
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '600',
   },
   bottomSpacer: {
     height: 24,

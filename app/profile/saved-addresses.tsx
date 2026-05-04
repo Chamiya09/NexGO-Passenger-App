@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,13 +14,13 @@ import {
   View,
   StatusBar as RNStatusBar,
 } from 'react-native';
-import MapView, { UrlTile } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
+import { CustomOsmMap } from '@/components/CustomOsmMap';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 type AddressLabel = 'Home' | 'Work' | 'Other';
@@ -34,6 +34,7 @@ type SavedAddress = {
   longitude: number;
   note: string;
   isDefault: boolean;
+  showOnRidePage: boolean;
 };
 
 const DEFAULT_REGION = {
@@ -65,6 +66,7 @@ export default function SavedAddressesScreen() {
   const [saving, setSaving] = useState(false);
   const [updatingDefaultId, setUpdatingDefaultId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: DEFAULT_REGION.latitude,
     longitude: DEFAULT_REGION.longitude,
@@ -310,15 +312,40 @@ export default function SavedAddressesScreen() {
     }
   };
 
-  const mapRegion = useMemo(
-    () => ({
-      latitude: selectedLocation.latitude,
-      longitude: selectedLocation.longitude,
-      latitudeDelta: DEFAULT_REGION.latitudeDelta,
-      longitudeDelta: DEFAULT_REGION.longitudeDelta,
-    }),
-    [selectedLocation]
-  );
+  const toggleVisibility = async (addressId: string) => {
+    if (!token) {
+      setErrorMessage('You need to be logged in to update a saved address.');
+      return;
+    }
+
+    setTogglingVisibilityId(addressId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/saved-addresses/${addressId}/visibility`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await parseApiResponse<{ savedAddresses: SavedAddress[] }>(response);
+      setAddresses(data.savedAddresses);
+      setSuccessMessage(data.savedAddresses.find((a) => a._id === addressId)?.showOnRidePage
+        ? 'Address is now shown on ride page.'
+        : 'Address hidden from ride page.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update address visibility');
+    } finally {
+      setTogglingVisibilityId(null);
+    }
+  };
+
+  const defaultAddress = addresses.find((address) => address.isDefault);
+  const homeCount = addresses.filter((address) => address.label === 'Home').length;
+  const workCount = addresses.filter((address) => address.label === 'Work').length;
+  const showCount = addresses.filter((a) => a.showOnRidePage).length;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -326,37 +353,104 @@ export default function SavedAddressesScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         onRefreshPage={loadSavedAddresses}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>Saved Addresses</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="location-outline" size={26} color={colors.accent} />
+            </View>
+
+            <View style={styles.heroIdentity}>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Saved Places</Text>
+              <Text style={[styles.heroSubline, { color: colors.textSecondary }]}>
+                Home, work, and favorite pickup points.
+              </Text>
+            </View>
+          </View>
+
           <View style={[styles.heroBadge, { backgroundColor: colors.accentSoft }]}>
             <Ionicons name="navigate-outline" size={15} color={colors.accent} />
             <Text style={[styles.heroBadgeText, { color: colors.accent }]}>Faster pickups</Text>
           </View>
 
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Saved Addresses</Text>
           <Text style={[styles.heroHint, { color: colors.textSecondary }]}>
             Keep your most-used places ready for one-tap ride booking and smoother pickups.
           </Text>
-
-          <View style={[styles.tipCard, { backgroundColor: colors.warningSoft, borderColor: '#F4DFB8' }]}>
-            <Ionicons name="map-outline" size={16} color={colors.warning} />
-            <Text style={[styles.tipText, { color: colors.textPrimary }]}>
-              New addresses are selected directly from the map, just like the ride booking flow.
-            </Text>
-          </View>
         </View>
 
         {errorMessage ? <Text style={[styles.pageFeedback, { color: colors.danger }]}>{errorMessage}</Text> : null}
         {successMessage ? <Text style={[styles.pageFeedback, { color: colors.success }]}>{successMessage}</Text> : null}
 
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SAVED PLACES</Text>
-          <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Add Address</Text>
-          </Pressable>
+        <View style={styles.metricGrid}>
+          <AddressMetricCard
+            icon="location-outline"
+            label="Saved"
+            value={`${addresses.length}`}
+            color={colors.accent}
+            backgroundColor={colors.accentSoft}
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <AddressMetricCard
+            icon="home-outline"
+            label="Home"
+            value={`${homeCount}`}
+            color={colors.success}
+            backgroundColor="#E9F8EF"
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
+          <AddressMetricCard
+            icon="briefcase-outline"
+            label="Work"
+            value={`${workCount}`}
+            color={colors.warning}
+            backgroundColor={colors.warningSoft}
+            borderColor={colors.border}
+            textColor={colors.textPrimary}
+            secondaryColor={colors.textSecondary}
+          />
         </View>
 
-        <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={[styles.sectionTitle, styles.sectionTitleInline, { color: colors.textSecondary }]}>SAVED PLACES</Text>
+            <Text style={[styles.sectionHint, { color: colors.textSecondary }]}>
+              {defaultAddress ? `Default: ${defaultAddress.title}` : 'No default address'}
+            </Text>
+          </View>
+          <View style={styles.sectionHeaderActions}>
+            <View
+              style={[
+                styles.shownBadge,
+                {
+                  backgroundColor: showCount >= 4 ? colors.warningSoft : colors.accentSoft,
+                  borderColor: showCount >= 4 ? colors.warning : colors.accent,
+                },
+              ]}>
+              <Ionicons name="eye-outline" size={12} color={showCount >= 4 ? colors.warning : colors.accent} />
+              <Text style={[styles.shownBadgeText, { color: showCount >= 4 ? colors.warning : colors.accent }]}>
+                {showCount} / 4
+              </Text>
+            </View>
+            <Pressable style={[styles.addButton, { backgroundColor: colors.accent }]} onPress={openAddModal}>
+              <Ionicons name="add" size={16} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={[styles.groupCard, styles.addressSectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.cardAccent, { backgroundColor: colors.accent }]} />
           {loading ? (
             <View style={styles.stateRow}>
               <ActivityIndicator size="small" color={colors.accent} />
@@ -379,51 +473,26 @@ export default function SavedAddressesScreen() {
 
               return (
                 <View key={address._id}>
-                  <View style={styles.addressRow}>
-                    <View style={styles.rowLeft}>
+                  {/* ── address card ── */}
+                  <View style={styles.addressCard}>
+                    {/* Top row: icon | info text | delete */}
+                    <View style={styles.addressCardTop}>
                       <View style={[styles.iconWrap, { backgroundColor: colors.accentSoft }]}>
                         <Ionicons name={labelIconMap[address.label]} size={16} color={colors.accent} />
                       </View>
 
                       <View style={styles.addressTextWrap}>
-                        <View style={styles.addressTitleRow}>
-                          <Text style={[styles.addressTitle, { color: colors.textPrimary }]}>{address.title}</Text>
-                          {address.isDefault ? (
-                            <View style={[styles.defaultPill, { backgroundColor: colors.accentSoft }]}>
-                              <Text style={[styles.defaultPillText, { color: colors.accent }]}>Default</Text>
-                            </View>
-                          ) : null}
-                        </View>
-
+                        <Text style={[styles.addressTitle, { color: colors.textPrimary }]}>{address.title}</Text>
                         <Text style={[styles.addressMeta, { color: colors.textSecondary }]}>{address.label}</Text>
-                        <Text style={[styles.addressLine, { color: colors.textPrimary }]}>{address.addressLine}</Text>
+                        <Text style={[styles.addressLine, { color: colors.textPrimary }]} numberOfLines={2}>{address.addressLine}</Text>
                         {address.note ? (
                           <Text style={[styles.addressNote, { color: colors.textSecondary }]}>{address.note}</Text>
                         ) : null}
                       </View>
-                    </View>
-
-                    <View style={styles.rowRight}>
-                      {!address.isDefault ? (
-                        <Pressable
-                          style={[styles.inlineActionButton, { borderColor: colors.border }]}
-                          onPress={() => {
-                            void markAsDefault(address._id);
-                          }}
-                          disabled={isUpdatingDefault || isDeleting}>
-                          {isUpdatingDefault ? (
-                            <ActivityIndicator size="small" color={colors.accent} />
-                          ) : (
-                            <Text style={[styles.inlineActionText, { color: colors.textPrimary }]}>Default</Text>
-                          )}
-                        </Pressable>
-                      ) : null}
 
                       <Pressable
                         style={[styles.deleteIconButton, { backgroundColor: colors.accentSoft }]}
-                        onPress={() => {
-                          void deleteAddress(address._id);
-                        }}
+                        onPress={() => { void deleteAddress(address._id); }}
                         disabled={isUpdatingDefault || isDeleting}>
                         {isDeleting ? (
                           <ActivityIndicator size="small" color={colors.danger} />
@@ -431,6 +500,55 @@ export default function SavedAddressesScreen() {
                           <Ionicons name="trash-outline" size={16} color={colors.danger} />
                         )}
                       </Pressable>
+                    </View>
+
+                    {/* Footer action bar: default badge/button | show toggle */}
+                    <View style={[styles.addressCardFooter, { borderTopColor: colors.divider }]}>
+                      {/* Left side: Default badge or Set-as-default button */}
+                      <View style={styles.footerLeft}>
+                        {address.isDefault ? (
+                          <View style={[styles.defaultPill, { backgroundColor: colors.accentSoft }]}>
+                            <Ionicons name="star" size={10} color={colors.accent} />
+                            <Text style={[styles.defaultPillText, { color: colors.accent }]}>Default pickup</Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            style={[styles.setDefaultButton, { borderColor: colors.border }]}
+                            onPress={() => { void markAsDefault(address._id); }}
+                            disabled={isUpdatingDefault || isDeleting || togglingVisibilityId !== null}>
+                            {isUpdatingDefault ? (
+                              <ActivityIndicator size="small" color={colors.accent} />
+                            ) : (
+                              <>
+                                <Ionicons name="star-outline" size={11} color={colors.textSecondary} />
+                                <Text style={[styles.setDefaultText, { color: colors.textSecondary }]}>Set as default</Text>
+                              </>
+                            )}
+                          </Pressable>
+                        )}
+                      </View>
+
+                      {/* Right side: Show on ride page toggle */}
+                      <View style={styles.footerRight}>
+                        <Text style={[styles.visibilityLabel, { color: colors.textSecondary }]}>Show on ride page</Text>
+                        {togglingVisibilityId === address._id ? (
+                          <ActivityIndicator size="small" color={colors.accent} style={styles.toggleLoader} />
+                        ) : (
+                          <Switch
+                            value={Boolean(address.showOnRidePage)}
+                            onValueChange={() => { void toggleVisibility(address._id); }}
+                            trackColor={{ false: '#C7D4D2', true: colors.accent }}
+                            thumbColor="#FFFFFF"
+                            disabled={
+                              isUpdatingDefault ||
+                              isDeleting ||
+                              togglingVisibilityId !== null ||
+                              (!address.showOnRidePage && addresses.filter((a) => a.showOnRidePage).length >= 4)
+                            }
+                            style={styles.visibilitySwitch}
+                          />
+                        )}
+                      </View>
                     </View>
                   </View>
 
@@ -503,26 +621,16 @@ export default function SavedAddressesScreen() {
                   </View>
 
                   <View style={[styles.mapCard, { borderColor: colors.border }]}>
-                    <MapView
+                    <CustomOsmMap
                       style={StyleSheet.absoluteFillObject}
-                      mapType="none"
-                      loadingEnabled={MAP_LOADING_ENABLED}
-                      loadingBackgroundColor="#EAE6DF"
-                      loadingIndicatorColor="#169F95"
-                      showsUserLocation={false}
-                      showsMyLocationButton={false}
-                      toolbarEnabled={false}
                       initialRegion={DEFAULT_REGION}
-                      region={mapRegion}
                       onRegionChangeComplete={(region) => {
                         setSelectedLocation({
                           latitude: region.latitude,
                           longitude: region.longitude,
                         });
                       }}
-                    >
-                      <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-                    </MapView>
+                    />
 
                     <View pointerEvents="none" style={styles.fixedMarkerContainer}>
                       <Ionicons name="location-sharp" size={40} color={colors.accent} style={styles.fixedMarkerIcon} />
@@ -620,18 +728,95 @@ export default function SavedAddressesScreen() {
   );
 }
 
+function AddressMetricCard({
+  icon,
+  label,
+  value,
+  color,
+  backgroundColor,
+  borderColor,
+  textColor,
+  secondaryColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+  secondaryColor: string;
+}) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor, borderColor }]}>
+      <View style={styles.metricIcon}>
+        <Ionicons name={icon} size={16} color={color} />
+      </View>
+      <Text style={[styles.metricValue, { color: textColor }]} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={[styles.metricLabel, { color: secondaryColor }]}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
   },
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   heroBadge: {
     alignSelf: 'flex-start',
@@ -648,48 +833,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 2,
   },
-  heroHint: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  tipCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tipText: {
-    flex: 1,
+  heroSubline: {
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  heroHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   pageFeedback: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  metricIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   sectionHeaderRow: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+  sectionTitleInline: {
+    marginBottom: 2,
+  },
+  sectionHint: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   addButton: {
     borderRadius: 999,
@@ -705,10 +920,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   groupCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
+  },
+  addressSectionCard: {
+    position: 'relative',
+    paddingLeft: 4,
+  },
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   stateRow: {
     minHeight: 76,
@@ -746,24 +972,66 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  addressRow: {
-    minHeight: 96,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+  addressCard: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 0,
+  },
+  addressCardTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+  },
+  addressCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    gap: 10,
   },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  footerLeft: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  rowRight: {
-    alignItems: 'flex-end',
+  footerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  setDefaultButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  setDefaultText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+  },
+  shownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  shownBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   iconWrap: {
     width: 34,
@@ -803,24 +1071,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   defaultPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   defaultPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  inlineActionButton: {
-    minWidth: 70,
-    minHeight: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inlineActionText: {
     fontSize: 11,
     fontWeight: '800',
   },
@@ -830,6 +1088,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  visibilityLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  visibilitySwitch: {
+    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  },
+  toggleLoader: {
+    width: 32,
+    height: 20,
   },
   divider: {
     height: 1,

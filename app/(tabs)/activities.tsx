@@ -6,6 +6,7 @@ import {
   Platform,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StatusBar as RNStatusBar,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RideStatus = 'Pending' | 'Accepted' | 'InProgress' | 'Completed' | 'Cancelled';
+type ActivityFilter = 'all' | RideStatus;
 
 type Coords = { latitude: number; longitude: number; name?: string };
 
@@ -65,6 +67,26 @@ const isCompletedRide = (ride: Ride) =>
 
 const isCancellableRide = (ride: Ride) =>
   String(ride.status).toLowerCase() === 'pending';
+
+const activityFilters: { label: string; value: ActivityFilter }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'Pending' },
+  { label: 'Accepted', value: 'Accepted' },
+  { label: 'In Progress', value: 'InProgress' },
+  { label: 'Completed', value: 'Completed' },
+  { label: 'Cancelled', value: 'Cancelled' },
+];
+
+const getCanonicalRideStatus = (ride: Ride): RideStatus => {
+  const status = String(ride.canonicalStatus ?? ride.status).toLowerCase();
+
+  if (status === 'accepted') return 'Accepted';
+  if (status === 'inprogress' || status === 'in_progress') return 'InProgress';
+  if (status === 'completed') return 'Completed';
+  if (status === 'cancelled' || status === 'canceled') return 'Cancelled';
+
+  return 'Pending';
+};
 
 // ── Status tag config ─────────────────────────────────────────────────────────
 type StatusConfig = {
@@ -215,15 +237,13 @@ function RideCard({
 }) {
   const pickupName = shortenLocation(ride.pickup?.name, ride.pickup?.latitude, ride.pickup?.longitude);
   const dropoffName = shortenLocation(ride.dropoff?.name, ride.dropoff?.latitude, ride.dropoff?.longitude);
-  const reviewScore = review?.rating ? `${review.rating}.0` : 'New';
+  const reviewScore = review?.rating ? `${review.rating}.0` : '';
   const reviewStatusLabel =
     review?.status === 'approved'
       ? 'Approved'
       : review?.status === 'rejected'
         ? 'Rejected'
-        : review
-          ? 'Pending'
-          : 'Open';
+        : 'Pending';
   const reviewStatusColor = review?.status === 'rejected' ? '#C13B3B' : teal;
   const reviewStatusBg = review?.status === 'rejected' ? '#FFF4F4' : '#E7F5F3';
 
@@ -271,7 +291,7 @@ function RideCard({
         <Text style={cardStyles.fare}>LKR {ride.price.toLocaleString()}</Text>
       </View>
 
-      {isCompletedRide(ride) && (
+      {isCompletedRide(ride) && review ? (
         <View style={cardStyles.reviewBlock}>
           <View style={cardStyles.reviewHeader}>
             <View style={cardStyles.reviewScoreWrap}>
@@ -279,10 +299,8 @@ function RideCard({
                 <Text style={cardStyles.reviewScore}>{reviewScore}</Text>
               </View>
               <View style={cardStyles.reviewTitleWrap}>
-                <Text style={cardStyles.reviewTitle}>{review ? 'Your ride review' : 'Review this ride'}</Text>
-                <Text style={cardStyles.reviewSubtitle}>
-                  {review ? 'Shared with NexGO after this trip' : 'Add a rating for this completed trip'}
-                </Text>
+                <Text style={cardStyles.reviewTitle}>Your ride review</Text>
+                <Text style={cardStyles.reviewSubtitle}>Shared with NexGO after this trip</Text>
               </View>
             </View>
 
@@ -293,9 +311,7 @@ function RideCard({
                     ? 'checkmark-circle'
                     : review?.status === 'rejected'
                       ? 'close-circle'
-                      : review
-                        ? 'time-outline'
-                        : 'create-outline'
+                      : 'time-outline'
                 }
                 size={13}
                 color={reviewStatusColor}
@@ -324,17 +340,17 @@ function RideCard({
                 color={review?.comment ? teal : '#8CA1A0'}
               />
               <Text style={cardStyles.reviewComment} numberOfLines={2}>
-                {review?.comment || 'No review yet. Tell us how the ride felt.'}
+                {review.comment || 'No written comment.'}
               </Text>
             </View>
           </View>
-
-          <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
-            <Ionicons name="receipt-outline" size={15} color={teal} />
-            <Text style={cardStyles.detailsBtnText}>View details</Text>
-          </TouchableOpacity>
         </View>
-      )}
+      ) : null}
+
+      <TouchableOpacity style={cardStyles.detailsBtn} onPress={() => onViewDetails(ride)}>
+        <Ionicons name="receipt-outline" size={15} color={teal} />
+        <Text style={cardStyles.detailsBtnText}>View details</Text>
+      </TouchableOpacity>
 
       {isResumeTarget && onResumeNavigation && (
         <TouchableOpacity style={cardStyles.resumeBtn} onPress={onResumeNavigation}>
@@ -552,6 +568,7 @@ const cardStyles = StyleSheet.create({
     fontSize: 14,
   },
   detailsBtn: {
+    marginTop: 12,
     minHeight: 38,
     borderRadius: 12,
     borderWidth: 1,
@@ -599,6 +616,18 @@ function EmptyState() {
   );
 }
 
+function FilteredEmptyState() {
+  return (
+    <View style={emptyStyles.wrap}>
+      <View style={emptyStyles.iconWrap}>
+        <Ionicons name="filter-outline" size={40} color={teal} />
+      </View>
+      <Text style={emptyStyles.title}>No rides match this filter</Text>
+      <Text style={emptyStyles.sub}>Choose another status to see more activities.</Text>
+    </View>
+  );
+}
+
 const emptyStyles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
   iconWrap: {
@@ -626,6 +655,7 @@ export default function ActivitiesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [latestNavigation, setLatestNavigation] = useState<PassengerActiveRideParams | null>(null);
   const [reviews, setReviews] = useState<RideReviewMap>({});
+  const [activeFilter, setActiveFilter] = useState<ActivityFilter>('all');
 
   const loadLatestNavigation = useCallback(async () => {
     const stored = await loadPassengerActiveRide();
@@ -791,8 +821,12 @@ export default function ActivitiesScreen() {
   }, [latestNavigation, rides]);
 
   // ── Summary counts ─────────────────────────────────────────────────────────
-  const pendingCount = rides.filter((r) => r.status === 'Pending' || r.status === 'InProgress').length;
-  const completedCount = rides.filter((r) => r.status === 'Completed').length;
+  const pendingCount = rides.filter((r) => ['Pending', 'Accepted', 'InProgress'].includes(getCanonicalRideStatus(r))).length;
+  const completedCount = rides.filter((r) => getCanonicalRideStatus(r) === 'Completed').length;
+  const filteredRides =
+    activeFilter === 'all'
+      ? rides
+      : rides.filter((ride) => getCanonicalRideStatus(ride) === activeFilter);
   const latestRide = latestNavigation
     ? rides.find((ride) => ride.id === latestNavigation.id)
     : null;
@@ -812,9 +846,6 @@ export default function ActivitiesScreen() {
           <Text style={styles.eyebrow}>TRIPS</Text>
           <Text style={styles.title}>Ride Activity</Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchRides(true)}>
-          <Ionicons name="refresh-outline" size={20} color={teal} />
-        </TouchableOpacity>
       </View>
 
       {/* Summary chips */}
@@ -824,6 +855,38 @@ export default function ActivitiesScreen() {
           <SummaryChip icon="hourglass-outline" label="Active" value={String(pendingCount)} />
           <SummaryChip icon="checkmark-done-outline" label="Done" value={String(completedCount)} />
         </View>
+      )}
+
+      {rides.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroller}
+        >
+          {activityFilters.map((filter) => {
+            const isActive = activeFilter === filter.value;
+            const count =
+              filter.value === 'all'
+                ? rides.length
+                : rides.filter((ride) => getCanonicalRideStatus(ride) === filter.value).length;
+
+            return (
+              <TouchableOpacity
+                key={filter.value}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => setActiveFilter(filter.value)}
+              >
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  {filter.label}
+                </Text>
+                <Text style={[styles.filterChipCount, isActive && styles.filterChipCountActive]}>
+                  {count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       )}
 
       {canResumeNavigation && (
@@ -874,7 +937,7 @@ export default function ActivitiesScreen() {
         </View>
       ) : (
         <FlatList
-          data={rides}
+          data={filteredRides}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <RideCard
@@ -903,7 +966,9 @@ export default function ActivitiesScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<EmptyState />}
+          ListEmptyComponent={
+            rides.length === 0 ? <EmptyState /> : <FilteredEmptyState />
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -980,18 +1045,64 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '900',
   },
-  refreshBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#E7F5F3',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#D9E9E6',
-    marginTop: 4,
-  },
   summaryRow: {
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 20,
     marginBottom: 14,
+  },
+  filterScroller: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 46,
+    maxHeight: 46,
+    marginBottom: 14,
+  },
+  filterRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  filterChip: {
+    height: 34,
+    flexShrink: 0,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  filterChipActive: {
+    borderColor: '#C6E7E4',
+    backgroundColor: '#E7F5F3',
+  },
+  filterChipText: {
+    color: '#617C79',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  filterChipTextActive: {
+    color: teal,
+  },
+  filterChipCount: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#F4F8F7',
+    color: '#617C79',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  filterChipCountActive: {
+    backgroundColor: teal,
+    color: '#FFFFFF',
   },
   resumeNavBtn: {
     marginHorizontal: 20,

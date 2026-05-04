@@ -2,13 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator, ScrollView, Alert, Animated, Modal, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/context/auth-context';
 import { savePassengerActiveRide } from '@/lib/activeRideStorage';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { CustomOsmMap, CustomOsmMapRef, OsmMarker, OsmPolyline } from '@/components/CustomOsmMap';
+import { VehicleCategoryIcon } from '@/components/VehicleCategoryIcon';
 
 const teal = '#169F95';
 
@@ -29,6 +29,7 @@ type AcceptedRideData = {
   rideId: string;
   driverId: string;
   driverName?: string;
+  driverImage?: string;
   vehicleType: string;
   status?: string;
   pickup?: {
@@ -81,7 +82,7 @@ const getSocketVehicleType = (category: string) => normalizeVehicleCategory(cate
 export default function ConfirmRouteScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<CustomOsmMapRef>(null);
   const socketRef = useRef<Socket | null>(null);
   const cancelRequestedRef = useRef(false);
   const { user } = useAuth();
@@ -92,6 +93,7 @@ export default function ConfirmRouteScreen() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState('Mini');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'WALLET'>('CASH');
   const [promoCode, setPromoCode] = useState(() => {
     const initialPromoCode = params.promoCode;
     return typeof initialPromoCode === 'string' ? initialPromoCode.toUpperCase() : '';
@@ -225,6 +227,7 @@ export default function ConfirmRouteScreen() {
         id: data.rideId,
         driverId: data.driverId,
         driverName: data.driverName ?? 'Driver',
+        driverImage: data.driverImage ?? '',
         vehicleType: data.vehicleType ?? selectedVehicle,
         status: data.status ?? 'Accepted',
         pLat: String(data.pickup?.latitude ?? pLat),
@@ -241,6 +244,7 @@ export default function ConfirmRouteScreen() {
         rideId: data.rideId,
         driverId: data.driverId,
         driverName: data.driverName ?? 'Driver',
+        driverImage: data.driverImage ?? '',
         vehicleType: data.vehicleType ?? selectedVehicle,
         status: data.status ?? 'Accepted',
         pickup: data.pickup,
@@ -332,11 +336,16 @@ export default function ConfirmRouteScreen() {
 
   // ── confirmRide ────────────────────────────────────────────────────────────
   const PRICE_MAP: Record<string, number> = {
-    Bike: 850,
-    Tuk: 1115,
-    Mini: 1301,
-    Car: 1450,
-    Van: 2100,
+    Bike: 70,
+    Tuk: 150,
+    Mini: 300,
+    Car: 350,
+    Van: 1250,
+  };
+
+  const parseDistanceKm = (value: string) => {
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
   };
 
   const formatMoney = (value: number) => `LKR ${Math.max(0, Math.round(value))}`;
@@ -353,7 +362,11 @@ export default function ConfirmRouteScreen() {
     return Math.min(price, numericValue);
   };
 
-  const basePrice = PRICE_MAP[selectedVehicle] ?? PRICE_MAP.Mini;
+  const distanceKm = parseDistanceKm(distance) ?? 1;
+  const baseRate = PRICE_MAP[selectedVehicle] ?? PRICE_MAP.Mini;
+  const basePrice = baseRate * distanceKm;
+  const getEstimatedFare = (category: string) =>
+    formatMoney((PRICE_MAP[category] ?? PRICE_MAP.Mini) * distanceKm);
   const discountAmount = appliedPromotion ? getDiscountAmount(appliedPromotion, basePrice) : 0;
   const finalPrice = Math.max(0, basePrice - discountAmount);
 
@@ -409,6 +422,7 @@ export default function ConfirmRouteScreen() {
         id: acceptedData.rideId,
         driverId: acceptedData.driverId,
         driverName: acceptedData.driverName ?? 'Driver',
+        driverImage: acceptedData.driverImage ?? '',
         vehicleType: acceptedData.vehicleType ?? selectedVehicle,
         status: acceptedData.status ?? 'Accepted',
         pLat: String(acceptedData.pickup?.latitude ?? pLat),
@@ -423,12 +437,16 @@ export default function ConfirmRouteScreen() {
     });
   };
 
-  const confirmRide = () => {
+  const confirmRide = async () => {
     if (!socketRef.current?.connected) {
       Alert.alert('Not Connected', 'Unable to reach the server. Please check your connection.');
       return;
     }
     if (!user?.id) {
+      Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
+      return;
+    }
+    if (!token) {
       Alert.alert('Not Logged In', 'Please sign in before booking a ride.');
       return;
     }
@@ -455,35 +473,115 @@ export default function ConfirmRouteScreen() {
     const socketVehicleType = getSocketVehicleType(selectedVehicle);
     const ridePrice = finalPrice;
 
-    socketRef.current.emit('requestRide', {
-      passengerId: user.id,
-      passengerName: user.fullName ?? 'Passenger',
-      vehicleType: socketVehicleType,
-      price: ridePrice,
-      promotion: appliedPromotion
-        ? {
-            id: appliedPromotion.id,
-            code: appliedPromotion.code,
-          }
-        : null,
-      pickup: {
-        latitude: pLat,
-        longitude: pLng,
-        name: pName ?? '',
-      },
-      dropoff: {
-        latitude: dLat,
-        longitude: dLng,
-        name: dName ?? '',
-      },
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/rides`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          passengerName: user.fullName ?? 'Passenger',
+          vehicleType: socketVehicleType,
+          price: ridePrice,
+          paymentMethod,
+          promotion: appliedPromotion
+            ? {
+                id: appliedPromotion.id,
+                code: appliedPromotion.code,
+              }
+            : null,
+          pickup: {
+            latitude: pLat,
+            longitude: pLng,
+            name: pName ?? '',
+          },
+          dropoff: {
+            latitude: dLat,
+            longitude: dLng,
+            name: dName ?? '',
+          },
+        }),
+      });
+      const data = await parseApiResponse<{ ride: { id?: string; _id?: string } }>(response);
+      const rideId = data.ride.id ?? data.ride._id ?? null;
 
-    console.log('[Passenger] requestRide emitted for vehicle:', selectedVehicle, socketVehicleType);
+      if (rideId) {
+        if (cancelRequestedRef.current) {
+          socketRef.current?.emit('cancelRide', { rideId });
+          setCurrentRideId(null);
+        } else {
+          setCurrentRideId(rideId);
+        }
+      }
+
+      console.log('[Passenger] ride created via REST for vehicle:', selectedVehicle, socketVehicleType);
+    } catch (error) {
+      console.error('[Passenger] create ride failed:', error);
+      setRideRequesting(false);
+      setOverlayState(null);
+      pulseAnim.stopAnimation();
+      cancelRequestedRef.current = false;
+      setHasActiveRide(false);
+      Alert.alert('Request Failed', error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+    }
   };
 
   // Derived price calculator for dynamic button
   const displayBasePrice = formatMoney(basePrice);
   const displayFinalPrice = formatMoney(finalPrice);
+  const mapPolylines: OsmPolyline[] = [
+    ...routesData.slice(1).flatMap((route, index) => [
+      { id: `alt-${index}-outer`, coordinates: route.coords, color: '#B0B0B0', width: 6, opacity: 0.82 },
+      { id: `alt-${index}-inner`, coordinates: route.coords, color: '#E0E0E0', width: 3, opacity: 0.95 },
+    ]),
+    ...(routesData[0]
+      ? [
+          { id: 'primary-outer', coordinates: routesData[0].coords, color: '#017270', width: 8, opacity: 0.92 },
+          { id: 'primary-inner', coordinates: routesData[0].coords, color: '#169F95', width: 4, opacity: 1 },
+        ]
+      : []),
+  ];
+  const mapMarkers: OsmMarker[] = [
+    ...(pLat && pLng
+      ? [{ id: 'pickup', coordinate: { latitude: pLat, longitude: pLng }, color: '#169F95', label: 'Pickup', kind: 'label' as const, zIndex: 30 }]
+      : []),
+    ...(dLat && dLng
+      ? [{ id: 'dropoff', coordinate: { latitude: dLat, longitude: dLng }, color: '#E74C3C', label: 'Dropoff', kind: 'label' as const, zIndex: 40 }]
+      : []),
+    ...(routesData[0]?.coords.length
+      ? [{
+          id: 'primary-route-label',
+          coordinate: routesData[0].coords[Math.floor(routesData[0].coords.length / 2)],
+          color: '#017270',
+          label: 'Local Fastest',
+          kind: 'label' as const,
+          zIndex: 50,
+        }]
+      : []),
+    ...(routesData[1]?.coords.length
+      ? [{
+          id: 'alt-route-label',
+          coordinate: routesData[1].coords[Math.floor(routesData[1].coords.length / 2)],
+          color: '#526E6C',
+          label: 'Short Way',
+          kind: 'label' as const,
+          zIndex: 45,
+        }]
+      : []),
+    ...availableDrivers.map((driver) => {
+      const markerCategory = normalizeVehicleCategory(driver.vehicleCategory || selectedVehicle);
+      const marker = VEHICLE_MARKERS[markerCategory];
+      return {
+        id: `driver-${driver.driverId}`,
+        coordinate: { latitude: driver.latitude, longitude: driver.longitude },
+        color: marker.color,
+        title: `${markerCategory} driver`,
+        kind: 'vehicle' as const,
+        zIndex: 60,
+      };
+    }),
+  ];
 
   return (
     <View style={styles.container}>
@@ -492,138 +590,18 @@ export default function ConfirmRouteScreen() {
 
       {/* Map Background */}
       <View style={styles.mapPlaceholder}>
-        <MapView
+        <CustomOsmMap
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          mapType="none"
-          loadingEnabled={MAP_LOADING_ENABLED}
-          loadingBackgroundColor="#EAE6DF"
-          loadingIndicatorColor="#169F95"
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          toolbarEnabled={false}
           initialRegion={{
             latitude: pLat || 6.9271,
             longitude: pLng || 79.8612,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
-          }}>
-          <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-
-          {/* Pickup Marker */}
-          {pLat && pLng && (
-            <Marker coordinate={{ latitude: pLat, longitude: pLng }} anchor={{ x: 0.5, y: 1 }} zIndex={3} tracksViewChanges={false}>
-              <View style={styles.mapLabelPill}>
-                <View style={[styles.mapLabelDot, { backgroundColor: '#169F95' }]} />
-                <Text style={styles.mapLabelText} numberOfLines={1}>Pickup</Text>
-              </View>
-              <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
-            </Marker>
-          )}
-
-          {/* Dropoff Marker */}
-          {dLat && dLng && (
-            <Marker coordinate={{ latitude: dLat, longitude: dLng }} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
-              <View style={styles.mapLabelPill}>
-                <View style={[styles.mapLabelDot, { backgroundColor: '#E74C3C' }]} />
-                <Text style={styles.mapLabelText} numberOfLines={1}>Dropoff</Text>
-              </View>
-              <View style={[styles.mapLabelPointer, { borderTopColor: '#FFFFFF' }]} />
-            </Marker>
-          )}
-
-          {/* Alternative Routes (Rendered First so they are beneath primary) */}
-          {routesData.length > 1 && routesData.slice(1).map((route, index) => (
-            <React.Fragment key={`alt-${index}`}>
-              <Polyline
-                coordinates={route.coords}
-                strokeColor="#B0B0B0"
-                strokeWidth={6}
-                lineJoin="round"
-                lineCap="round"
-                zIndex={1}
-              />
-              <Polyline
-                coordinates={route.coords}
-                strokeColor="#E0E0E0"
-                strokeWidth={3}
-                lineJoin="round"
-                lineCap="round"
-                zIndex={1}
-              />
-            </React.Fragment>
-          ))}
-
-          {/* Primary Route Line Highlight (Outer Border) */}
-          {routesData.length > 0 && (
-            <Polyline
-              coordinates={routesData[0].coords}
-              strokeColor="#017270"
-              strokeWidth={8}
-              lineJoin="round"
-              lineCap="round"
-              zIndex={2}
-            />
-          )}
-          {/* Primary Route Line Core (Inner) */}
-          {routesData.length > 0 && (
-            <Polyline
-              coordinates={routesData[0].coords}
-              strokeColor="#169F95"
-              strokeWidth={4}
-              lineJoin="round"
-              lineCap="round"
-              zIndex={3}
-            />
-          )}
-
-          {/* Primary Route Label Midway */}
-          {routesData.length > 0 && (
-            <Marker coordinate={routesData[0].coords[Math.floor(routesData[0].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={5} tracksViewChanges={false}>
-              <View style={styles.routeTagPill}>
-                <Text style={styles.routeTagText}>Local Fastest</Text>
-              </View>
-            </Marker>
-          )}
-
-          {/* Alternative Route Label Midway */}
-          {routesData.length > 1 && (
-            <Marker coordinate={routesData[1].coords[Math.floor(routesData[1].coords.length / 2)]} anchor={{ x: 0.5, y: 0.5 }} zIndex={4} tracksViewChanges={false}>
-              <View style={[styles.routeTagPill, { backgroundColor: '#FFFFFF', borderColor: '#B0B0B0' }]}>
-                <Text style={[styles.routeTagText, { color: '#526E6C' }]}>Short Way</Text>
-              </View>
-            </Marker>
-          )}
-
-          {/* Categorized Driver Markers with Fade Transition */}
-          {availableDrivers.map((driver) => {
-            const markerCategory = normalizeVehicleCategory(driver.vehicleCategory || selectedVehicle);
-            const marker = VEHICLE_MARKERS[markerCategory];
-
-            return (
-              <Marker
-                key={driver.driverId}
-                coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                zIndex={5}
-                tracksViewChanges={false}
-              >
-                <Animated.View
-                  style={[
-                    styles.driverMarker,
-                    {
-                      opacity: driversFadeAnim,
-                      backgroundColor: marker.bg,
-                      borderColor: marker.color,
-                    },
-                  ]}>
-                  <MaterialCommunityIcons name={marker.icon} size={21} color={marker.color} />
-                  <View style={[styles.driverMarkerDot, { backgroundColor: marker.color }]} />
-                </Animated.View>
-              </Marker>
-            );
-          })}
-        </MapView>
+          }}
+          markers={mapMarkers}
+          polylines={mapPolylines}
+        />
       </View>
 
       {/* Back Button */}
@@ -690,45 +668,55 @@ export default function ConfirmRouteScreen() {
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Bike' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Bike')}>
-                  <MaterialCommunityIcons name="motorbike" size={26} color={selectedVehicle === 'Bike' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Bike' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Bike" size={32} active={selectedVehicle === 'Bike'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Bike' && { color: '#FFF' }]}>Bike</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && { color: '#FFF' }]}>LKR 850</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Bike' && { color: '#FFF' }]}>{getEstimatedFare('Bike')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Bike' && { color: '#FFF' }]}>15 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Tuk' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Tuk')}>
-                  <MaterialCommunityIcons name="train-car" size={26} color={selectedVehicle === 'Tuk' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Tuk' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Tuk" size={32} active={selectedVehicle === 'Tuk'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>Tuk</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>LKR 1115</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>{getEstimatedFare('Tuk')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Tuk' && { color: '#FFF' }]}>28 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Mini' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Mini')}>
-                  <MaterialCommunityIcons name="car" size={26} color={selectedVehicle === 'Mini' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Mini' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Mini" size={32} active={selectedVehicle === 'Mini'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Mini' && { color: '#FFF' }]}>Mini</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && { color: '#FFF' }]}>LKR 1301</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Mini' && { color: '#FFF' }]}>{getEstimatedFare('Mini')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Mini' && { color: '#FFF' }]}>26 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Car' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Car')}>
-                  <MaterialCommunityIcons name="car-estate" size={26} color={selectedVehicle === 'Car' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Car' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Car" size={32} active={selectedVehicle === 'Car'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Car' && { color: '#FFF' }]}>Car</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>LKR 1450</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Car' && { color: '#FFF' }]}>{getEstimatedFare('Car')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Car' && { color: '#FFF' }]}>24 min</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.rideSquare, selectedVehicle === 'Van' && styles.activeRideSquare]}
                   onPress={() => setSelectedVehicle('Van')}>
-                  <MaterialCommunityIcons name="van-passenger" size={26} color={selectedVehicle === 'Van' ? '#FFF' : '#017270'} />
+                  <View style={[styles.vehicleCategoryIconWrap, selectedVehicle === 'Van' && styles.vehicleCategoryIconWrapActive]}>
+                    <VehicleCategoryIcon category="Van" size={32} active={selectedVehicle === 'Van'} />
+                  </View>
                   <Text style={[styles.rideSquareTitle, selectedVehicle === 'Van' && { color: '#FFF' }]}>Van</Text>
-                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && { color: '#FFF' }]}>LKR 2100</Text>
+                  <Text style={[styles.rideSquarePrice, selectedVehicle === 'Van' && { color: '#FFF' }]}>{getEstimatedFare('Van')}</Text>
                   <Text style={[styles.rideSquareETA, selectedVehicle === 'Van' && { color: '#FFF' }]}>30 min</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -781,14 +769,29 @@ export default function ConfirmRouteScreen() {
 
                   <View style={styles.formDivider} />
 
-                  <TouchableOpacity style={styles.paymentMethodRow} activeOpacity={0.82}>
+                  <TouchableOpacity
+                    style={styles.paymentMethodRow}
+                    activeOpacity={0.82}
+                    onPress={() => {
+                      Alert.alert('Payment Method', 'Select how you want to pay', [
+                        { text: 'Cash', onPress: () => setPaymentMethod('CASH') },
+                        { text: 'Wallet', onPress: () => setPaymentMethod('WALLET') },
+                        { text: 'Cancel', style: 'cancel' },
+                      ]);
+                    }}>
                     <View style={styles.paymentMethodLeft}>
                       <View style={styles.formIconWrap}>
-                        <MaterialCommunityIcons name="cash" size={18} color="#017270" />
+                        <MaterialCommunityIcons
+                          name={paymentMethod === 'WALLET' ? 'wallet-outline' : 'cash'}
+                          size={18}
+                          color="#017270"
+                        />
                       </View>
                       <View style={styles.paymentTextWrap}>
                         <Text style={styles.formLabel}>Payment method</Text>
-                        <Text style={styles.paymentMethodValue}>Cash</Text>
+                        <Text style={styles.paymentMethodValue}>
+                          {paymentMethod === 'WALLET' ? 'Wallet' : 'Cash'}
+                        </Text>
                       </View>
                     </View>
                     <Feather name="chevron-right" size={18} color="#8A9A9A" />
@@ -1195,6 +1198,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F5F4',
     marginRight: 10,
     alignItems: 'center',
+  },
+  vehicleCategoryIconWrap: {
+    width: 46,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9E9E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  vehicleCategoryIconWrapActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.45)',
   },
   activeRideSquare: {
     backgroundColor: '#017270',

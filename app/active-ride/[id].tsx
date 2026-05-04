@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { Image, View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
 import * as geolib from 'geolib';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
 import { clearPassengerActiveRide, savePassengerActiveRide } from '@/lib/activeRideStorage';
-import { MAP_LOADING_ENABLED, MAP_TILE_URL_TEMPLATE } from '@/lib/mapTiles';
+import { fetchPublicDriverProfile, type PublicDriverProfile } from '@/lib/driverProfiles';
+import { CustomOsmMap, CustomOsmMapRef } from '@/components/CustomOsmMap';
 
 const SOCKET_SERVER_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/api$/, '');
 const teal = '#008080';
@@ -17,6 +17,12 @@ const formatMoney = (value?: number | string | null) => {
     const amount = Number(value ?? 0);
     if (!Number.isFinite(amount)) return 'LKR 0';
     return `LKR ${amount.toLocaleString()}`;
+};
+
+const formatDriverVehicle = (driver?: PublicDriverProfile | null, fallbackVehicleType = 'Vehicle') => {
+    const vehicle = driver?.vehicle;
+    const parts = [vehicle?.color, vehicle?.make, vehicle?.model].filter(Boolean);
+    return parts.length ? parts.join(' ') : vehicle?.category || fallbackVehicleType;
 };
 
 // Types
@@ -50,7 +56,7 @@ async function fetchOsrmRoute(from: LatLng, to: LatLng) {
 export default function ActiveRideScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<CustomOsmMapRef>(null);
     const socketRef = useRef<Socket | null>(null);
     const { user, token } = useAuth();
 
@@ -65,6 +71,7 @@ export default function ActiveRideScreen() {
     const drLng = parseFloat(params.drLng as string);
     const vehicleType = params.vehicleType as string || 'Vehicle';
     const driverName = params.driverName as string || 'Driver';
+    const driverImage = params.driverImage as string || '';
     const statusParam = params.status as string || 'Accepted';
 
     const pickup = useMemo<LatLng>(() => ({ latitude: pLat, longitude: pLng }), [pLat, pLng]);
@@ -87,6 +94,14 @@ export default function ActiveRideScreen() {
     const [arrivalCode, setArrivalCode] = useState<string | null>(null);
     const [paymentVisible, setPaymentVisible] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState<string>('LKR 0');
+    const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+    const [driverProfile, setDriverProfile] = useState<PublicDriverProfile | null>(null);
+
+    const displayDriverName = driverProfile?.fullName || driverName;
+    const displayDriverImage = driverProfile?.profileImageUrl || driverImage;
+    const displayVehicle = formatDriverVehicle(driverProfile, vehicleType);
+    const displayPlate = driverProfile?.vehicle?.plateNumber || '';
+    const displayRating = driverProfile?.ratingCount ? driverProfile.ratingAverage.toFixed(1) : 'New';
 
     useEffect(() => {
         if (!rideId) return;
@@ -95,6 +110,7 @@ export default function ActiveRideScreen() {
             id: rideId,
             driverId,
             driverName,
+            driverImage,
             vehicleType,
             status: activeStatus,
             pLat: String(pLat),
@@ -110,6 +126,7 @@ export default function ActiveRideScreen() {
         dLat,
         dLng,
         driverId,
+        driverImage,
         driverName,
         drLat,
         drLng,
@@ -118,6 +135,27 @@ export default function ActiveRideScreen() {
         rideId,
         vehicleType,
     ]);
+
+    useEffect(() => {
+        if (!driverId && !rideId) return;
+
+        let active = true;
+        fetchPublicDriverProfile(driverId, rideId)
+            .then((profile) => {
+                if (active) {
+                    setDriverProfile(profile);
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setDriverProfile(null);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [driverId, rideId]);
 
     // Map Phase Route Computation
     useEffect(() => {
@@ -255,6 +293,30 @@ export default function ActiveRideScreen() {
     }, [rideId, token]);
 
     const pathColor = phase === 'TRACK_DRIVER' ? teal : '#1A365D';
+    const mapMarkers = [
+        ...(driverPos
+            ? [{
+                id: 'driver',
+                coordinate: driverPos,
+                color: teal,
+                heading: driverHeading,
+                kind: 'vehicle' as const,
+                title: displayDriverName,
+                zIndex: 50,
+            }]
+            : []),
+        {
+            id: 'target',
+            coordinate: phase === 'TRACK_DRIVER' ? pickup : dropoff,
+            color: pathColor,
+            kind: 'pin' as const,
+            title: phase === 'TRACK_DRIVER' ? 'Pickup' : 'Drop-off',
+            zIndex: 40,
+        },
+    ];
+    const mapPolylines = slicedRouteCoords.length > 0
+        ? [{ id: 'active-route', coordinates: slicedRouteCoords, color: pathColor, width: 5 }]
+        : [];
     const openDriverProfile = () => {
         if (!driverId) return;
 
@@ -262,55 +324,48 @@ export default function ActiveRideScreen() {
             pathname: '/driver-profile/[id]',
             params: {
                 id: driverId,
-                name: driverName,
+                name: displayDriverName,
+                image: displayDriverImage,
                 rideId,
             },
         });
     };
 
+    const handleConfirmPayment = async () => {
+        if (!token || !rideId || paymentSubmitting) return;
+
+        try {
+            setPaymentSubmitting(true);
+            const response = await fetch(`${API_BASE_URL}/rides/${rideId}/confirm-payment`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            await parseApiResponse(response);
+
+            setPaymentVisible(false);
+            router.replace('/(tabs)');
+        } catch (error) {
+            console.log('[ActiveRide] confirm payment failed:', error);
+        } finally {
+            setPaymentSubmitting(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
-            <MapView
+            <CustomOsmMap
                 ref={mapRef}
                 style={StyleSheet.absoluteFillObject}
-                mapType="none"
-                loadingEnabled={MAP_LOADING_ENABLED}
-                loadingBackgroundColor="#EAE6DF"
-                loadingIndicatorColor="#169F95"
-                showsUserLocation={false}
-                showsMyLocationButton={false}
-                toolbarEnabled={false}
                 initialRegion={{
                     latitude: Number.isFinite(pLat) ? pLat : 6.9271,
                     longitude: Number.isFinite(pLng) ? pLng : 79.8612,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05
-                }}>
-                <UrlTile urlTemplate={MAP_TILE_URL_TEMPLATE} maximumZ={19} flipY={false} />
-
-                {/* Dynamic Route */}
-                {slicedRouteCoords.length > 0 && (
-                    <Polyline coordinates={slicedRouteCoords} strokeColor={pathColor} strokeWidth={5} lineCap="round" lineJoin="round" zIndex={3} />
-                )}
-
-                {/* Driver Marker */}
-                {driverPos && (
-                    <Marker coordinate={driverPos} anchor={{ x: 0.5, y: 0.5 }} rotation={driverHeading} zIndex={5} tracksViewChanges={false}>
-                        <View style={styles.driverCar}>
-                            <Ionicons name="car-sport" size={20} color="#FFF" />
-                        </View>
-                    </Marker>
-                )}
-
-                {/* Target Marker */}
-                <Marker coordinate={phase === 'TRACK_DRIVER' ? pickup : dropoff} anchor={{ x: 0.5, y: 1 }} zIndex={4} tracksViewChanges={false}>
-                    <View style={styles.nexusMarker}>
-                        <View style={[styles.markerRing, { backgroundColor: pathColor }]} />
-                    </View>
-                    <View style={[styles.markerPointer, { borderTopColor: '#FFF' }]} />
-                </Marker>
-            </MapView>
+                }}
+                markers={mapMarkers}
+                polylines={mapPolylines}
+            />
 
             {/* Safety Header Back Btn */}
             <View style={styles.topNav}>
@@ -332,11 +387,27 @@ export default function ActiveRideScreen() {
                         onPress={openDriverProfile}
                         disabled={!driverId}
                         activeOpacity={0.75}>
-                        <Ionicons name="person" size={24} color="#FFF" />
+                        {displayDriverImage ? (
+                            <Image source={{ uri: displayDriverImage }} style={styles.avatarImage} />
+                        ) : (
+                            <Ionicons name="person" size={24} color="#FFF" />
+                        )}
                     </TouchableOpacity>
                     <View style={styles.metaCol}>
-                        <Text style={styles.driverName}>{driverName}</Text>
-                        <Text style={styles.vehicleType}>{vehicleType} • {distance}</Text>
+                        <Text style={styles.driverName}>{displayDriverName}</Text>
+                        <Text style={styles.vehicleType}>{displayVehicle} • {distance}</Text>
+                        <View style={styles.driverDetailRow}>
+                            <View style={styles.driverDetailPill}>
+                                <Ionicons name="star" size={12} color="#D79A00" />
+                                <Text style={styles.driverDetailText}>{displayRating}</Text>
+                            </View>
+                            {displayPlate ? (
+                                <View style={styles.driverDetailPill}>
+                                    <Ionicons name="card-outline" size={12} color={teal} />
+                                    <Text style={styles.driverDetailText}>{displayPlate}</Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
                     <TouchableOpacity style={styles.callIcon}>
                         <Ionicons name="call" size={20} color="#FFF" />
@@ -376,11 +447,11 @@ export default function ActiveRideScreen() {
                         <Text style={styles.paymentValue}>{paymentAmount}</Text>
                         <TouchableOpacity
                             style={styles.paymentButton}
-                            onPress={() => {
-                                setPaymentVisible(false);
-                                router.replace('/(tabs)');
-                            }}>
-                            <Text style={styles.paymentButtonText}>Confirm Payment</Text>
+                            onPress={handleConfirmPayment}
+                            disabled={paymentSubmitting}>
+                            <Text style={styles.paymentButtonText}>
+                                {paymentSubmitting ? 'Processing...' : 'Confirm Payment'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -425,7 +496,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7FBFA', padding: 16, borderRadius: 24, borderWidth: 1, borderColor: '#E6F5F4'
     },
     avatar: {
-        width: 50, height: 50, borderRadius: 25, backgroundColor: '#C8DDD9', justifyContent: 'center', alignItems: 'center'
+        width: 50, height: 50, borderRadius: 25, backgroundColor: '#C8DDD9', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'
+    },
+    avatarImage: {
+        width: '100%', height: '100%'
     },
     metaCol: {
         flex: 1, marginLeft: 16
@@ -435,6 +509,15 @@ const styles = StyleSheet.create({
     },
     vehicleType: {
         fontSize: 14, fontWeight: '600', color: '#6AA8A4', marginTop: 4
+    },
+    driverDetailRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap'
+    },
+    driverDetailPill: {
+        minHeight: 24, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D9E9E6', paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4
+    },
+    driverDetailText: {
+        color: '#102A28', fontSize: 11, fontWeight: '800'
     },
     callIcon: {
         width: 44, height: 44, borderRadius: 22, backgroundColor: teal, justifyContent: 'center', alignItems: 'center', elevation: 4

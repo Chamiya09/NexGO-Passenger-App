@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth-context';
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import { useResponsiveLayout } from '@/lib/responsive';
 
 type ProfileSection = {
   title: string;
@@ -22,12 +24,11 @@ type ProfileSection = {
   icon: keyof typeof Ionicons.glyphMap;
   route:
     | '/profile/personal-details'
-    | '/profile/membership'
     | '/profile/support-help'
     | '/profile/my-support-tickets'
     | '/profile/my-reviews'
     | '/profile/saved-addresses'
-    | '/profile/payment-details'
+    | '/profile/wallet'
     | '/profile/privacy-security'
     | '/profile/earn-with-nexgo'
     | '/profile/about-us';
@@ -42,16 +43,10 @@ const PROFILE_SECTIONS: ProfileSection[] = [
     route: '/profile/personal-details',
   },
   {
-    title: 'Membership',
-    subtitle: 'See tier benefits and point milestones',
-    icon: 'ribbon-outline',
-    route: '/profile/membership',
-  },
-  {
-    title: 'Payment',
-    subtitle: 'Cards, wallet setup, and transaction methods',
-    icon: 'card-outline',
-    route: '/profile/payment-details',
+    title: 'Wallet',
+    subtitle: 'Top up ride credit and view wallet activity',
+    icon: 'wallet-outline',
+    route: '/profile/wallet',
   },
   {
     title: 'My Reviews',
@@ -100,14 +95,41 @@ const PROFILE_SECTIONS: ProfileSection[] = [
   },
 ];
 
-const PROFILE_METRICS = [
-  { label: 'Points', value: '450', icon: 'star-outline' as const },
-  { label: 'Completed', value: '37', icon: 'checkmark-done-outline' as const },
-  { label: 'Wallet', value: 'PHP 820', icon: 'wallet-outline' as const },
-];
+type WalletSummary = {
+  balance: number;
+  transactions?: unknown[];
+};
+
+type RideSummary = {
+  status?: string;
+  canonicalStatus?: string;
+  review?: unknown;
+};
+
+type ProfileSummary = {
+  walletBalance: number;
+  completedRides: number;
+  reviewedRides: number;
+};
+
+const emptyProfileSummary: ProfileSummary = {
+  walletBalance: 0,
+  completedRides: 0,
+  reviewedRides: 0,
+};
+
+function getRideStatus(ride: RideSummary) {
+  return String(ride.canonicalStatus || ride.status || '').toLowerCase();
+}
+
+function formatMoney(amount: number) {
+  return `LKR ${Number(amount || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })}`;
+}
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const responsive = useResponsiveLayout();
+  const [profileSummary, setProfileSummary] = useState<ProfileSummary>(emptyProfileSummary);
 
   const palette = {
     background: '#F4F8F7',
@@ -130,11 +152,64 @@ export default function ProfileScreen() {
     .map((part) => part[0]?.toUpperCase() || '')
     .join('');
 
+  const loadProfileSummary = useCallback(async () => {
+    if (!token) {
+      setProfileSummary(emptyProfileSummary);
+      return;
+    }
+
+    try {
+      const requestConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      const [walletResponse, ridesResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/auth/wallet`, requestConfig),
+        fetch(`${API_BASE_URL}/rides/my-rides`, requestConfig),
+      ]);
+
+      const [{ wallet }, { rides }] = await Promise.all([
+        parseApiResponse<{ wallet: WalletSummary }>(walletResponse),
+        parseApiResponse<{ rides: RideSummary[] }>(ridesResponse),
+      ]);
+
+      const safeRides = rides ?? [];
+      const completedRides = safeRides.filter((ride) => getRideStatus(ride) === 'completed').length;
+      const reviewedRides = safeRides.filter((ride) => Boolean(ride.review)).length;
+
+      setProfileSummary({
+        walletBalance: Number(wallet?.balance || 0),
+        completedRides,
+        reviewedRides,
+      });
+    } catch {
+      setProfileSummary(emptyProfileSummary);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadProfileSummary();
+  }, [loadProfileSummary]);
+
+  const profileMetrics = useMemo(
+    () => [
+      { label: 'Wallet', value: formatMoney(profileSummary.walletBalance), icon: 'wallet-outline' as const },
+      { label: 'Completed', value: String(profileSummary.completedRides), icon: 'checkmark-done-outline' as const },
+      { label: 'Reviews', value: String(profileSummary.reviewedRides), icon: 'star-outline' as const },
+    ],
+    [profileSummary.completedRides, profileSummary.reviewedRides, profileSummary.walletBalance]
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <StatusBar style="dark" />
-      <RefreshableScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+      <RefreshableScrollView
+        contentContainerStyle={[styles.container, { paddingHorizontal: responsive.screenPadding }]}
+        showsVerticalScrollIndicator={false}
+        onRefreshPage={loadProfileSummary}>
+        <View style={[styles.heroCard, { backgroundColor: palette.card, borderColor: palette.border, padding: responsive.cardPadding }]}>
           <View style={styles.profileHead}>
             <View style={[styles.avatarCircle, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}>
               {user?.profileImageUrl ? (
@@ -149,23 +224,19 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.metricsRow}>
-            {PROFILE_METRICS.map((metric) => (
+            {profileMetrics.map((metric) => (
               <View
                 key={metric.label}
-                style={[styles.metricItem, { backgroundColor: palette.elevatedCard, borderColor: palette.border }]}>
+                style={[
+                  styles.metricItem,
+                  { backgroundColor: palette.elevatedCard, borderColor: palette.border, minWidth: responsive.metricMinWidth },
+                ]}>
                 <Ionicons name={metric.icon} size={16} color={palette.accent} />
                 <Text style={[styles.metricValue, { color: palette.primaryText }]}>{metric.value}</Text>
                 <Text style={[styles.metricLabel, { color: palette.secondaryText }]}>{metric.label}</Text>
               </View>
             ))}
           </View>
-
-          <Pressable
-            style={[styles.quickActionButton, { backgroundColor: palette.accent }]}
-            onPress={() => router.push('/profile/membership')}>
-            <Text style={styles.quickActionText}>Open Membership Hub</Text>
-            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-          </Pressable>
         </View>
 
         <View style={styles.sectionHeadingWrap}>
@@ -239,14 +310,12 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   container: {
-    paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 34,
   },
   heroCard: {
     borderRadius: 22,
     borderWidth: 1,
-    padding: 16,
     marginBottom: 18,
   },
   profileHead: {
@@ -282,6 +351,7 @@ const styles = StyleSheet.create({
   },
   metricsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 14,
   },
@@ -302,20 +372,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  quickActionButton: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  quickActionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
   },
   sectionHeadingWrap: {
     marginBottom: 10,

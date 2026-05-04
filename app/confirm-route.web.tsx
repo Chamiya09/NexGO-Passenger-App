@@ -21,6 +21,36 @@ export default function ConfirmRouteWebScreen() {
   const pName = (params.pName as string) || 'Pickup';
   const dName = (params.dName as string) || 'Drop-off';
   const promoCode = typeof params.promoCode === 'string' ? params.promoCode.toUpperCase() : '';
+  const distanceParam = typeof params.distanceKm === 'string'
+    ? params.distanceKm
+    : typeof params.distance === 'string'
+      ? params.distance
+      : '';
+  const durationParam = typeof params.durationMin === 'string'
+    ? params.durationMin
+    : typeof params.duration === 'string'
+      ? params.duration
+      : '';
+
+  const PRICE_MAP: Record<string, number> = {
+    Bike: 70,
+    Tuk: 150,
+    Mini: 300,
+    Car: 350,
+    Van: 1250,
+  };
+
+  const parseDistanceKm = (value: string) => {
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const formatMoney = (value: number) => `LKR ${Math.max(0, Math.round(value))}`;
+  const distanceKm = parseDistanceKm(distanceParam) ?? 1;
+  const etaLabel = durationParam ? `${Number(durationParam)}m` : '26m';
+  const defaultVehicle = 'Mini';
+  const getEstimatedFare = (category: string) =>
+    formatMoney((PRICE_MAP[category] ?? PRICE_MAP.Mini) * distanceKm);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -54,17 +84,17 @@ export default function ConfirmRouteWebScreen() {
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Ionicons name="navigate-outline" size={18} color={teal} />
-            <Text style={styles.summaryValue}>9.3</Text>
+            <Text style={styles.summaryValue}>{distanceKm.toFixed(1)}</Text>
             <Text style={styles.summaryLabel}>Km</Text>
           </View>
           <View style={styles.summaryCard}>
             <Ionicons name="time-outline" size={18} color={teal} />
-            <Text style={styles.summaryValue}>26m</Text>
+            <Text style={styles.summaryValue}>{etaLabel}</Text>
             <Text style={styles.summaryLabel}>ETA</Text>
           </View>
           <View style={styles.summaryCard}>
             <Ionicons name="cash-outline" size={18} color={teal} />
-            <Text style={styles.summaryValue}>1301</Text>
+            <Text style={styles.summaryValue}>{getEstimatedFare(defaultVehicle).replace('LKR ', '')}</Text>
             <Text style={styles.summaryLabel}>Fare</Text>
           </View>
         </View>
@@ -88,13 +118,15 @@ export default function ConfirmRouteWebScreen() {
         </View>
 
         <View style={styles.quickOptionsRow}>
-          <VehicleOption name="Mini" price="LKR 1301" active />
-          <VehicleOption name="Car" price="LKR 1450" />
-          <VehicleOption name="Van" price="LKR 2100" />
+          <VehicleOption name="Bike" price={getEstimatedFare('Bike')} />
+          <VehicleOption name="Tuk" price={getEstimatedFare('Tuk')} />
+          <VehicleOption name="Mini" price={getEstimatedFare('Mini')} active />
+          <VehicleOption name="Car" price={getEstimatedFare('Car')} />
+          <VehicleOption name="Van" price={getEstimatedFare('Van')} />
         </View>
 
         <TouchableOpacity style={styles.confirmButton}>
-          <Text style={styles.confirmText}>Confirm Mini - LKR 1301</Text>
+          <Text style={styles.confirmText}>Confirm Mini - {getEstimatedFare(defaultVehicle)}</Text>
           <Feather name="chevron-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </RefreshableScrollView>

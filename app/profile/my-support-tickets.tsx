@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
 import RefreshableScrollView from '@/components/RefreshableScrollView';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuth } from '@/context/auth-context';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { API_BASE_URL, parseApiResponse } from '@/lib/api';
@@ -51,6 +52,8 @@ export default function MySupportTicketsScreen() {
   const [editRideReference, setEditRideReference] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editPriority, setEditPriority] = useState<SupportTicket['priority']>('Normal');
+  const [ticketPendingDelete, setTicketPendingDelete] = useState<SupportTicket | null>(null);
+  const [deletingTicket, setDeletingTicket] = useState(false);
 
   const colors = {
     background: useThemeColor({ light: '#F4F8F7', dark: '#151718' }, 'background'),
@@ -179,29 +182,29 @@ export default function MySupportTicketsScreen() {
 
   const deleteTicket = async (ticket: SupportTicket) => {
     if (!token) return;
+    setTicketPendingDelete(ticket);
+  };
 
-    Alert.alert('Delete support ticket', 'This will permanently remove this support ticket.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
+  const confirmDeleteTicket = async () => {
+    if (!token || !ticketPendingDelete) return;
+
+    setDeletingTicket(true);
           try {
-            const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${ticket.id}`, {
+            const response = await fetch(`${API_BASE_URL}/support-tickets/my-tickets/${ticketPendingDelete.id}`, {
               method: 'DELETE',
               headers: {
                 Authorization: `Bearer ${token}`,
               },
             });
             await parseApiResponse<{ id: string; message?: string }>(response);
-            setTickets((current) => current.filter((item) => item.id !== ticket.id));
+            setTickets((current) => current.filter((item) => item.id !== ticketPendingDelete.id));
             setSelectedTicket(null);
+      setTicketPendingDelete(null);
           } catch (error) {
             Alert.alert('Could not delete ticket', error instanceof Error ? error.message : 'Please try again.');
-          }
-        },
-      },
-    ]);
+    } finally {
+      setDeletingTicket(false);
+    }
   };
 
   return (
@@ -210,15 +213,25 @@ export default function MySupportTicketsScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         onRefreshPage={() => loadTickets(true)}>
+        <View style={styles.topBar}>
+          <Pressable style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.textPrimary }]}>My Support Tickets</Text>
+          <View style={styles.topBarSpacer} />
+        </View>
+
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="file-tray-full-outline" size={22} color={colors.accent} />
-          </View>
-          <View style={styles.heroTextWrap}>
-            <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>My Support Tickets</Text>
-            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-              Review your passenger complaints, support status, and admin replies.
-            </Text>
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroIcon, { backgroundColor: colors.accentSoft, borderColor: colors.border }]}>
+              <Ionicons name="file-tray-full-outline" size={26} color={colors.accent} />
+            </View>
+            <View style={styles.heroTextWrap}>
+              <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Ticket Center</Text>
+              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                Complaint status, support replies, and updates.
+              </Text>
+            </View>
           </View>
           <Pressable style={[styles.newTicketButton, { backgroundColor: colors.accent }]} onPress={openSupportForm}>
             <Ionicons name="add" size={18} color="#FFFFFF" />
@@ -503,6 +516,19 @@ export default function MySupportTicketsScreen() {
           </View>
         </View>
       </Modal>
+      <ConfirmDialog
+        visible={Boolean(ticketPendingDelete)}
+        title="Delete support ticket"
+        message="This will permanently remove this support ticket."
+        confirmLabel="Delete"
+        destructive
+        loading={deletingTicket}
+        icon="trash-outline"
+        onCancel={() => {
+          if (!deletingTicket) setTicketPendingDelete(null);
+        }}
+        onConfirm={confirmDeleteTicket}
+      />
     </SafeAreaView>
   );
 }
@@ -516,31 +542,64 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 30,
   },
-  heroCard: {
-    borderRadius: 18,
+  topBar: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    padding: 14,
-    marginBottom: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  topBarSpacer: {
+    width: 38,
+    height: 38,
+  },
+  heroCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+    gap: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   heroIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroTextWrap: {
-    gap: 4,
+    flex: 1,
+    minWidth: 0,
   },
   heroTitle: {
-    fontSize: 21,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
   },
   heroSubtitle: {
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: '600',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   newTicketButton: {
     minHeight: 46,
