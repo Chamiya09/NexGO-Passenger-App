@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { API_BASE_URL, parseApiResponse } from '@/lib/api';
+import { API_BASE_URL, apiFetch, parseApiResponse } from '@/lib/api';
 
 type AuthUser = {
   id: string;
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        const response = await apiFetch(`${API_BASE_URL}/auth/me`, {
           headers: {
             Authorization: `Bearer ${parsedSession.token}`,
           },
@@ -113,12 +113,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async ({ email, password }: LoginPayload) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
       const data = await parseApiResponse<{ token: string; user: AuthUser }>(response);
