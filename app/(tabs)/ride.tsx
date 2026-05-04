@@ -234,7 +234,7 @@ export default function RideScreen() {
         return;
       }
 
-      const permission = await Location.requestForegroundPermissionsAsync();
+      const permission = await Location.getForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
         if (showAlerts) {
           Alert.alert('Location permission needed', 'Allow NexGO to access your location so we can select your current place.');

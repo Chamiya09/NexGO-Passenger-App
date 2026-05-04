@@ -59,6 +59,7 @@ export function useAppPermissions() {
         setChecking(false);
         return;
       }
+      await AsyncStorage.setItem(PERMISSIONS_BOOTSTRAP_KEY, new Date().toISOString());
 
       const nextSummary: PermissionSummary = { ...initialSummary };
 
@@ -127,7 +128,6 @@ export function useAppPermissions() {
       }
 
       setSummary(nextSummary);
-      await AsyncStorage.setItem(PERMISSIONS_BOOTSTRAP_KEY, new Date().toISOString());
     } finally {
       setChecking(false);
       hasStartedRef.current = false;
