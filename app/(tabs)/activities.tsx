@@ -720,8 +720,8 @@ export default function ActivitiesScreen() {
   const handleCancelRide = async (rideId: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/rides/${rideId}/cancel`, {
-        method: 'PATCH',
+      const res = await fetch(`${API_BASE_URL}/rides/${rideId}`, {
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -729,16 +729,7 @@ export default function ActivitiesScreen() {
         throw new Error(body?.message ?? 'Failed to cancel ride');
       }
 
-      // Emit cancel payload to socket so driver gets notified live
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('cancelRide', { rideId });
-      }
-
-      setRides((prev) =>
-        prev.map((r) => (
-          r.id === rideId ? { ...r, status: 'Cancelled', canonicalStatus: 'Cancelled' } : r
-        ))
-      );
+      setRides((prev) => prev.filter((r) => r.id !== rideId));
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Unable to cancel ride');
     }

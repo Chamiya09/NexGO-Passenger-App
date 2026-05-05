@@ -460,13 +460,6 @@ export default function RideScreen() {
         </View>
       </View>
 
-      {/* Back Button */}
-      <SafeAreaView style={styles.topSafeArea}>
-        <TouchableOpacity style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#102A28" />
-        </TouchableOpacity>
-      </SafeAreaView>
-
       {/* Target Location Button */}
       <TouchableOpacity
         style={[styles.targetButton, isLocating && !hasLatestDeviceLocation && styles.targetButtonDisabled]}
